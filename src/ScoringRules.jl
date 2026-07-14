@@ -38,6 +38,8 @@ using DocStringExtensions: TYPEDSIGNATURES, TYPEDEF, TYPEDFIELDS, DOCSTRING, @te
 export crps, logs, dss
 # Multivariate ensemble scores
 export es, vs, mmds
+# Weighted (threshold- and outcome-weighted) ensemble scores
+export twcrps, owcrps, twes, owes, twvs, owvs, twmmds, owmmds
 # Quantile / interval scores and the ranked probability score
 export quantile_score, interval_score, rps
 # Distribution types provided here (not in Distributions.jl)
@@ -72,6 +74,7 @@ include("crps/twopiece.jl")
 # Simulated / ensemble forecasts and sample-based scores
 include("sample/univariate.jl")
 include("sample/multivariate.jl")
+include("sample/weighted.jl")
 include("sample/quantiles.jl")
 include("sample/rps.jl")
 
