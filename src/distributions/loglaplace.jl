@@ -6,6 +6,15 @@
 # Ported from R scoringRules distributionFunctions.R (fllapl/flapl) and
 # scores_llapl.R (Jordan, Krüger, Lerch, Allen).
 
+"""
+    LogLaplace(μ, σ)
+
+The log-Laplace distribution: `X ~ LogLaplace(μ, σ)` iff `log(X) ~ Laplace(μ, σ)`,
+with `μ` the location and `σ > 0` the scale, both on the log scale. Supported on
+the positive reals. The mean exists for `σ < 1` and the variance for `σ < 1/2`.
+Not part of Distributions.jl; provided here so it flows through
+[`crps`](@ref)/[`logs`](@ref)/[`dss`](@ref) dispatch.
+"""
 struct LogLaplace{T<:Real} <: ContinuousUnivariateDistribution
     μ::T  # location on log scale
     σ::T  # scale on log scale (> 0)

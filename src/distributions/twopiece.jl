@@ -31,6 +31,15 @@
 const _SQRT2DIVPI = sqrt(2 / π)
 const _2DIVPI     = 2 / π
 
+"""
+    TwoPieceNormal(location, scale1, scale2)
+
+The two-piece (split) normal distribution: a normal density with scale `scale1`
+below `location` and `scale2` above it, renormalised to a proper density. With
+`scale1 == scale2` it reduces to `Normal(location, scale1)`. Not part of
+Distributions.jl; provided here so it flows through
+[`crps`](@ref)/[`logs`](@ref)/[`dss`](@ref) dispatch.
+"""
 struct TwoPieceNormal{T<:Real} <: ContinuousUnivariateDistribution
     location::T
     scale1::T  # left-arm scale  (> 0)
@@ -139,6 +148,14 @@ end
 #         = 2σ₁² − 2σ₁σ₂ + 2σ₂² − σ₂² + 2σ₁σ₂ − σ₁²
 #         = σ₁² + σ₂²
 
+"""
+    TwoPieceExponential(location, scale1, scale2)
+
+The two-piece (double / asymmetric) exponential distribution: back-to-back
+exponential tails with scale `scale1` below `location` and `scale2` above it.
+Not part of Distributions.jl; provided here so it flows through
+[`crps`](@ref)/[`logs`](@ref)/[`dss`](@ref) dispatch.
+"""
 struct TwoPieceExponential{T<:Real} <: ContinuousUnivariateDistribution
     location::T
     scale1::T  # left-arm scale  (> 0)

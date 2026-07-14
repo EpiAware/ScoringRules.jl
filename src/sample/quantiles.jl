@@ -122,7 +122,7 @@ estimated from an ensemble `dat`.  Mirrors `qs_sample` in
 - `dat`  — `AbstractVector` of ensemble draws.
 - `y`    — scalar observation.
 - `alpha` — quantile level α ∈ (0, 1).
-- `type`  — quantile interpolation type (1–9), passed to `Statistics.quantile`;
+- `type`  — quantile interpolation type (1–9), passed to `quantile`;
             default 7 matches R's default.
 
 # Returns
@@ -134,7 +134,7 @@ The empirical α-quantile `q̂` is computed from `dat`, and the score is
 """
 function quantile_score(dat::AbstractVector, y::Real;
                         alpha::Real, type::Int=7)
-    q_hat = Statistics.quantile(dat, alpha)   # type-7 by default in Julia
+    q_hat = quantile(dat, alpha)   # type-7 by default in Julia
     return _qs_quantile(y, q_hat, alpha)
 end
 
@@ -198,6 +198,6 @@ function interval_score(dat::AbstractVector, y::Real;
                         level::Real, type::Int=7)
     alpha1 = 0.5 * (1 - level)
     alpha2 = 1 - alpha1
-    qs     = Statistics.quantile(dat, [alpha1, alpha2])
+    qs     = quantile(dat, [alpha1, alpha2])
     return _ints_quantile(y, qs[1], qs[2], level)
 end

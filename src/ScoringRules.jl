@@ -29,7 +29,7 @@ using SpecialFunctions: erf, erfc, gamma, loggamma, digamma, beta_inc, logbeta,
 using LogExpFunctions: logistic
 using HypergeometricFunctions: _₂F₁
 using QuadGK: quadgk
-using Statistics: mean, var, std
+using Statistics: mean, var, std, quantile
 using LinearAlgebra: norm
 using Random: AbstractRNG
 using DocStringExtensions: TYPEDSIGNATURES, TYPEDEF, TYPEDFIELDS, DOCSTRING, @template
