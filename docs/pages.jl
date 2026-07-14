@@ -21,15 +21,14 @@ pages = [
     "Getting started" => [
         "Overview" => "getting-started/index.md",
         "Tutorials" => [
-            "Automatic differentiation backends" =>
-                "getting-started/tutorials/ad-backends.md"
+            "Automatic differentiation backends" => "getting-started/tutorials/ad-backends.md"
         ]
     ],
     "Guide" => [
-        "Forecast input modes"       => "guide/input-modes.md",
-        "Scoring rules reference"    => "guide/scoring-rules-reference.md",
-        "Supported distributions"    => "guide/distributions.md",
-        "Differences from R"         => "guide/differences-from-r.md",
+        "Forecast input modes" => "guide/input-modes.md",
+        "Scoring rules reference" => "guide/scoring-rules-reference.md",
+        "Supported distributions" => "guide/distributions.md",
+        "Differences from R" => "guide/differences-from-r.md"
     ],
     "API reference" => [
         "Public API" => "lib/public.md",
