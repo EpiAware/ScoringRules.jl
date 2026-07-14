@@ -7,7 +7,11 @@
     const DATA_DIR = joinpath(@__DIR__, "references", "data")
 
     _tof(x::Number) = Float64(x)
-    _tof(x::AbstractString) = parse(Float64, strip(x))
+    function _tof(x::AbstractString)
+        s = strip(strip(x, '"'))
+        (s == "NA" || s == "NaN") && return NaN
+        return parse(Float64, s)
+    end
 
     "Load reference table `name` as a `Dict{String, Vector{Float64}}` plus row count."
     function load(name::AbstractString)
