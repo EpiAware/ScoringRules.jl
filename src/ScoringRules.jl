@@ -24,7 +24,8 @@ module ScoringRules
 using Distributions
 using Distributions: UnivariateDistribution, ContinuousUnivariateDistribution,
                      DiscreteUnivariateDistribution, Truncated, Censored
-using SpecialFunctions: erf, erfc, gamma, loggamma, digamma, beta_inc, logbeta
+using SpecialFunctions: erf, erfc, gamma, loggamma, digamma, beta_inc, logbeta,
+                        besseli, expinti, gamma_inc
 using LogExpFunctions: logistic
 using HypergeometricFunctions: _₂F₁
 using QuadGK: quadgk
@@ -41,5 +42,16 @@ include("generics.jl")
 
 # Closed-form CRPS per distribution family
 include("crps/normal.jl")
+include("crps/logistic.jl")
+include("crps/student.jl")
+include("crps/laplace.jl")
+include("crps/exponential.jl")
+include("crps/gamma.jl")
+include("crps/beta.jl")
+include("crps/uniform.jl")
+include("crps/lognormal.jl")
+include("crps/extremes.jl")
+include("crps/mixture.jl")
+include("crps/discrete.jl")
 
 end # module ScoringRules
