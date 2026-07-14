@@ -1,0 +1,122 @@
+# MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
+#
+# Scheduled template-sync. Re-applies the managed EpiAware standard
+# (`scaffold_update("."; ad = true, benchmarks = false, downgrade_compat = true)`) and, when the
+# committed infra has drifted from
+# the kit, opens (or refreshes) a PR with the refresh. This is the auto-refresh
+# half of the self-sync loop: the `self-drift` check guards every push/PR, and
+# this workflow proactively pulls the newest standard on a schedule and reports
+# drift on Dependabot action bumps so a repo never silently falls behind.
+#
+# Refs are preserved: `scaffold_update` keeps whatever reusable-workflow SHA Dependabot
+# has pinned in this repo, so a sync never reverts a Dependabot bump — it only
+# re-applies the rest of the managed standard.
+#
+# The sync only ever pushes to a branch it opened itself (#215). On a
+# Dependabot PR it re-applies the standard to detect drift and reports it, but
+# does not commit: pushing a re-apply onto someone else's branch silently
+# reverted package-owned overrides that live in managed files, so a merged
+# bump carried an unrelated regression that never appeared in its own diff.
+
+name: Template sync
+
+on:
+  schedule:
+    # Weekly, Monday 04:00 UTC.
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+  # React to Dependabot action/package bumps (the job below gates to the
+  # dependabot actor so other PRs do not trigger a sync).
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    # Schedule / manual runs always; PR runs only for Dependabot.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      # For a Dependabot PR, check out its branch so the sync amends that PR;
+      # otherwise check out the triggering ref (the default branch).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - name: Re-apply the managed EpiAware standard
+        run: |
+          julia --color=yes -e '
+              using Pkg
+              Pkg.activate(; temp = true); Pkg.add(url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main")
+              using EpiAwarePackageTools
+              res = scaffold_update("."; ad = true, benchmarks = false, downgrade_compat = true)
+              println("re-applied ", length(res.updated), " managed files")'
+      # A branch this workflow did not open (a Dependabot PR) is reported on,
+      # never pushed to (#215). Re-applying the standard on such a branch and
+      # pushing the result silently reverted package-owned overrides that live
+      # in managed files — a routine, single-purpose action bump then merged
+      # carrying an unrelated revert of hand-maintained config, invisible in
+      # the PR's own diff. Drift is surfaced instead (a job summary plus a
+      # warning annotation on the PR); the scheduled run below is what
+      # actually applies it, in a `chore/template-sync` PR that a reviewer
+      # sees as its own reviewable change.
+      - name: Report drift without pushing
+        if: github.event_name == 'pull_request'
+        run: |
+          # `git add -A` first: a re-apply that CREATES a managed file (the kit
+          # shipped a new one) leaves it untracked, and a bare `git diff` is
+          # blind to untracked files — the drift would be reported as "none".
+          # Staging first makes both modified and new files visible to the
+          # diff. Nothing is committed; the index is scratch.
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No drift from the standard."
+            exit 0
+          fi
+          {
+            echo "### Managed infra drifts from the EpiAware standard"
+            echo
+            echo "This branch was **not** auto-corrected: template sync never"
+            echo "pushes to a branch it did not open (EpiAwarePackageTools"
+            echo "issue #215). The scheduled sync opens a"
+            echo "\`chore/template-sync\` PR with the refresh."
+            echo
+            echo '```'
+            git --no-pager diff --cached --stat
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          msg="Managed infra drifts from the EpiAware standard. Template sync"
+          msg="$msg did not push to this branch; the scheduled sync will open"
+          msg="$msg a PR with the refresh."
+          echo "::warning::$msg"
+      # Schedule / manual: open or refresh a sync PR when the standard drifted.
+      - name: Open a PR if the standard drifted
+        if: github.event_name != 'pull_request'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/template-sync
+          delete-branch: true
+          commit-message: "ci: sync managed infra to the EpiAware standard"
+          title: "ci: sync managed infra to the EpiAware standard"
+          labels: |
+            ci
+          body: |
+            Automated re-apply of the managed EpiAwarePackageTools standard
+            (`scaffold_update("."; ad = true, benchmarks = false, downgrade_compat = true)`).
+
+            Merge to bring this repo's managed infra back in line with the kit.
+            Package-owned files (unit tests, `qa_config.jl`, AD scenarios,
+            `LICENSE`) are never touched.
