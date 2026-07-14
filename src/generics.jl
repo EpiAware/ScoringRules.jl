@@ -39,6 +39,17 @@ function dss(d::UnivariateDistribution, y::Real)
 end
 
 """
+    dss_moments(y, mean, var)
+
+Dawid–Sebastiani score from a moment forecast given directly as its `mean` and
+`var`iance, without constructing a distribution. Since the DSS depends on the
+forecast only through its first two moments, this equals `dss(d, y)` for any `d`
+with that mean and variance. This is the moment-based forecast input mode. Lower
+is better.
+"""
+dss_moments(y::Real, mean::Real, var::Real) = (y - mean)^2 / var + log(var)
+
+"""
     crps(d::UnivariateDistribution, y)
 
 Continuous ranked probability score of the forecast distribution `d` at the
