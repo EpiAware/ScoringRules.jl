@@ -21,9 +21,9 @@
         for i in 1:n
             eid = Int(c["ens_id"][i])
             dat = ensembles[eid]
-            y   = c["y"][i]
+            y = c["y"][i]
             ref = c["crps"][i]
-            @test crps(dat, y; method=:edf) ≈ ref atol=atol rtol=rtol
+            @test crps(dat, y; method = :edf)≈ref atol=atol rtol=rtol
         end
     end
 
@@ -31,10 +31,10 @@
         for i in 1:n
             eid = Int(c["ens_id"][i])
             dat = ensembles[eid]
-            y   = c["y"][i]
+            y = c["y"][i]
             ref = c["crps_kde"][i]
             # KDE bandwidth matching R's bw.nrd may introduce rounding differences.
-            @test crps(dat, y; method=:kde) ≈ ref atol=atol rtol=1e-6
+            @test crps(dat, y; method = :kde)≈ref atol=atol rtol=1e-6
         end
     end
 
@@ -42,9 +42,9 @@
         for i in 1:n
             eid = Int(c["ens_id"][i])
             dat = ensembles[eid]
-            y   = c["y"][i]
+            y = c["y"][i]
             ref = c["logs"][i]
-            @test logs(dat, y) ≈ ref atol=atol rtol=1e-6
+            @test logs(dat, y)≈ref atol=atol rtol=1e-6
         end
     end
 
@@ -52,9 +52,9 @@
         for i in 1:n
             eid = Int(c["ens_id"][i])
             dat = ensembles[eid]
-            y   = c["y"][i]
+            y = c["y"][i]
             ref = c["dss"][i]
-            @test dss(dat, y) ≈ ref atol=atol rtol=rtol
+            @test dss(dat, y)≈ref atol=atol rtol=rtol
         end
     end
 end

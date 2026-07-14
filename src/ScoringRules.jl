@@ -18,13 +18,25 @@ dispatch on `Distributions.jl` types for parametric forecasts and on
 `AbstractVector`s for simulated (ensemble) forecasts. Multivariate ensemble
 forecasts are scored with [`es`](@ref) (energy score), [`vs`](@ref) (variogram
 score) and [`mmds`](@ref) (maximum-mean-discrepancy score).
+
+# Example
+
+```@example
+using Distributions, ScoringRules
+crps(Normal(0, 1), 0.5)
+```
 """
 module ScoringRules
 
-using Distributions
-using Distributions: UnivariateDistribution, ContinuousUnivariateDistribution,
-                     DiscreteUnivariateDistribution, Truncated, Censored
-using SpecialFunctions: erf, erfc, gamma, loggamma, digamma, beta_inc, logbeta,
+using Distributions: Distributions, Beta, Binomial, Censored, Continuous,
+                     ContinuousUnivariateDistribution, DiscreteUnivariateDistribution,
+                     Exponential, Gamma, GeneralizedExtremeValue, GeneralizedPareto,
+                     Hypergeometric, Laplace, LogLogistic, LogNormal,
+                     Logistic, MixtureModel, NegativeBinomial, Normal, Poisson, TDist,
+                     Truncated, Uniform, Univariate, UnivariateDistribution,
+                     ccdf, cdf, components, dof, location, logpdf, params, pdf, probs,
+                     scale, shape
+using SpecialFunctions: erfc, gamma, digamma, beta_inc, logbeta,
                         besseli, expinti, gamma_inc
 using LogExpFunctions: logistic
 using HypergeometricFunctions: _₂F₁

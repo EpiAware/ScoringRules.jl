@@ -20,7 +20,7 @@ const QA_CONFIG = (
     # non-publicly. Tuple of Symbols, e.g. (:_internal_helper,). Package
     # extensions are handled automatically (#189), so their import lists do not
     # need listing here.
-    ei_ignore = (),
+    ei_ignore = (:Censored,),
 
     # Docstring `crossref_ignore`: upstream names docstrings link to via
     # `[`name`](@ref)`, e.g. (:pdf, :cdf, :logpdf).

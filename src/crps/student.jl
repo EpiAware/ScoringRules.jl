@@ -16,15 +16,15 @@
 #   0.5 * (p ≤ 0.5 ? pb : 2 − pb)
 # In Julia, R's `pbeta(x, a, b)` = `beta_inc(a, b, x)[1]`.
 @inline function _Phi_t2(x::Real, df::Real)
-    p  = cdf(TDist(df), x)
+    p = cdf(TDist(df), x)
     pb = beta_inc(df - 0.5, 0.5, df / (df + x^2))[1]
     return 0.5 * (p <= 0.5 ? pb : 2 - pb)
 end
 
 # The constant `bfrac(df)` = 2√df/(df−1) · B(½, df−½) / B(½, df/2)²,
 # shared by all four CRPS formulae once standardised.
-@inline _t_bfrac(df::Real) =
-    2 * sqrt(df) / (df - 1) * exp(logbeta(0.5, df - 0.5) - 2 * logbeta(0.5, 0.5 * df))
+@inline _t_bfrac(df::Real) = 2 * sqrt(df) / (df - 1) *
+                             exp(logbeta(0.5, df - 0.5) - 2 * logbeta(0.5, 0.5 * df))
 
 # --- standard t: _crps_t(y, df, location, scale) ------------------------------
 
@@ -51,7 +51,7 @@ crps(d::TDist, y::Real) = _crps_t(y, dof(d), 0, 1)
 # as `LocationScale{T,Continuous,TDist{T}}`.  The public alias is
 # `Distributions.AffineDistribution` (defined as a `Union` type alias in
 # Distributions ≥ 0.25; at runtime the concrete type is `LocationScale`).
-function crps(d::Distributions.LocationScale{<:Real,Continuous,<:TDist}, y::Real)
+function crps(d::Distributions.LocationScale{<:Real, Continuous, <:TDist}, y::Real)
     return _crps_t(y, dof(d.ρ), d.μ, d.σ)
 end
 
@@ -63,27 +63,29 @@ function _crps_tt_unit(y::Real, df::Real, l::Real, u::Real)
         y, l, u = -y, -u, -l
     end
     d = TDist(df)
-    p_l = 0.0; out_l = 0.0
-    p_u = 1.0; out_u = 1.0
+    p_l = 0.0;
+    out_l = 0.0
+    p_u = 1.0;
+    out_u = 1.0
     z = y
     if isfinite(l)
-        p_l  = cdf(d, l)
+        p_l = cdf(d, l)
         out_l = _Phi_t2(l, df)
-        z    = max(l, z)
+        z = max(l, z)
     end
     if isfinite(u)
-        p_u  = cdf(d, u)
+        p_u = cdf(d, u)
         out_u = _Phi_t2(u, df)
-        z    = min(u, z)
+        z = min(u, z)
     end
     l > u && return oftype(float(y), NaN)
     l == u && return abs(y - z)
     a = p_u - p_l
     b = out_u - out_l
     b == 0 && return oftype(float(y), NaN)
-    G_z   = _t_G(z, df)
+    G_z = _t_G(z, df)
     out_z = z * (2 * cdf(d, z) - p_l - p_u) - 2 * G_z
-    out   = (out_z - b / a * _t_bfrac(df)) / a
+    out = (out_z - b / a * _t_bfrac(df)) / a
     return out + abs(y - z)
 end
 
@@ -108,39 +110,41 @@ end
 # produces `Truncated{LocationScale{…,TDist{…}},…}`. There is no public
 # named type for this combination; dispatch matches the concrete parametric
 # type below.
-function crps(d::Truncated{<:Distributions.LocationScale{<:Real,Continuous,<:TDist}}, y::Real)
+function crps(d::Truncated{<:Distributions.LocationScale{<:Real, Continuous, <:TDist}}, y::Real)
     inner = d.untruncated
     return _crps_tt(y, dof(inner.ρ), inner.μ, inner.σ,
-                    _lo(d.lower), _hi(d.upper))
+        _lo(d.lower), _hi(d.upper))
 end
 
 # --- censored t: _crps_ct(y, df, location, scale, lower, upper) --------------
 
 function _crps_ct_unit(y::Real, df::Real, l::Real, u::Real)
     d = TDist(df)
-    out_l1 = 0.0; out_l2 = 0.0
-    out_u1 = 0.0; out_u2 = 1.0
+    out_l1 = 0.0;
+    out_l2 = 0.0
+    out_u1 = 0.0;
+    out_u2 = 1.0
     z = y
     if isfinite(l)
-        p_l    = cdf(d, l)
-        G_l    = _t_G(l, df)
+        p_l = cdf(d, l)
+        G_l = _t_G(l, df)
         out_l1 = -l * p_l^2 + 2 * G_l * p_l      # sign: G_l is negative
         out_l2 = _Phi_t2(l, df)
-        z      = max(l, z)
+        z = max(l, z)
     end
     if isfinite(u)
-        p_u    = ccdf(d, u)
-        G_u    = _t_G(u, df)
+        p_u = ccdf(d, u)
+        G_u = _t_G(u, df)
         out_u1 = u * p_u^2 + 2 * G_u * p_u        # G_u is negative, so this subtracts
         out_u2 = _Phi_t2(u, df)
-        z      = min(u, z)
+        z = min(u, z)
     end
     l > u && return oftype(float(y), NaN)
     l == u && return abs(y - z)
-    b     = out_u2 - out_l2
-    G_z   = _t_G(z, df)
+    b = out_u2 - out_l2
+    G_z = _t_G(z, df)
     out_z = z * (2 * cdf(d, z) - 1) - 2 * G_z
-    out   = out_z + out_l1 + out_u1 - b * _t_bfrac(df)
+    out = out_z + out_l1 + out_u1 - b * _t_bfrac(df)
     return out + abs(y - z)
 end
 
@@ -163,43 +167,50 @@ end
 
 # Location–scale censored t: `censored(loc + scale*TDist(df), lower, upper)`
 # gives `Censored{LocationScale{…,TDist{…}},…}` — again no public named type.
-function crps(d::Distributions.Censored{<:Distributions.LocationScale{<:Real,Continuous,<:TDist}}, y::Real)
+function crps(
+        d::Distributions.Censored{<:Distributions.LocationScale{
+            <:Real, Continuous, <:TDist}}, y::Real)
     inner = d.uncensored
     return _crps_ct(y, dof(inner.ρ), inner.μ, inner.σ,
-                    _lo(d.lower), _hi(d.upper))
+        _lo(d.lower), _hi(d.upper))
 end
 
 # --- generalised truncated/censored t: _crps_gtct(..., lmass, umass) ---------
 
 function _crps_gtct_unit(y::Real, df::Real, l::Real, u::Real,
-                          lmass::Real, umass::Real)
+        lmass::Real, umass::Real)
     # Sign-swap for numerical stability when lower > 3.
     if l > 3
         y, l, u = -y, -u, -l
         lmass, umass = umass, lmass
     end
     d = TDist(df)
-    out_l1 = 0.0; out_l2 = 0.0; out_l3 = 0.0
-    out_u1 = 0.0; out_u2 = 0.0
-    p_l = 0.0; p_u = 1.0; out_u3 = 1.0
+    out_l1 = 0.0;
+    out_l2 = 0.0;
+    out_l3 = 0.0
+    out_u1 = 0.0;
+    out_u2 = 0.0
+    p_l = 0.0;
+    p_u = 1.0;
+    out_u3 = 1.0
     z = y
     if isfinite(l) || lmass != 0
         (lmass < 0 || lmass > 1) && return oftype(float(y), NaN)
-        p_l    = cdf(d, l)
-        G_l    = isfinite(l) ? _t_G(l, df) : 0.0
+        p_l = cdf(d, l)
+        G_l = isfinite(l) ? _t_G(l, df) : 0.0
         out_l1 = lmass == 0 ? 0.0 : l * lmass^2
         out_l2 = 2 * G_l * lmass
         out_l3 = _Phi_t2(l, df)
-        z      = max(l, z)
+        z = max(l, z)
     end
     if isfinite(u) || umass != 0
         (umass < 0 || umass > 1) && return oftype(float(y), NaN)
-        p_u    = cdf(d, u)
-        G_u    = isfinite(u) ? _t_G(u, df) : 0.0
+        p_u = cdf(d, u)
+        G_u = isfinite(u) ? _t_G(u, df) : 0.0
         out_u1 = umass == 0 ? 0.0 : u * umass^2
         out_u2 = 2 * G_u * umass
         out_u3 = _Phi_t2(u, df)
-        z      = min(u, z)
+        z = min(u, z)
     end
     l > u && return oftype(float(y), NaN)
     l == u && return abs(y - z)
@@ -219,7 +230,7 @@ function _crps_gtct_unit(y::Real, df::Real, l::Real, u::Real,
 end
 
 function _crps_gtct(y::Real, df::Real, location::Real, scale::Real,
-                    l::Real, u::Real, lmass::Real, umass::Real)
+        l::Real, u::Real, lmass::Real, umass::Real)
     scale < 0 && return oftype(float(y), NaN)
     df <= 1 && return oftype(float(y), NaN)
     ys = y - location

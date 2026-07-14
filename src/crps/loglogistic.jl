@@ -20,7 +20,7 @@ CRPS of a log-logistic forecast with log-scale parameters `locationlog` and
 function _crps_llogis(y::Real, locationlog::Real, scalelog::Real)
     (scalelog <= 0 || scalelog >= 1) && return oftype(float(y), NaN)
     y1 = max(y, zero(y))
-    p  = logistic((log(y1) - locationlog) / scalelog)
+    p = logistic((log(y1) - locationlog) / scalelog)
     c1 = y * (2 * p - 1)
     # beta(a,b) = Γ(a)Γ(b)/Γ(a+b); use logbeta for numerical stability
     c2 = 2 * exp(locationlog) * exp(logbeta(1 + scalelog, 1 - scalelog))

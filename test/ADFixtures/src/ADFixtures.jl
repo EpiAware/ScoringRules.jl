@@ -62,8 +62,10 @@ function backends()
     return [
         (name = "ForwardDiff", backend = AutoForwardDiff()),
         (name = "ReverseDiff (tape)", backend = AutoReverseDiff(compile = false)),
-        (name = "Enzyme forward", backend = AutoEnzyme(mode = Enzyme.set_runtime_activity(Enzyme.Forward))),
-        (name = "Enzyme reverse", backend = AutoEnzyme(mode = Enzyme.set_runtime_activity(Enzyme.Reverse))),
+        (name = "Enzyme forward",
+            backend = AutoEnzyme(mode = Enzyme.set_runtime_activity(Enzyme.Forward))),
+        (name = "Enzyme reverse",
+            backend = AutoEnzyme(mode = Enzyme.set_runtime_activity(Enzyme.Reverse))),
         (name = "Mooncake reverse", backend = AutoMooncake(config = nothing)),
         (name = "Mooncake forward", backend = AutoMooncakeForward())
     ]

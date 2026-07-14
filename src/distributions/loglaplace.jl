@@ -15,10 +15,10 @@ the positive reals. The mean exists for `σ < 1` and the variance for `σ < 1/2`
 Not part of Distributions.jl; provided here so it flows through
 [`crps`](@ref)/[`logs`](@ref)/[`dss`](@ref) dispatch.
 """
-struct LogLaplace{T<:Real} <: ContinuousUnivariateDistribution
+struct LogLaplace{T <: Real} <: ContinuousUnivariateDistribution
     μ::T  # location on log scale
     σ::T  # scale on log scale (> 0)
-    function LogLaplace{T}(μ::T, σ::T) where {T<:Real}
+    function LogLaplace{T}(μ::T, σ::T) where {T <: Real}
         σ > zero(T) || error("σ must be positive")
         return new{T}(μ, σ)
     end
@@ -76,7 +76,7 @@ end
 # Var[X] = exp(2μ) * (1/(1 - 4σ²) - 1/(1 - σ²)²)   (requires σ < 1/2)
 function Distributions.var(d::LogLaplace)
     sl2 = d.σ^2
-    e2  = exp(2 * d.μ)
+    e2 = exp(2 * d.μ)
     return e2 * (1 / (1 - 4 * sl2) - 1 / (1 - sl2)^2)
 end
 

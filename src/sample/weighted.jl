@@ -52,20 +52,40 @@ is returned.  Alternatively, supply a custom vectorised `chain_func` (takes a
 
 Lower is better.
 
+# Arguments
+
+  - `dat`: ensemble of simulation draws.
+  - `y`: scalar observation.
+
+# Keyword Arguments
+
+  - `a`: lower threshold (default `-Inf`).
+  - `b`: upper threshold (default `Inf`).
+  - `chain_func`: custom chaining function; overrides `a` and `b` when supplied.
+
 # Provenance
+
 Ported from `twcrps_sample` in R scoringRules (scores_sample_univ_weighted.R;
 Allen 2024, JSS 110(8)).
+
+# Example
+
+```@example
+using ScoringRules
+dat = randn(100)
+twcrps(dat, 0.5; a = 0.0, b = 1.0)
+```
 """
 function twcrps(dat::AbstractVector, y::Real;
-                a::Real=-Inf, b::Real=Inf,
-                chain_func=nothing)
+        a::Real = -Inf, b::Real = Inf,
+        chain_func = nothing)
     if chain_func === nothing
         a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
         v = z -> clamp(z, a, b)
     else
         v = chain_func
     end
-    v_y   = v(y)
+    v_y = v(y)
     v_dat = v.(dat)
     return _crps_edf_unweighted(v_y, v_dat)
 end
@@ -90,20 +110,40 @@ returns a non-negative `Real`); supplying `weight_func` ignores `a` and `b`.
 Returns `NaN` when all ensemble weights are zero (no member in the region).
 Lower is better.
 
+# Arguments
+
+  - `dat`: ensemble of simulation draws.
+  - `y`: scalar observation.
+
+# Keyword Arguments
+
+  - `a`: lower threshold (default `-Inf`).
+  - `b`: upper threshold (default `Inf`).
+  - `weight_func`: custom weight function; overrides `a` and `b` when supplied.
+
 # Provenance
+
 Ported from `owcrps_sample` in R scoringRules (scores_sample_univ_weighted.R;
 Allen 2024, JSS 110(8)).
+
+# Example
+
+```@example
+using ScoringRules
+dat = randn(100)
+owcrps(dat, 0.5; a = 0.0, b = 1.0)
+```
 """
 function owcrps(dat::AbstractVector, y::Real;
-                a::Real=-Inf, b::Real=Inf,
-                weight_func=nothing)
+        a::Real = -Inf, b::Real = Inf,
+        weight_func = nothing)
     if weight_func === nothing
         a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
         w_func = z -> Float64(a < z < b)
     else
         w_func = weight_func
     end
-    w_y   = w_func(y)
+    w_y = w_func(y)
     w_dat = w_func.(dat)
     # _crps_edf_weighted normalises internally so only relative weights matter
     return _crps_edf_weighted(y, dat, w_dat) * w_y
@@ -153,11 +193,21 @@ returns a length-`d` vector) overrides `a` and `b`.
 Lower is better.
 
 # Provenance
+
 Ported from `twes_sample` in R scoringRules (scores_sample_multiv_weighted.R;
 Allen 2024, JSS 110(8)).
+
+# Example
+
+```@example
+using ScoringRules
+X = randn(2, 50)
+y = [0.0, 0.0]
+twes(X, y; a = -1.0, b = 1.0)
+```
 """
 function twes(X::AbstractMatrix, y::AbstractVector;
-              a=-Inf, b=Inf, chain_func=nothing)
+        a = -Inf, b = Inf, chain_func = nothing)
     _check_multiv(X, y)
     d = length(y)
     if chain_func === nothing
@@ -169,9 +219,9 @@ function twes(X::AbstractMatrix, y::AbstractVector;
     else
         v = chain_func
     end
-    v_y   = v(y)
+    v_y = v(y)
     v_dat = reduce(hcat, [v(view(X, :, i)) for i in 1:size(X, 2)])
-    m  = size(v_dat, 2)
+    m = size(v_dat, 2)
     wv = fill(1.0 / m, m)
     return _esC_xy(v_y, v_dat, wv) - 0.5 * _esC_xx(v_dat, wv)
 end
@@ -196,11 +246,21 @@ a length-`d` vector, returns a non-negative scalar) overrides `a` and `b`.
 Lower is better.
 
 # Provenance
+
 Ported from `owes_sample` in R scoringRules (scores_sample_multiv_weighted.R;
 Allen 2024, JSS 110(8)).
+
+# Example
+
+```@example
+using ScoringRules
+X = randn(2, 50)
+y = [0.0, 0.0]
+owes(X, y; a = -1.0, b = 1.0)
+```
 """
 function owes(X::AbstractMatrix, y::AbstractVector;
-              a=-Inf, b=Inf, weight_func=nothing)
+        a = -Inf, b = Inf, weight_func = nothing)
     _check_multiv(X, y)
     d = length(y)
     if weight_func === nothing
@@ -212,7 +272,7 @@ function owes(X::AbstractMatrix, y::AbstractVector;
     else
         wf = weight_func
     end
-    w_y   = wf(y)
+    w_y = wf(y)
     w_dat = [wf(view(X, :, i)) for i in 1:size(X, 2)]
     sw = sum(w_dat)
     if sw == 0
@@ -237,11 +297,21 @@ variogram score is then evaluated on the transformed forecast.  See `twes` for
 the conventions on `a`, `b`, and `chain_func`.  Lower is better.
 
 # Provenance
+
 Ported from `twvs_sample` in R scoringRules (scores_sample_multiv_weighted.R;
 Allen 2024, JSS 110(8)).
+
+# Example
+
+```@example
+using ScoringRules
+X = randn(2, 50)
+y = [0.0, 0.0]
+twvs(X, y; a = -1.0, b = 1.0)
+```
 """
 function twvs(X::AbstractMatrix, y::AbstractVector;
-              p::Real=0.5, a=-Inf, b=Inf, chain_func=nothing)
+        p::Real = 0.5, a = -Inf, b = Inf, chain_func = nothing)
     _check_multiv(X, y)
     d = length(y)
     if chain_func === nothing
@@ -253,7 +323,7 @@ function twvs(X::AbstractMatrix, y::AbstractVector;
     else
         v = chain_func
     end
-    v_y   = v(y)
+    v_y = v(y)
     v_dat = reduce(hcat, [v(view(X, :, i)) for i in 1:size(X, 2)])
     return _vsC(v_y, v_dat, p)
 end
@@ -273,11 +343,21 @@ then multiplied by w(y).  Returns `NaN` when all member weights are zero.  See
 `owes` for conventions on `a`, `b`, and `weight_func`.  Lower is better.
 
 # Provenance
+
 Ported from `owvs_sample` in R scoringRules (scores_sample_multiv_weighted.R;
 Allen 2024, JSS 110(8)).
+
+# Example
+
+```@example
+using ScoringRules
+X = randn(2, 50)
+y = [0.0, 0.0]
+owvs(X, y; a = -1.0, b = 1.0)
+```
 """
 function owvs(X::AbstractMatrix, y::AbstractVector;
-              p::Real=0.5, a=-Inf, b=Inf, weight_func=nothing)
+        p::Real = 0.5, a = -Inf, b = Inf, weight_func = nothing)
     _check_multiv(X, y)
     d = length(y)
     if weight_func === nothing
@@ -289,7 +369,7 @@ function owvs(X::AbstractMatrix, y::AbstractVector;
     else
         wf = weight_func
     end
-    w_y   = wf(y)
+    w_y = wf(y)
     w_dat = [wf(view(X, :, i)) for i in 1:size(X, 2)]
     sw = sum(w_dat)
     if sw == 0
@@ -314,11 +394,21 @@ MMD score is evaluated on the transformed forecast.  See `twes` for conventions
 on `a`, `b`, and `chain_func`.  Lower is better.
 
 # Provenance
+
 Ported from `twmmds_sample` in R scoringRules (scores_sample_multiv_weighted.R;
 Allen 2024, JSS 110(8)).
+
+# Example
+
+```@example
+using ScoringRules
+X = randn(2, 50)
+y = [0.0, 0.0]
+twmmds(X, y; a = -1.0, b = 1.0)
+```
 """
 function twmmds(X::AbstractMatrix, y::AbstractVector;
-                a=-Inf, b=Inf, chain_func=nothing)
+        a = -Inf, b = Inf, chain_func = nothing)
     _check_multiv(X, y)
     d = length(y)
     if chain_func === nothing
@@ -330,9 +420,9 @@ function twmmds(X::AbstractMatrix, y::AbstractVector;
     else
         v = chain_func
     end
-    v_y   = v(y)
+    v_y = v(y)
     v_dat = reduce(hcat, [v(view(X, :, i)) for i in 1:size(X, 2)])
-    m  = size(v_dat, 2)
+    m = size(v_dat, 2)
     wv = fill(1.0 / m, m)
     return 0.5 * _mmdsC_xx(v_dat, wv) - _mmdsC_xy(v_y, v_dat, wv)
 end
@@ -352,11 +442,21 @@ multiplied by w(y).  Returns `NaN` when all member weights are zero.  See
 `owes` for conventions on `a`, `b`, and `weight_func`.  Lower is better.
 
 # Provenance
+
 Ported from `owmmds_sample` in R scoringRules (scores_sample_multiv_weighted.R;
 Allen 2024, JSS 110(8)).
+
+# Example
+
+```@example
+using ScoringRules
+X = randn(2, 50)
+y = [0.0, 0.0]
+owmmds(X, y; a = -1.0, b = 1.0)
+```
 """
 function owmmds(X::AbstractMatrix, y::AbstractVector;
-                a=-Inf, b=Inf, weight_func=nothing)
+        a = -Inf, b = Inf, weight_func = nothing)
     _check_multiv(X, y)
     d = length(y)
     if weight_func === nothing
@@ -368,7 +468,7 @@ function owmmds(X::AbstractMatrix, y::AbstractVector;
     else
         wf = weight_func
     end
-    w_y   = wf(y)
+    w_y = wf(y)
     w_dat = [wf(view(X, :, i)) for i in 1:size(X, 2)]
     sw = sum(w_dat)
     if sw == 0

@@ -21,10 +21,10 @@ CRPS of a log-Laplace forecast with log-scale parameters `locationlog` and
 function _crps_llapl(y::Real, locationlog::Real, scalelog::Real)
     (scalelog <= 0 || scalelog >= 1) && return oftype(float(y), NaN)
     y1 = max(y, zero(y))
-    z  = (log(y1) - locationlog) / scalelog
+    z = (log(y1) - locationlog) / scalelog
     # Laplace CDF: p = 0.5 + 0.5*sign(z)*(1 - exp(-|z|)) = 0.5*(1 + sign(z)*(-expm1(-|z|)))
     az = abs(z)
-    p  = z < 0 ? exp(z) / 2 : 1 - exp(-z) / 2
+    p = z < 0 ? exp(z) / 2 : 1 - exp(-z) / 2
     c1 = y * (2 * p - 1)
     if z < 0
         c2 = (1 - (2 * p)^(1 + scalelog)) / (1 + scalelog)

@@ -56,10 +56,10 @@ Expanded this gives:
 The convention follows *nominal coverage* (not alpha = 1 - coverage).
 """
 @inline function _ints_quantile(y::Real, x_lower::Real, x_upper::Real,
-                                target_coverage::Real)
+        target_coverage::Real)
     alpha1 = 0.5 * (1 - target_coverage)
     alpha2 = 0.5 * (1 + target_coverage)
-    scale  = 2 / (1 - target_coverage)
+    scale = 2 / (1 - target_coverage)
     return scale * (_qs_quantile(y, x_lower, alpha1) +
                     _qs_quantile(y, x_upper, alpha2))
 end
@@ -91,15 +91,17 @@ The score at level α with forecast q and observation y is
 which equals `(1 - α)(q - y)` when `y < q` and `α(y - q)` when `y ≥ q`
 (Koenker & Bassett 1978).  Lower values indicate better forecasts.
 
-# Examples
-```julia
+# Example
+
+```@example
+using ScoringRules
 levels = [0.1, 0.5, 0.9]
-q      = [-1.28, 0.0, 1.28]
+q = [-1.28, 0.0, 1.28]
 quantile_score(levels, q, 1.0)
 ```
 """
 function quantile_score(q_levels::AbstractVector, q_forecasts::AbstractVector,
-                        y::Real)
+        y::Real)
     length(q_levels) == length(q_forecasts) ||
         throw(DimensionMismatch(
             "q_levels and q_forecasts must have the same length"))
@@ -131,9 +133,17 @@ A scalar `Float64` score.
 The empirical α-quantile `q̂` is computed from `dat`, and the score is
 
     score = ((y < q̂) - α) * (q̂ - y)
+
+# Example
+
+```@example
+using ScoringRules
+dat = randn(100)
+quantile_score(dat, 0.5; alpha = 0.9)
+```
 """
 function quantile_score(dat::AbstractVector, y::Real;
-                        alpha::Real, type::Int=7)
+        alpha::Real, type::Int = 7)
     q_hat = quantile(dat, alpha)   # type-7 by default in Julia
     return _qs_quantile(y, q_hat, alpha)
 end
@@ -168,8 +178,10 @@ This convention uses *coverage* (not alpha = 1 - coverage), matching
 `ints_quantiles` in `scores_quantiles.R`.  Lower values indicate better
 forecasts.
 
-# Examples
-```julia
+# Example
+
+```@example
+using ScoringRules
 interval_score(-1.64, 1.64, 0.5, 0.9)
 ```
 """
@@ -193,11 +205,19 @@ called.  Mirrors `ints_sample` in `scores_quantiles.R`.
 
 # Returns
 A scalar `Float64` score.
+
+# Example
+
+```@example
+using ScoringRules
+dat = randn(100)
+interval_score(dat, 0.5; level = 0.9)
+```
 """
 function interval_score(dat::AbstractVector, y::Real;
-                        level::Real, type::Int=7)
+        level::Real, type::Int = 7)
     alpha1 = 0.5 * (1 - level)
     alpha2 = 1 - alpha1
-    qs     = quantile(dat, [alpha1, alpha2])
+    qs = quantile(dat, [alpha1, alpha2])
     return _ints_quantile(y, qs[1], qs[2], level)
 end

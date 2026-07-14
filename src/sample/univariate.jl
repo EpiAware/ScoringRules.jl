@@ -14,8 +14,6 @@
 #   continuous hydrological variables. Hydrology and Earth System Sciences 11,
 #   1267–1277.
 
-using Statistics: mean, var, std, quantile
-
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -46,12 +44,12 @@ end
 
 # Unweighted path.
 function _crps_edf_unweighted(y::Real, dat::AbstractVector)
-    n   = length(dat)
+    n = length(dat)
     c1n = 1.0 / n
-    x   = sort(dat)
-    s   = 0.0
+    x = sort(dat)
+    s = 0.0
     @inbounds for i in eachindex(x)
-        a  = (i - 0.5) * c1n       # (i − 0.5) / n, i.e. seq(0.5/n, 1−0.5/n)
+        a = (i - 0.5) * c1n       # (i − 0.5) / n, i.e. seq(0.5/n, 1−0.5/n)
         s += ((y < x[i]) - a) * (x[i] - y)
     end
     return 2 * c1n * s
@@ -65,14 +63,14 @@ function _crps_edf_weighted(y::Real, dat::AbstractVector, w::AbstractVector)
     any(<(0), w) && return NaN
 
     ord = sortperm(dat)
-    x   = dat[ord]
-    ww  = float.(w[ord])
-    p   = cumsum(ww)
-    P   = p[end]
+    x = dat[ord]
+    ww = float.(w[ord])
+    p = cumsum(ww)
+    P = p[end]
 
     s = 0.0
     @inbounds for i in eachindex(x)
-        a  = (p[i] - 0.5 * ww[i]) / P   # mid-point cumulative weight
+        a = (p[i] - 0.5 * ww[i]) / P   # mid-point cumulative weight
         s += ww[i] * ((y < x[i]) - a) * (x[i] - y)
     end
     return 2 / P * s
@@ -83,11 +81,11 @@ end
 # Translates `crps_kdens` / `crpsmixnC` from scores_sample_univ.R and mixn.cpp.
 # ---------------------------------------------------------------------------
 
-function _crps_kde(y::Real, dat::AbstractVector, bw::Union{Real,Nothing})
+function _crps_kde(y::Real, dat::AbstractVector, bw::Union{Real, Nothing})
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
-    n      = length(dat)
-    ww     = fill(1.0 / n, n)
-    sw     = fill(bw_val, n)
+    n = length(dat)
+    ww = fill(1.0 / n, n)
+    sw = fill(bw_val, n)
     return _crps_mixnorm(y, dat, sw, ww)
 end
 
@@ -103,22 +101,42 @@ observation `y`.
 
 Two approximation methods are available via `method`:
 
-- `:edf` (default) — empirical distribution function approximation using the
-  quantile decomposition of Laio & Tamea (2007).  Optional non-negative weights
-  `w` (length `m`) are normalised to sum to one internally.
+  - `:edf` (default) — empirical distribution function approximation using the
+    quantile decomposition of Laio & Tamea (2007).  Optional non-negative weights
+    `w` (length `m`) are normalised to sum to one internally.
 
-- `:kde` — Gaussian kernel density estimate with bandwidth `bw`.  If `bw` is
-  `nothing`, Silverman's rule-of-thumb is applied (matching R's `bw.nrd`).
-  The `w` argument is ignored for this method.
+  - `:kde` — Gaussian kernel density estimate with bandwidth `bw`.  If `bw` is
+    `nothing`, Silverman's rule-of-thumb is applied (matching R's `bw.nrd`).
+    The `w` argument is ignored for this method.
 
 Lower is better.
 
+# Arguments
+
+  - `dat`: ensemble of `m` simulation draws.
+  - `y`: scalar observation.
+
+# Keyword Arguments
+
+  - `method`: `:edf` (default) or `:kde`.
+  - `w`: optional non-negative weight vector (length `m`); only used for `:edf`.
+  - `bw`: optional bandwidth; only used for `:kde`.
+
 # Provenance
+
 Ported from `crps_sample` / `crps_edf` / `crps_kdens` in R scoringRules
 (scores_sample_univ.R; mixn.cpp; Jordan, Krüger, Lerch, Allen).
+
+# Example
+
+```@example
+using ScoringRules
+dat = randn(100)
+crps(dat, 0.5)
+```
 """
 function crps(dat::AbstractVector{<:Real}, y::Real;
-              method::Symbol=:edf, w=nothing, bw=nothing)
+        method::Symbol = :edf, w = nothing, bw = nothing)
     if method === :edf
         if w === nothing
             return _crps_edf_unweighted(y, dat)
@@ -141,13 +159,31 @@ Gaussian kernel density estimation.
 If `bw` is `nothing`, Silverman's rule-of-thumb bandwidth is used (matching
 R's `bw.nrd`).  Lower is better.
 
+# Arguments
+
+  - `dat`: ensemble of simulation draws.
+  - `y`: scalar observation.
+
+# Keyword Arguments
+
+  - `bw`: optional bandwidth; defaults to Silverman's rule-of-thumb.
+
 # Provenance
+
 Ported from `logs_sample` / `lsmixnC` in R scoringRules (scores_sample_univ.R;
 mixn.cpp; Jordan, Krüger, Lerch, Allen).
+
+# Example
+
+```@example
+using ScoringRules
+dat = randn(100)
+logs(dat, 0.5)
+```
 """
-function logs(dat::AbstractVector{<:Real}, y::Real; bw=nothing)
+function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
-    n      = length(dat)
+    n = length(dat)
     # KDE density at y: (1/n) Σ_i φ_{bw}(y − datᵢ)
     # log score = −log density
     den = 0.0
@@ -171,9 +207,23 @@ where ``\\bar{x}`` is the sample mean and ``s^2 = \\tfrac{1}{n}\\sum_i(x_i - \\b
 is the **population** variance (R uses `mean(dat^2) - mean(dat)^2`, i.e. the
 biased estimator). Lower is better.
 
+# Arguments
+
+  - `dat`: ensemble of simulation draws.
+  - `y`: scalar observation.
+
 # Provenance
+
 Ported from `dss_sample` / `dss_edf` in R scoringRules (scores_sample_univ.R;
 Jordan, Krüger, Lerch, Allen).
+
+# Example
+
+```@example
+using ScoringRules
+dat = randn(100)
+dss(dat, 0.5)
+```
 """
 function dss(dat::AbstractVector{<:Real}, y::Real)
     m = mean(dat)

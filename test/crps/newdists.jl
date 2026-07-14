@@ -14,11 +14,11 @@
         c, n = References.load("llogis")
         for i in 1:n
             locationlog = c["locationlog"][i]
-            scalelog    = c["scalelog"][i]
-            y           = c["y"][i]
-            ref         = c["crps"][i]
+            scalelog = c["scalelog"][i]
+            y = c["y"][i]
+            ref = c["crps"][i]
             d = LogLogistic(exp(locationlog), 1 / scalelog)
-            @test crps(d, y) ≈ ref atol=atol rtol=rtol
+            @test crps(d, y)≈ref atol=atol rtol=rtol
         end
     end
 
@@ -26,11 +26,11 @@
         c, n = References.load("llogis")
         for i in 1:n
             locationlog = c["locationlog"][i]
-            scalelog    = c["scalelog"][i]
-            y           = c["y"][i]
-            ref         = c["logs"][i]
+            scalelog = c["scalelog"][i]
+            y = c["y"][i]
+            ref = c["logs"][i]
             d = LogLogistic(exp(locationlog), 1 / scalelog)
-            @test logs(d, y) ≈ ref atol=atol rtol=rtol
+            @test logs(d, y)≈ref atol=atol rtol=rtol
         end
     end
 
@@ -42,24 +42,24 @@
     @testset "LogLaplace crps" begin
         c, n = References.load("llapl")
         for i in 1:n
-            μ   = c["locationlog"][i]
-            σ   = c["scalelog"][i]
-            y   = c["y"][i]
+            μ = c["locationlog"][i]
+            σ = c["scalelog"][i]
+            y = c["y"][i]
             ref = c["crps"][i]
             d = LogLaplace(μ, σ)
-            @test crps(d, y) ≈ ref atol=atol rtol=rtol
+            @test crps(d, y)≈ref atol=atol rtol=rtol
         end
     end
 
     @testset "LogLaplace logs" begin
         c, n = References.load("llapl")
         for i in 1:n
-            μ   = c["locationlog"][i]
-            σ   = c["scalelog"][i]
-            y   = c["y"][i]
+            μ = c["locationlog"][i]
+            σ = c["scalelog"][i]
+            y = c["y"][i]
             ref = c["logs"][i]
             d = LogLaplace(μ, σ)
-            @test logs(d, y) ≈ ref atol=atol rtol=rtol
+            @test logs(d, y)≈ref atol=atol rtol=rtol
         end
     end
 
@@ -67,12 +67,12 @@
         c, n = References.load("llapl")
         for i in 1:n
             isnan(c["dss"][i]) && continue   # NA rows skipped
-            μ   = c["locationlog"][i]
-            σ   = c["scalelog"][i]
-            y   = c["y"][i]
+            μ = c["locationlog"][i]
+            σ = c["scalelog"][i]
+            y = c["y"][i]
             ref = c["dss"][i]
             d = LogLaplace(μ, σ)
-            @test dss(d, y) ≈ ref atol=atol rtol=rtol
+            @test dss(d, y)≈ref atol=atol rtol=rtol
         end
     end
 
@@ -83,26 +83,26 @@
     @testset "TwoPieceNormal crps" begin
         c, n = References.load("twopiecenorm")
         for i in 1:n
-            loc    = c["location"][i]
+            loc = c["location"][i]
             scale1 = c["scale1"][i]
             scale2 = c["scale2"][i]
-            y      = c["y"][i]
-            ref    = c["crps"][i]
+            y = c["y"][i]
+            ref = c["crps"][i]
             d = TwoPieceNormal(loc, scale1, scale2)
-            @test crps(d, y) ≈ ref atol=atol rtol=rtol
+            @test crps(d, y)≈ref atol=atol rtol=rtol
         end
     end
 
     @testset "TwoPieceNormal logs" begin
         c, n = References.load("twopiecenorm")
         for i in 1:n
-            loc    = c["location"][i]
+            loc = c["location"][i]
             scale1 = c["scale1"][i]
             scale2 = c["scale2"][i]
-            y      = c["y"][i]
-            ref    = c["logs"][i]
+            y = c["y"][i]
+            ref = c["logs"][i]
             d = TwoPieceNormal(loc, scale1, scale2)
-            @test logs(d, y) ≈ ref atol=atol rtol=rtol
+            @test logs(d, y)≈ref atol=atol rtol=rtol
         end
     end
 
@@ -113,26 +113,26 @@
     @testset "TwoPieceExponential crps" begin
         c, n = References.load("twopieceexp")
         for i in 1:n
-            loc    = c["location"][i]
+            loc = c["location"][i]
             scale1 = c["scale1"][i]
             scale2 = c["scale2"][i]
-            y      = c["y"][i]
-            ref    = c["crps"][i]
+            y = c["y"][i]
+            ref = c["crps"][i]
             d = TwoPieceExponential(loc, scale1, scale2)
-            @test crps(d, y) ≈ ref atol=atol rtol=rtol
+            @test crps(d, y)≈ref atol=atol rtol=rtol
         end
     end
 
     @testset "TwoPieceExponential logs" begin
         c, n = References.load("twopieceexp")
         for i in 1:n
-            loc    = c["location"][i]
+            loc = c["location"][i]
             scale1 = c["scale1"][i]
             scale2 = c["scale2"][i]
-            y      = c["y"][i]
-            ref    = c["logs"][i]
+            y = c["y"][i]
+            ref = c["logs"][i]
             d = TwoPieceExponential(loc, scale1, scale2)
-            @test logs(d, y) ≈ ref atol=atol rtol=rtol
+            @test logs(d, y)≈ref atol=atol rtol=rtol
         end
     end
 end

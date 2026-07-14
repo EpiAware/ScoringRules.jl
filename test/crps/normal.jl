@@ -21,9 +21,9 @@
         for i in 1:n
             d = Normal(c["mean"][i], c["sd"][i])
             y = c["y"][i]
-            @test crps(d, y) ≈ c["crps"][i] atol=atol rtol=rtol
-            @test logs(d, y) ≈ c["logs"][i] atol=atol rtol=rtol
-            @test dss(d, y) ≈ c["dss"][i] atol=atol rtol=rtol
+            @test crps(d, y)≈c["crps"][i] atol=atol rtol=rtol
+            @test logs(d, y)≈c["logs"][i] atol=atol rtol=rtol
+            @test dss(d, y)≈c["dss"][i] atol=atol rtol=rtol
         end
     end
 
@@ -31,7 +31,7 @@
         c, n = References.load("tnorm")
         for i in 1:n
             d = trunc_normal(c["location"][i], c["scale"][i], c["lower"][i], c["upper"][i])
-            @test crps(d, c["y"][i]) ≈ c["crps"][i] atol=atol rtol=rtol
+            @test crps(d, c["y"][i])≈c["crps"][i] atol=atol rtol=rtol
         end
     end
 
@@ -39,7 +39,7 @@
         c, n = References.load("cnorm")
         for i in 1:n
             d = cens_normal(c["location"][i], c["scale"][i], c["lower"][i], c["upper"][i])
-            @test crps(d, c["y"][i]) ≈ c["crps"][i] atol=atol rtol=rtol
+            @test crps(d, c["y"][i])≈c["crps"][i] atol=atol rtol=rtol
         end
     end
 
@@ -48,7 +48,7 @@
         for i in 1:n
             got = _crps_gtcnorm(c["y"][i], c["location"][i], c["scale"][i],
                 c["lower"][i], c["upper"][i], c["lmass"][i], c["umass"][i])
-            @test got ≈ c["crps"][i] atol=atol rtol=rtol
+            @test got≈c["crps"][i] atol=atol rtol=rtol
         end
     end
 end

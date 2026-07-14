@@ -1,5 +1,4 @@
 @testitem "quantile and interval scores match R scoringRules" setup=[References] begin
-
     atol = 1e-9
     rtol = 1e-7
 
@@ -11,34 +10,34 @@
 
     @testset "quantile_score (explicit quantile forecasts)" begin
         for i in 1:n
-            y  = c["y"][i]
+            y = c["y"][i]
             qf = [c["q$j"][i] for j in 1:5]
 
             for (j, alpha) in enumerate(q_levels)
                 ref = c["qs_a$j"][i]
                 got = quantile_score([alpha], [qf[j]], y)
-                @test only(got) ≈ ref atol=atol rtol=rtol
+                @test only(got)≈ref atol=atol rtol=rtol
             end
         end
     end
 
     @testset "interval_score 80% (explicit bounds)" begin
         for i in 1:n
-            y     = c["y"][i]
+            y = c["y"][i]
             lower = c["q1"][i]   # 10th percentile
             upper = c["q5"][i]   # 90th percentile
-            ref   = c["ints_80"][i]
-            @test interval_score(lower, upper, y, 0.8) ≈ ref atol=atol rtol=rtol
+            ref = c["ints_80"][i]
+            @test interval_score(lower, upper, y, 0.8)≈ref atol=atol rtol=rtol
         end
     end
 
     @testset "interval_score 50% (explicit bounds)" begin
         for i in 1:n
-            y     = c["y"][i]
+            y = c["y"][i]
             lower = c["q2"][i]   # 25th percentile
             upper = c["q4"][i]   # 75th percentile
-            ref   = c["ints_50"][i]
-            @test interval_score(lower, upper, y, 0.5) ≈ ref atol=atol rtol=rtol
+            ref = c["ints_50"][i]
+            @test interval_score(lower, upper, y, 0.5)≈ref atol=atol rtol=rtol
         end
     end
 

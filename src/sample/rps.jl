@@ -33,13 +33,13 @@ category k.  This is equivalent to a sum of K Brier scores, one per category
 boundary.
 """
 function _rps0(p::AbstractVector, y::Integer)
-    K  = length(p)
+    K = length(p)
     Pk = zero(eltype(p))       # running cumulative forecast probability
-    s  = zero(Float64)
+    s = zero(Float64)
     for k in 1:K
         Pk += p[k]
-        Iy  = y <= k ? 1.0 : 0.0   # cumulative indicator: 1{y ≤ k}
-        s  += (Pk - Iy)^2
+        Iy = y <= k ? 1.0 : 0.0   # cumulative indicator: 1{y ≤ k}
+        s += (Pk - Iy)^2
     end
     return s
 end
@@ -76,11 +76,12 @@ outcome `y` is 1-indexed and the sum runs over all K categories (the last term
 is always zero when probabilities sum to 1, but is retained for consistency
 with the R source).
 
-# Examples
-```julia
+# Example
+
+```@example
+using ScoringRules
 p = [0.3, 0.2, 0.5]
-rps(p, 2)   # ≈ 0.34
-rps(p, 1)   # ≈ 0.74
+rps(p, 2)
 ```
 """
 function rps(p::AbstractVector, y::Integer)

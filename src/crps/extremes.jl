@@ -31,7 +31,7 @@ function _crps_gev(y::Real, shape::Real, location::Real = 0.0, scale::Real = 1.0
         # out = -y_std - γ_E - log 2 - 2·Ei(-exp(-y_std))
         # where γ_E = -digamma(1)
         -y_std - digamma(one(float(y_std))) - log(oftype(float(y_std), 2)) -
-            2 * expinti(-exp(-y_std))
+        2 * expinti(-exp(-y_std))
     else
         # General case
         x_inner = 1 + shape * y_std
@@ -41,16 +41,15 @@ function _crps_gev(y::Real, shape::Real, location::Real = 0.0, scale::Real = 1.0
         #   shape < 0 → exponent -1/shape > 0 → 0^(pos) = 0
         x = (x_inner <= 0 ? zero(float(y_std)) : x_inner)^(-1 / shape)
         c1 = 2 * exp(-x) - 1
-        g  = gamma(1 - shape)
+        g = gamma(1 - shape)
         # pgamma(x, 1-shape) is the lower regularised incomplete gamma P(1-shape, x)
-        p  = gamma_inc(1 - shape, x)[1]
+        p = gamma_inc(1 - shape, x)[1]
         (y_std + 1 / shape) * c1 + g / shape * (2 * p - 2^shape)
     end
     return scale * out
 end
 
-crps(d::GeneralizedExtremeValue, y::Real) =
-    _crps_gev(y, d.ξ, d.μ, d.σ)
+crps(d::GeneralizedExtremeValue, y::Real) = _crps_gev(y, d.ξ, d.μ, d.σ)
 
 # ---------------------------------------------------------------------------
 # GPD
@@ -64,9 +63,9 @@ in closed form (Friederichs & Thorarinsdottir 2012). Shape must be < 1.
 retained for internal use but not exposed through the Distributions dispatch.
 """
 function _crps_gpd(y::Real, shape::Real,
-                   location::Real = 0.0, scale::Real = 1.0,
-                   mass::Real = 0.0)
-    scale < 0  && return oftype(float(y), NaN)
+        location::Real = 0.0, scale::Real = 1.0,
+        mass::Real = 0.0)
+    scale < 0 && return oftype(float(y), NaN)
     shape >= 1 && return oftype(float(y), NaN)
     (mass < 0 || mass > 1) && return oftype(float(y), NaN)
 
@@ -87,5 +86,4 @@ function _crps_gpd(y::Real, shape::Real,
     return abs(y - location) - scale * a * (2 / b * (1 - x^b) - a / (2 - shape))
 end
 
-crps(d::GeneralizedPareto, y::Real) =
-    _crps_gpd(y, d.ξ, d.μ, d.σ)
+crps(d::GeneralizedPareto, y::Real) = _crps_gpd(y, d.ξ, d.μ, d.σ)

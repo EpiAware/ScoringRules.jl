@@ -22,9 +22,9 @@ end
 #   out(z) = [F(z) + log F(-z)] - F(z)·[z·F(z) + 2·log F(-z)]
 # Equivalent to the R expressions `ifelse(p>1e-8, p+lp_m, Taylor) - p*(z*p + 2*lp_m)`.
 @inline function _logis_out(z::Real)
-    p   = logistic(z)
+    p = logistic(z)
     lpm = log1p(-p)             # log F(-z)
-    fz  = _logis_Fz_plus_logFmz(z)   # F(z) + log F(-z), Taylor-safe
+    fz = _logis_Fz_plus_logFmz(z)   # F(z) + log F(-z), Taylor-safe
     return fz - p * (z * p + 2 * lpm)
 end
 
@@ -75,8 +75,8 @@ function _crps_clogis(y::Real, location::Real, scale::Real, l::Real, u::Real)
         return abs(y0 - max(l0, zero(l0)) - min(u0, zero(u0)))
     end
     return scale * _crps_clogis_unit(y0 / scale,
-                                     isfinite(l0) ? l0 / scale : l0,
-                                     isfinite(u0) ? u0 / scale : u0)
+        isfinite(l0) ? l0 / scale : l0,
+        isfinite(u0) ? u0 / scale : u0)
 end
 
 function crps(d::Censored{<:Logistic}, y::Real)
@@ -93,16 +93,18 @@ function _crps_tlogis_unit(y::Real, l::Real, u::Real)
         y, l, u = -y, -u, -l
     end
 
-    out_l = 0.0; p_l = 0.0
-    out_u = 1.0; p_u = 1.0
+    out_l = 0.0;
+    p_l = 0.0
+    out_u = 1.0;
+    p_u = 1.0
     z = y
     if isfinite(l)
-        p_l   = logistic(l)
+        p_l = logistic(l)
         out_l = _logis_out(l)
         z = max(l, z)
     end
     if isfinite(u)
-        p_u   = logistic(u)
+        p_u = logistic(u)
         out_u = _logis_out(u)
         z = min(u, z)
     end
@@ -129,8 +131,8 @@ function _crps_tlogis(y::Real, location::Real, scale::Real, l::Real, u::Real)
         return (l0 < 0 && u0 > 0) ? abs(y0) : oftype(float(y), NaN)
     end
     return scale * _crps_tlogis_unit(y0 / scale,
-                                     isfinite(l0) ? l0 / scale : l0,
-                                     isfinite(u0) ? u0 / scale : u0)
+        isfinite(l0) ? l0 / scale : l0,
+        isfinite(u0) ? u0 / scale : u0)
 end
 
 function crps(d::Truncated{<:Logistic}, y::Real)
@@ -142,7 +144,7 @@ end
 # Point masses `lmass`, `umass` at the (finite) lower/upper truncation points.
 # Internal only — no Distributions.jl type captures this directly.
 function _crps_gtclogis(y::Real, location::Real, scale::Real,
-                        l::Real, u::Real, lmass::Real, umass::Real)
+        l::Real, u::Real, lmass::Real, umass::Real)
     scale < 0 && return oftype(float(y), NaN)
     y0 = y - location
     l0 = isfinite(l) ? l - location : l
@@ -157,9 +159,9 @@ function _crps_gtclogis(y::Real, location::Real, scale::Real,
         return oftype(float(y), NaN)
     end
     return scale * _crps_gtclogis_unit(y0 / scale,
-                                       isfinite(l0) ? l0 / scale : l0,
-                                       isfinite(u0) ? u0 / scale : u0,
-                                       lmass, umass)
+        isfinite(l0) ? l0 / scale : l0,
+        isfinite(u0) ? u0 / scale : u0,
+        lmass, umass)
 end
 
 function _crps_gtclogis_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real)
@@ -172,12 +174,13 @@ function _crps_gtclogis_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real
     out_l1 = out_l2 = out_l3 = 0.0
     out_u1 = out_u2 = 0.0
     p_l = 0.0
-    p_u = 1.0; out_u3 = 1.0
+    p_u = 1.0;
+    out_u3 = 1.0
     z = y
 
     if isfinite(l) || lmass != 0
         (lmass < 0 || lmass > 1) && return NaN
-        p_l   = logistic(l)
+        p_l = logistic(l)
         lp_ml = log1p(-p_l)       # log F(-l)
         out_l1 = lmass == 0 ? 0.0 : l * lmass^2
         out_l2 = isfinite(l) ? 2 * (l * p_l + lp_ml) * lmass : 0.0
@@ -186,7 +189,7 @@ function _crps_gtclogis_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real
     end
     if isfinite(u) || umass != 0
         (umass < 0 || umass > 1) && return NaN
-        p_u   = logistic(u)
+        p_u = logistic(u)
         lp_mu = log1p(-p_u)       # log F(-u)
         out_u1 = umass == 0 ? 0.0 : u * umass^2
         out_u2 = isfinite(u) ? 2 * (u * p_u + lp_mu) * umass : 0.0

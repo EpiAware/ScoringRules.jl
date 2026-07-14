@@ -1,2 +1,3 @@
 # MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 style = "sciml"
+ignore = ["docs/pages.jl"]

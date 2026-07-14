@@ -9,9 +9,6 @@
 
 export es, vs, mmds
 
-using LinearAlgebra: norm
-using Statistics: mean
-
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -65,7 +62,7 @@ function _esC_xx(X::AbstractMatrix, w::AbstractVector)
     out = 0.0
     m = size(X, 2)
     @inbounds for i in 1:m
-        @inbounds for j in (i+1):m
+        @inbounds for j in (i + 1):m
             out += 2.0 * w[i] * w[j] * norm(view(X, :, i) .- view(X, :, j))
         end
     end
@@ -86,10 +83,20 @@ Optional per-member weights `w` (length `m`); they are normalised to sum to one
 internally. If `w` is `nothing`, uniform weights are used. Lower is better.
 
 # Provenance
+
 Ported from `es_sample` in R scoringRules (scores_sample_multiv.R; procs_es.cpp;
 Jordan, Krüger, Lerch, Allen). Gneiting et al. (2008), TEST 17, 211–235.
+
+# Example
+
+```@example
+using ScoringRules
+X = randn(2, 50)
+y = [0.0, 0.0]
+es(X, y)
+```
 """
-function es(X::AbstractMatrix, y::AbstractVector; w=nothing)
+function es(X::AbstractMatrix, y::AbstractVector; w = nothing)
     _check_multiv(X, y)
     wv = _w_helper(X, w)
     return _esC_xy(y, X, wv) - 0.5 * _esC_xx(X, wv)
@@ -106,7 +113,7 @@ function _vsC(y::AbstractVector, X::AbstractMatrix, p::Real)
     @inbounds for k in 1:d
         @inbounds for l in k:d
             vdat = mean(abs(X[k, i] - X[l, i])^p for i in 1:size(X, 2))
-            vy   = abs(y[k] - y[l])^p
+            vy = abs(y[k] - y[l])^p
             out += 2.0 * (vy - vdat)^2
         end
     end
@@ -120,7 +127,7 @@ function _vsC_w_vs(y::AbstractVector, X::AbstractMatrix, w_vs::AbstractMatrix, p
     @inbounds for k in 1:d
         @inbounds for l in k:d
             vdat = mean(abs(X[k, i] - X[l, i])^p for i in 1:size(X, 2))
-            vy   = abs(y[k] - y[l])^p
+            vy = abs(y[k] - y[l])^p
             out += 2.0 * w_vs[k, l] * (vy - vdat)^2
         end
     end
@@ -143,7 +150,7 @@ end
 
 # Member-weight path (w per column, default w_vs = ones)
 function _vsC_w(y::AbstractVector, X::AbstractMatrix, w_vs::AbstractMatrix,
-                w::AbstractVector, p::Real)
+        w::AbstractVector, p::Real)
     m = size(X, 2)
     s1 = 0.0
     @inbounds for i in 1:m
@@ -174,10 +181,20 @@ ones). Per-member weights are not supported; pass `nothing` for `w` to use the
 unweighted form.
 
 # Provenance
+
 Ported from `vs_sample` in R scoringRules (scores_sample_multiv.R; procs_es.cpp;
 Jordan, Krüger, Lerch, Allen). Scheuerer & Hamill (2015), MWR 143, 1321–1334.
+
+# Example
+
+```@example
+using ScoringRules
+X = randn(2, 50)
+y = [0.0, 0.0]
+vs(X, y)
+```
 """
-function vs(X::AbstractMatrix, y::AbstractVector; p::Real=0.5, w=nothing)
+function vs(X::AbstractMatrix, y::AbstractVector; p::Real = 0.5, w = nothing)
     _check_multiv(X, y)
     d = length(y)
     if w !== nothing
@@ -186,7 +203,7 @@ function vs(X::AbstractMatrix, y::AbstractVector; p::Real=0.5, w=nothing)
         size(w) == (d, d) || throw(DimensionMismatch(
             "w must be a $d × $d matrix, got $(size(w))"))
         any(<(0), w) && throw(ArgumentError("weight matrix w must be non-negative"))
-        isapprox(w, w'; atol=1e-12) || throw(ArgumentError(
+        isapprox(w, w'; atol = 1e-12) || throw(ArgumentError(
             "weight matrix w must be symmetric"))
         return _vsC_w_vs(y, X, w, p)
     else
@@ -215,7 +232,7 @@ function _mmdsC_xx(X::AbstractMatrix, w::AbstractVector)
     m = size(X, 2)
     @inbounds for i in 1:m
         out += w[i]^2
-        @inbounds for j in (i+1):m
+        @inbounds for j in (i + 1):m
             d2 = sum(abs2, view(X, :, i) .- view(X, :, j))
             out += 2.0 * w[i] * w[j] * exp(-0.5 * d2)
         end
@@ -238,9 +255,19 @@ Uniform weights `w_i = 1/m` are used (weighted form not currently exposed).
 Lower is better.
 
 # Provenance
+
 Ported from `mmds_sample` in R scoringRules (scores_sample_multiv.R; procs_es.cpp;
 Jordan, Krüger, Lerch, Allen). Gneiting & Raftery (2007), JASA 102, 359–378;
 Gretton et al. (2012), JMLR 13, 723–773.
+
+# Example
+
+```@example
+using ScoringRules
+X = randn(2, 50)
+y = [0.0, 0.0]
+mmds(X, y)
+```
 """
 function mmds(X::AbstractMatrix, y::AbstractVector)
     _check_multiv(X, y)

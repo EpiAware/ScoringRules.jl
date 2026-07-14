@@ -17,6 +17,18 @@
 Logarithmic score of the forecast distribution `d` at the observation `y`,
 equal to the negative log-likelihood `-logpdf(d, y)` (or `-logpmf` for discrete
 `d`). Lower is better.
+
+# Arguments
+
+  - `d`: forecast distribution (any `UnivariateDistribution`).
+  - `y`: scalar observation.
+
+# Example
+
+```@example
+using Distributions, ScoringRules
+logs(Normal(0, 1), 0.5)
+```
 """
 logs(d::UnivariateDistribution, y::Real) = -logpdf(d, y)
 
@@ -31,6 +43,18 @@ Dawid–Sebastiani score of the forecast distribution `d` at the observation `y`
 
 where ``\\mu_F`` and ``\\sigma_F^2`` are the mean and variance of `d`. Only the
 first two moments of the forecast enter. Lower is better.
+
+# Arguments
+
+  - `d`: forecast distribution (any `UnivariateDistribution`).
+  - `y`: scalar observation.
+
+# Example
+
+```@example
+using Distributions, ScoringRules
+dss(Normal(0, 1), 0.5)
+```
 """
 function dss(d::UnivariateDistribution, y::Real)
     m = mean(d)
@@ -46,6 +70,19 @@ Dawid–Sebastiani score from a moment forecast given directly as its `mean` and
 forecast only through its first two moments, this equals `dss(d, y)` for any `d`
 with that mean and variance. This is the moment-based forecast input mode. Lower
 is better.
+
+# Arguments
+
+  - `y`: scalar observation.
+  - `mean`: forecast mean.
+  - `var`: forecast variance.
+
+# Example
+
+```@example
+using ScoringRules
+dss_moments(0.5, 0.0, 1.0)
+```
 """
 dss_moments(y::Real, mean::Real, var::Real) = (y - mean)^2 / var + log(var)
 
@@ -61,6 +98,18 @@ observation `y`,
 
 Distribution-specific methods provide closed forms; this generic method is a
 numerical fallback (adaptive quadrature for continuous `d`). Lower is better.
+
+# Arguments
+
+  - `d`: forecast distribution (any `UnivariateDistribution`).
+  - `y`: scalar observation.
+
+# Example
+
+```@example
+using Distributions, ScoringRules
+crps(Normal(0, 1), 0.5)
+```
 """
 function crps(d::ContinuousUnivariateDistribution, y::Real)
     lo = minimum(d)

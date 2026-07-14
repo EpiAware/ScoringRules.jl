@@ -29,7 +29,7 @@
 #         = σ₁² − σ₁σ₂ + σ₂² − (2/π)(σ₂ − σ₁)²
 
 const _SQRT2DIVPI = sqrt(2 / π)
-const _2DIVPI     = 2 / π
+const _2DIVPI = 2 / π
 
 """
     TwoPieceNormal(location, scale1, scale2)
@@ -40,11 +40,11 @@ below `location` and `scale2` above it, renormalised to a proper density. With
 Distributions.jl; provided here so it flows through
 [`crps`](@ref)/[`logs`](@ref)/[`dss`](@ref) dispatch.
 """
-struct TwoPieceNormal{T<:Real} <: ContinuousUnivariateDistribution
+struct TwoPieceNormal{T <: Real} <: ContinuousUnivariateDistribution
     location::T
     scale1::T  # left-arm scale  (> 0)
     scale2::T  # right-arm scale (> 0)
-    function TwoPieceNormal{T}(location::T, scale1::T, scale2::T) where {T<:Real}
+    function TwoPieceNormal{T}(location::T, scale1::T, scale2::T) where {T <: Real}
         scale1 > zero(T) || error("scale1 must be positive")
         scale2 > zero(T) || error("scale2 must be positive")
         return new{T}(location, scale1, scale2)
@@ -86,7 +86,8 @@ function Distributions.cdf(d::TwoPieceNormal, x::Real)
     if z <= 0
         return 2 * d.scale1 / S * _norm_cdf(z / d.scale1)
     else
-        return d.scale1 / S + 2 * d.scale2 / S * (_norm_cdf(z / d.scale2) - oftype(float(x), 0.5))
+        return d.scale1 / S +
+               2 * d.scale2 / S * (_norm_cdf(z / d.scale2) - oftype(float(x), 0.5))
     end
 end
 
@@ -156,11 +157,11 @@ exponential tails with scale `scale1` below `location` and `scale2` above it.
 Not part of Distributions.jl; provided here so it flows through
 [`crps`](@ref)/[`logs`](@ref)/[`dss`](@ref) dispatch.
 """
-struct TwoPieceExponential{T<:Real} <: ContinuousUnivariateDistribution
+struct TwoPieceExponential{T <: Real} <: ContinuousUnivariateDistribution
     location::T
     scale1::T  # left-arm scale  (> 0)
     scale2::T  # right-arm scale (> 0)
-    function TwoPieceExponential{T}(location::T, scale1::T, scale2::T) where {T<:Real}
+    function TwoPieceExponential{T}(location::T, scale1::T, scale2::T) where {T <: Real}
         scale1 > zero(T) || error("scale1 must be positive")
         scale2 > zero(T) || error("scale2 must be positive")
         return new{T}(location, scale1, scale2)

@@ -30,14 +30,20 @@ function _crps_tnorm_unit(y::Real, l::Real, u::Real)
     if l > 3
         y, l, u = -y, -u, -l
     end
-    p_l = 0.0; out_l = 0.0
-    p_u = 1.0; out_u = 1.0
+    p_l = 0.0;
+    out_l = 0.0
+    p_u = 1.0;
+    out_u = 1.0
     z = y
     if isfinite(l)
-        p_l = _norm_cdf(l); out_l = _Phi_root2(l); z = max(l, z)
+        p_l = _norm_cdf(l);
+        out_l = _Phi_root2(l);
+        z = max(l, z)
     end
     if isfinite(u)
-        p_u = _norm_cdf(u); out_u = _Phi_root2(u); z = min(u, z)
+        p_u = _norm_cdf(u);
+        out_u = _Phi_root2(u);
+        z = min(u, z)
     end
     l > u && return NaN
     l == u && return abs(y - z)
@@ -66,7 +72,10 @@ end
 
 # --- censored normal -------------------------------------------------------
 function _crps_cnorm_unit(y::Real, l::Real, u::Real)
-    out_l1 = 0.0; out_u1 = 0.0; out_l2 = 0.0; out_u2 = 1.0
+    out_l1 = 0.0;
+    out_u1 = 0.0;
+    out_l2 = 0.0;
+    out_u2 = 1.0
     z = y
     if isfinite(l)
         p_l = _norm_cdf(l)
@@ -113,9 +122,14 @@ function _crps_gtcnorm_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real)
         y, l, u = -y, -u, -l
         lmass, umass = umass, lmass
     end
-    out_l1 = 0.0; out_l2 = 0.0; out_l3 = 0.0
-    out_u1 = 0.0; out_u2 = 0.0
-    p_l = 0.0; p_u = 1.0; out_u3 = 1.0
+    out_l1 = 0.0;
+    out_l2 = 0.0;
+    out_l3 = 0.0
+    out_u1 = 0.0;
+    out_u2 = 0.0
+    p_l = 0.0;
+    p_u = 1.0;
+    out_u3 = 1.0
     z = y
     if isfinite(l) || lmass != 0
         (lmass < 0 || lmass > 1) && return NaN
@@ -145,7 +159,8 @@ function _crps_gtcnorm_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real)
     return out + abs(y - z)
 end
 
-function _crps_gtcnorm(y::Real, μ::Real, σ::Real, l::Real, u::Real, lmass::Real, umass::Real)
+function _crps_gtcnorm(
+        y::Real, μ::Real, σ::Real, l::Real, u::Real, lmass::Real, umass::Real)
     σ < 0 && return oftype(float(y), NaN)
     y -= μ
     isfinite(l) && (l -= μ)
