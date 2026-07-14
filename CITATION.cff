@@ -1,0 +1,57 @@
+cff-version: 1.2.0
+message: >-
+  ScoringRules.jl is a port of the R `scoringRules` package. If you use it,
+  please cite the original authors' Journal of Statistical Software papers
+  (listed under `references`) in addition to this software.
+title: "ScoringRules.jl"
+type: software
+authors:
+  - name: "Sebastian Funk"
+  - name: "contributors"
+repository-code: "https://github.com/EpiAware/ScoringRules.jl"
+url: "https://github.com/EpiAware/ScoringRules.jl"
+license: GPL-2.0-or-later
+references:
+  - type: article
+    title: "Evaluating Probabilistic Forecasts with scoringRules"
+    authors:
+      - given-names: "Alexander I."
+        family-names: "Jordan"
+      - given-names: "Fabian"
+        family-names: "Krüger"
+      - given-names: "Sebastian"
+        family-names: "Lerch"
+    journal: "Journal of Statistical Software"
+    year: 2019
+    volume: 90
+    issue: 12
+    start: 1
+    end: 37
+    doi: "10.18637/jss.v090.i12"
+  - type: article
+    title: >-
+      Weighted scoringRules: Emphasizing Particular Outcomes When Evaluating
+      Probabilistic Forecasts
+    authors:
+      - given-names: "Sam"
+        family-names: "Allen"
+    journal: "Journal of Statistical Software"
+    year: 2024
+    volume: 110
+    issue: 8
+    start: 1
+    end: 26
+    doi: "10.18637/jss.v110.i08"
+  - type: software
+    title: "scoringRules: Scoring Rules for Parametric and Simulated Distribution Forecasts"
+    authors:
+      - given-names: "Alexander I."
+        family-names: "Jordan"
+      - given-names: "Fabian"
+        family-names: "Krüger"
+      - given-names: "Sebastian"
+        family-names: "Lerch"
+      - given-names: "Sam"
+        family-names: "Allen"
+    repository-code: "https://github.com/FK83/scoringRules"
+    notes: "The R package that ScoringRules.jl is ported from."
