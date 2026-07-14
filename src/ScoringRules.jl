@@ -31,14 +31,22 @@ using HypergeometricFunctions: _₂F₁
 using QuadGK: quadgk
 using Statistics: mean, var, std
 using LinearAlgebra: norm
+using Random: AbstractRNG
 using DocStringExtensions: TYPEDSIGNATURES, TYPEDEF, TYPEDFIELDS, DOCSTRING, @template
 
 # Generic scoring-rule interface (parametric + ensemble via dispatch)
 export crps, logs, dss
+# Distribution types provided here (not in Distributions.jl)
+export LogLaplace, TwoPieceNormal, TwoPieceExponential
 
 include("docstrings.jl")
 include("utils.jl")
 include("generics.jl")
+
+# Extra distribution types, so they flow through crps/logs/dss dispatch
+# (log-logistic is Distributions.LogLogistic; only these are missing upstream)
+include("distributions/loglaplace.jl")
+include("distributions/twopiece.jl")
 
 # Closed-form CRPS per distribution family
 include("crps/normal.jl")
@@ -53,5 +61,8 @@ include("crps/lognormal.jl")
 include("crps/extremes.jl")
 include("crps/mixture.jl")
 include("crps/discrete.jl")
+include("crps/loglogistic.jl")
+include("crps/loglaplace.jl")
+include("crps/twopiece.jl")
 
 end # module ScoringRules
