@@ -1,4 +1,5 @@
 @testitem "extra distribution scores match R scoringRules" setup=[References] begin
+    using ScoringRules
     using Distributions
 
     atol = 1e-9

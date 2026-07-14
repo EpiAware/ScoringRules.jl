@@ -1,4 +1,5 @@
 @testitem "RPS matches R scoringRules rps_probs" setup=[References] begin
+    using ScoringRules
     atol = 1e-9
     rtol = 1e-7
 

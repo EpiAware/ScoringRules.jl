@@ -20,7 +20,12 @@
         names = strip.(replace.(vec(header), '"' => ""))
         cols = Dict{String, Vector{Float64}}()
         for (j, nm) in enumerate(names)
-            cols[String(nm)] = _tof.(raw[:, j])
+            # Skip non-numeric columns (e.g. a string "method" label) that some
+            # reference tables carry alongside their numeric score columns.
+            try
+                cols[String(nm)] = _tof.(raw[:, j])
+            catch
+            end
         end
         return cols, size(raw, 1)
     end

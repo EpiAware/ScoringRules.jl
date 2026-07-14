@@ -1,4 +1,5 @@
 @testitem "student-t family scores match R scoringRules" tags=[:crps] setup=[References] begin
+    using ScoringRules
     using Distributions
 
     atol=1e-9
@@ -23,6 +24,9 @@
             y = c["y"][i]
             @test crps(d, y)≈c["crps"][i] atol=atol rtol=rtol
             @test logs(d, y)≈c["logs"][i] atol=atol rtol=rtol
+            # R's dss_t returns NaN for df ≤ 2 (infinite variance); the t
+            # variance is genuinely infinite there, so skip those rows.
+            isnan(c["dss"][i]) && continue
             @test dss(d, y)≈c["dss"][i] atol=atol rtol=rtol
         end
     end
@@ -37,7 +41,7 @@
             ref_logs = c["logs"][i]
             isnan(ref_crps) && continue
             @test crps(d, y)≈ref_crps atol=atol rtol=rtol
-            isnan(ref_logs) || isinf(ref_logs) && continue
+            (isnan(ref_logs) || isinf(ref_logs)) && continue
             @test logs(d, y)≈ref_logs atol=atol rtol=rtol
         end
     end

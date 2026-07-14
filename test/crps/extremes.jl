@@ -1,4 +1,5 @@
 @testitem "extreme value family scores match R scoringRules" tags=[:crps] setup=[References] begin
+    using ScoringRules
     using Distributions
 
     atol=1e-9
@@ -20,9 +21,9 @@
             isnan(ref_crps) && continue
             d = GeneralizedExtremeValue(loc, sc, shape)
             @test crps(d, y)≈ref_crps atol=atol rtol=rtol_gev
-            isnan(ref_logs) || isinf(ref_logs) && continue
+            (isnan(ref_logs) || isinf(ref_logs)) && continue
             @test logs(d, y)≈ref_logs atol=atol rtol=rtol
-            isnan(ref_dss) || isinf(ref_dss) && continue
+            (isnan(ref_dss) || isinf(ref_dss)) && continue
             @test dss(d, y)≈ref_dss atol=atol rtol=rtol
         end
     end
@@ -40,9 +41,9 @@
             isnan(ref_crps) && continue
             d = GeneralizedPareto(loc, sc, shape)
             @test crps(d, y)≈ref_crps atol=atol rtol=rtol
-            isnan(ref_logs) || isinf(ref_logs) && continue
+            (isnan(ref_logs) || isinf(ref_logs)) && continue
             @test logs(d, y)≈ref_logs atol=atol rtol=rtol
-            isnan(ref_dss) || isinf(ref_dss) && continue
+            (isnan(ref_dss) || isinf(ref_dss)) && continue
             @test dss(d, y)≈ref_dss atol=atol rtol=rtol
         end
     end

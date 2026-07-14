@@ -1,4 +1,5 @@
 @testitem "continuous family scores match R scoringRules" tags=[:crps] setup=[References] begin
+    using ScoringRules
     using Distributions
 
     atol=1e-9
@@ -60,9 +61,9 @@
             ref_dss = c["dss"][i]
             @test crps(d, y)≈ref_crps atol=atol rtol=rtol
             # logs and dss are Inf when y is outside [min, max]
-            isnan(ref_logs) || isinf(ref_logs) && continue
+            (isnan(ref_logs) || isinf(ref_logs)) && continue
             @test logs(d, y)≈ref_logs atol=atol rtol=rtol
-            isnan(ref_dss) || isinf(ref_dss) && continue
+            (isnan(ref_dss) || isinf(ref_dss)) && continue
             @test dss(d, y)≈ref_dss atol=atol rtol=rtol
         end
     end

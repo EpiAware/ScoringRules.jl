@@ -1,4 +1,5 @@
 @testitem "discrete family scores match R scoringRules" tags=[:crps] setup=[References] begin
+    using ScoringRules
     using Distributions
 
     atol=1e-9

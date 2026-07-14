@@ -1,4 +1,5 @@
 @testitem "normal family scores match R scoringRules" setup=[References] begin
+    using ScoringRules
     using Distributions
     using ScoringRules: _crps_gtcnorm
 

@@ -1,4 +1,5 @@
 @testitem "sample univariate scores match R scoringRules" setup=[References] begin
+    using ScoringRules
     using ScoringRules: _bw_nrd
 
     atol = 1e-9

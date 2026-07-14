@@ -1,4 +1,5 @@
 @testitem "quantile and interval scores match R scoringRules" setup=[References] begin
+    using ScoringRules
     atol = 1e-9
     rtol = 1e-7
 
