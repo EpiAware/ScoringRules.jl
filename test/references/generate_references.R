@@ -190,13 +190,11 @@ g$dss  <- dss_gev(g$y, shape = g$shape, location = g$location, scale = g$scale)
 write_ref("gev", g)
 
 ## ---- GPD ------------------------------------------------------------------
+# Includes observations below the support with positive shape (y < location),
+# which the closed form now handles exactly as R does.
 g <- grid(shape = c(-0.5, 0.0, 0.5, 0.9),
           location = c(0, 1), scale = c(0.5, 1, 2),
-          y = c(0, 0.5, 1, 2, 5))
-# Exclude rows where y < location and shape > 0: the closed-form clips the
-# standardised value differently from R for that edge case (y below support,
-# positive shape). Those rows exercise a separate code path not yet covered.
-g <- g[!(g$shape > 0 & g$y < g$location), ]
+          y = c(-2, -0.5, 0, 0.5, 1, 2, 5))
 g$crps <- crps_gpd(g$y, shape = g$shape, location = g$location, scale = g$scale)
 g$logs <- logs_gpd(g$y, shape = g$shape, location = g$location, scale = g$scale)
 g$dss  <- dss_gpd(g$y, shape = g$shape, location = g$location, scale = g$scale)

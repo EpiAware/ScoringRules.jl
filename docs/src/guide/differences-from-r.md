@@ -23,23 +23,6 @@ returns a finite result wherever the variance exists (requires ``\beta > 2``).
 Numerical comparison with R is not possible because R's implementation is
 broken for this family.
 
-## GPD CRPS: observation below support with positive shape
-
-For a `GeneralizedPareto(μ, σ, ξ)` distribution with positive shape ``\xi > 0``,
-the support is ``[μ, μ + σ/ξ]``. When the observation ``y`` is below the
-lower boundary ``\mu``, the closed-form expression involves
-``(1 + \xi z)^{-1/\xi}`` where ``z = (y - \mu)/\sigma < -1/\xi``, so
-``1 + \xi z \le 0``.
-
-ScoringRules.jl clips this to zero before raising to the power, which is the
-convention the R source also applies. However, R and this package handle the
-edge case ``y < \mu``, ``\xi > 0`` differently at the level of the survival
-function clipping step. The results from these rows are not currently compared
-against R references; that code path is not yet fully validated.
-
-Users are advised to restrict GPD evaluations to observations ``y \ge \mu``
-until this edge case is resolved.
-
 ## GEV CRPS: Gumbel case (shape ≈ 0)
 
 For a `GeneralizedExtremeValue(μ, σ, 0)` distribution (the Gumbel limit,

@@ -74,8 +74,10 @@ function _crps_gpd(y::Real, shape::Real,
     x = if abs(shape) < 1e-12
         exp(-z)               # exponential limit
     else
-        x_inner = 1 + shape * z
-        x_inner <= 0 ? zero(float(z)) : x_inner^(-1 / shape)
+        # Match R: clip 1 + shape·z at 0, then raise to -1/shape. Below the
+        # support this gives 0^(-1/shape) = Inf for shape > 0 (clipped to 1
+        # below) and 0 for shape < 0, exactly as scores_gpd.R does.
+        max(1 + shape * z, zero(float(z)))^(-1 / shape)
     end
     # x represents the survival function value; clip from above at 1
     x = min(x, one(x))
