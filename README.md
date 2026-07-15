@@ -37,18 +37,6 @@ What that means in practice:
 - `LogLaplace`, `TwoPieceNormal` and `TwoPieceExponential` are provided here, as
   Distributions.jl does not have them.
 
-## Why ScoringRules?
-
-- **Three univariate scores** — the continuous ranked probability score
-  (`crps`), the logarithmic score (`logs`) and the Dawid–Sebastiani score
-  (`dss`), all negatively oriented so that a lower score is better.
-- **Dispatch on Distributions.jl** — score a parametric forecast by passing the
-  distribution itself: `crps(Normal(0, 1), 0.4)`. Closed forms are used where
-  the R package has them, with a quadrature fallback otherwise.
-- **Ensemble forecasts** — score simulated or MCMC draws directly, including
-  multivariate ensembles via the energy score, variogram score and MMD score.
-- **Broadcast-friendly** — vectorise with the usual dot syntax, `crps.(ds, ys)`.
-
 ## Getting started
 
 ```julia
