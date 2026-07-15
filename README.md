@@ -23,6 +23,20 @@ expected to diverge from upstream over time. If you use it, please cite the
 original authors (see [How to cite](#how-to-cite) and [`NOTICE.md`](NOTICE.md)).
 It is distributed under the same licence as the original, **GPL-2.0-or-later**.
 
+The formulae and algorithms come from the R package; the interface is Julia's.
+What that means in practice:
+
+- Forecasts are Distributions.jl objects, dispatched on their type, instead of a
+  separate function per family: write `crps(Normal(0, 1), 0.4)`, not `crps_norm`.
+- Gradients come from automatic differentiation with any supported backend, so
+  there is no equivalent of R's hand-written `gradcrps_*` / `hesscrps_*`.
+- Results match R in almost every case (the test suite checks against reference
+  values generated from R). A few diverge on purpose, such as the log-logistic
+  Dawid–Sebastiani score and the Gumbel limit of the GEV CRPS; each is documented
+  under [Differences from R](https://epiaware.org/ScoringRules.jl/stable/guide/differences-from-r/).
+- `LogLaplace`, `TwoPieceNormal` and `TwoPieceExponential` are provided here, as
+  Distributions.jl does not have them.
+
 ## Why ScoringRules?
 
 - **Three univariate scores** — the continuous ranked probability score
