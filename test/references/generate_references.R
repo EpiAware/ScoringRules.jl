@@ -507,3 +507,20 @@ g <- grid(location = c(-1, 0, 2),
 g$crps <- crps_2pexp(g$y, scale1 = g$scale1, scale2 = g$scale2, location = g$location)
 g$logs <- logs_2pexp(g$y, scale1 = g$scale1, scale2 = g$scale2, location = g$location)
 write_ref("twopieceexp", g)
+
+## ---- gradient references (gradcrps_*) for the AD validation page ----
+## R ships analytic CRPS gradients only for the Normal, Logistic and Student-t
+## families; the Julia docs compare ForwardDiff against these.
+gn <- expand.grid(location = c(-1, 0, 1, 2), scale = c(0.5, 1, 2),
+                  y = c(-1.5, 0.3, 1.2, 3))
+g_norm  <- gradcrps_norm(gn$y, gn$location, gn$scale)
+g_logis <- gradcrps_logis(gn$y, gn$location, gn$scale)
+write.csv(cbind(gn, dloc = g_norm[, 1],  dscale = g_norm[, 2]),
+          "test/references/data/grad_norm.csv",  row.names = FALSE)
+write.csv(cbind(gn, dloc = g_logis[, 1], dscale = g_logis[, 2]),
+          "test/references/data/grad_logis.csv", row.names = FALSE)
+gt <- expand.grid(df = c(2, 5, 20), location = c(0, 1), scale = c(1, 2),
+                  y = c(-1.5, 0.3, 1.2, 3))
+g_t <- gradcrps_t(gt$y, gt$df, gt$location, gt$scale)
+write.csv(cbind(gt, dloc = g_t[, 1], dscale = g_t[, 2]),
+          "test/references/data/grad_t.csv", row.names = FALSE)

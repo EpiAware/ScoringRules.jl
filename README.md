@@ -31,9 +31,12 @@ What that means in practice:
 - Gradients come from automatic differentiation with any supported backend, so
   there is no equivalent of R's hand-written `gradcrps_*` / `hesscrps_*`.
 - Results match R in almost every case (the test suite checks against reference
-  values generated from R). A few diverge on purpose, such as the log-logistic
-  Dawid–Sebastiani score and the Gumbel limit of the GEV CRPS; each is documented
-  under [Differences from R](https://epiaware.org/ScoringRules.jl/stable/guide/differences-from-r/).
+  values generated from R; see
+  [Validation against R](https://epiaware.org/ScoringRules.jl/stable/guide/validation-against-r/)
+  for a live value- and gradient-level comparison). A few diverge on purpose,
+  such as the log-logistic Dawid–Sebastiani score and the Gumbel limit of the GEV
+  CRPS; each is documented under
+  [Differences from R](https://epiaware.org/ScoringRules.jl/stable/guide/differences-from-r/).
 - `LogLaplace`, `TwoPieceNormal` and `TwoPieceExponential` are provided here, as
   Distributions.jl does not have them.
 

@@ -29,7 +29,8 @@ pages = [
         "Forecast input modes" => "guide/input-modes.md",
         "Scoring rules reference" => "guide/scoring-rules-reference.md",
         "Supported distributions" => "guide/distributions.md",
-        "Differences from R" => "guide/differences-from-r.md"
+        "Differences from R" => "guide/differences-from-r.md",
+        "Validation against R" => "guide/validation-against-r.md"
     ],
     "API reference" => [
         "Public API" => "lib/public.md",
