@@ -5,7 +5,8 @@ Proper scoring rules for probabilistic forecasts in Julia.
 
 A port of the R package [`scoringRules`](https://github.com/FK83/scoringRules)
 by Alexander I. Jordan, Fabian Krüger, Sebastian Lerch and Sam Allen. See
-`NOTICE.md` for attribution and provenance. Distributed under GPL-2.0-or-later.
+the package README for attribution and provenance. Distributed under
+GPL-2.0-or-later.
 
 Scores follow the *lower-is-better* convention (negative orientation) and are
 broadcast-friendly. The three univariate entry points

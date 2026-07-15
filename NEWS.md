@@ -2,7 +2,7 @@
 
 First working version: a port of the R
 [`scoringRules`](https://github.com/FK83/scoringRules) package (Jordan, Krüger,
-Lerch and Allen). See `NOTICE.md` for attribution and provenance.
+Lerch and Allen). See the README for attribution and provenance.
 
 - Three univariate scores via multiple dispatch: `crps`, `logs`, `dss`. `logs`
   and `dss` work for any `Distributions.jl` univariate type; `crps` has a

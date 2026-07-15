@@ -12,7 +12,7 @@ emphasising particular outcomes with weighted scores.
 
 It reworks the spirit of the *scoringRules* articles by Jordan, Krüger &
 Lerch (2019) and Allen (2024) as a self-contained Julia workflow (see
-[How to cite](@ref) and `NOTICE.md`). The data here is synthetic and generated
+[How to cite](@ref)). The data here is synthetic and generated
 in-code; the original articles used real macroeconomic and weather forecasts.
 Everything runs from a fixed seed, so the page is reproducible.
 """

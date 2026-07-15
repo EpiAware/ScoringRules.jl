@@ -89,6 +89,5 @@ crps(NegativeBinomial(5, 0.4), 3)
 ScoringRules.jl is a Julia port of the R package
 [`scoringRules`](https://github.com/FK83/scoringRules) by Alexander I. Jordan,
 Fabian Krüger, Sebastian Lerch and Sam Allen. The **initial port was generated
-by a large language model (Claude) under human guidance**. See
-[`NOTICE.md`](https://github.com/EpiAware/ScoringRules.jl/blob/main/NOTICE.md)
+by a large language model (Claude) under human guidance**. See the [package README](https://github.com/EpiAware/ScoringRules.jl#attribution-and-provenance)
 for full attribution and licence details.
