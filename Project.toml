@@ -2,7 +2,7 @@ name = "ScoringRules"
 uuid = "1fcf7366-10ae-49d1-a4dc-286b3bf402d3"
 license = "GPL-2.0-or-later"
 authors = ["Sebastian Funk <sebastian.funk@lshtm.ac.uk> and contributors"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
