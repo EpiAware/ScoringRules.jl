@@ -11,7 +11,9 @@
 #
 # Light tutorials emit `@example` blocks that Documenter runs in-process; keep
 # cheap tutorials here.
-const LIGHT_TUTORIALS = String[]
+const LIGHT_TUTORIALS = String[
+    "evaluating-forecasts.jl"
+]
 
 # Heavy tutorials (live MCMC fits, multi-backend AD, plotting) are each
 # executed once in a fresh subprocess so native/memory state cannot accumulate.

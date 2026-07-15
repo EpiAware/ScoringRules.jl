@@ -21,6 +21,7 @@ pages = [
     "Getting started" => [
         "Overview" => "getting-started/index.md",
         "Tutorials" => [
+            "Evaluating forecasts end-to-end" => "getting-started/tutorials/evaluating-forecasts.md",
             "Automatic differentiation backends" => "getting-started/tutorials/ad-backends.md"
         ]
     ],
