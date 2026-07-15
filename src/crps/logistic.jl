@@ -8,6 +8,10 @@
 # Taylor expansion for z → -∞ to avoid underflow:
 #   F(z) + log(1 - F(z))  ≈  -F(z)²/2 - F(z)³/3   when F(z) < 1e-8
 
+# Below this tail probability, log F(-z) is evaluated via its Taylor expansion
+# to avoid catastrophic cancellation (mirrors the R source).
+const _LOGIS_TAYLOR_ATOL = 1e-8
+
 # --- logistic helpers ---------------------------------------------------------
 
 # Numerically stable   F(z) + log F(-z)  =  F(z) + log(1 - F(z)).
@@ -15,7 +19,7 @@
 # the Taylor expansion used in the R source.
 @inline function _logis_Fz_plus_logFmz(z::Real)
     p = logistic(z)
-    return p > 1e-8 ? p + log1p(-p) : -p^2 / 2 - p^3 / 3
+    return p > _LOGIS_TAYLOR_ATOL ? p + log1p(-p) : -p^2 / 2 - p^3 / 3
 end
 
 # Normalising constant appearing in the truncated/gtc formulas:
@@ -93,9 +97,9 @@ function _crps_tlogis_unit(y::Real, l::Real, u::Real)
         y, l, u = -y, -u, -l
     end
 
-    out_l = 0.0;
+    out_l = 0.0
     p_l = 0.0
-    out_u = 1.0;
+    out_u = 1.0
     p_u = 1.0
     z = y
     if isfinite(l)
@@ -174,7 +178,7 @@ function _crps_gtclogis_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real
     out_l1 = out_l2 = out_l3 = 0.0
     out_u1 = out_u2 = 0.0
     p_l = 0.0
-    p_u = 1.0;
+    p_u = 1.0
     out_u3 = 1.0
     z = y
 

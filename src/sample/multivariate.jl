@@ -50,9 +50,8 @@ end
 # "XY" part: Σ_i w_i ‖X_i − y‖
 function _esC_xy(y::AbstractVector, X::AbstractMatrix, w::AbstractVector)
     out = 0.0
-    m = size(X, 2)
-    @inbounds for i in 1:m
-        out += w[i] * norm(view(X, :, i) .- y)
+    @inbounds for (wi, xi) in zip(w, eachcol(X))
+        out += wi * norm(xi .- y)
     end
     return out
 end
@@ -218,10 +217,9 @@ end
 # "XY" part: Σ_i w_i exp(−½ ‖X_i − y‖²)
 function _mmdsC_xy(y::AbstractVector, X::AbstractMatrix, w::AbstractVector)
     out = 0.0
-    m = size(X, 2)
-    @inbounds for i in 1:m
-        d2 = sum(abs2, view(X, :, i) .- y)
-        out += w[i] * exp(-0.5 * d2)
+    @inbounds for (wi, xi) in zip(w, eachcol(X))
+        d2 = sum(abs2, xi .- y)
+        out += wi * exp(-0.5 * d2)
     end
     return out
 end

@@ -63,9 +63,9 @@ function _crps_tt_unit(y::Real, df::Real, l::Real, u::Real)
         y, l, u = -y, -u, -l
     end
     d = TDist(df)
-    p_l = 0.0;
+    p_l = 0.0
     out_l = 0.0
-    p_u = 1.0;
+    p_u = 1.0
     out_u = 1.0
     z = y
     if isfinite(l)
@@ -120,9 +120,9 @@ end
 
 function _crps_ct_unit(y::Real, df::Real, l::Real, u::Real)
     d = TDist(df)
-    out_l1 = 0.0;
+    out_l1 = 0.0
     out_l2 = 0.0
-    out_u1 = 0.0;
+    out_u1 = 0.0
     out_u2 = 1.0
     z = y
     if isfinite(l)
@@ -185,13 +185,13 @@ function _crps_gtct_unit(y::Real, df::Real, l::Real, u::Real,
         lmass, umass = umass, lmass
     end
     d = TDist(df)
-    out_l1 = 0.0;
-    out_l2 = 0.0;
+    out_l1 = 0.0
+    out_l2 = 0.0
     out_l3 = 0.0
-    out_u1 = 0.0;
+    out_u1 = 0.0
     out_u2 = 0.0
-    p_l = 0.0;
-    p_u = 1.0;
+    p_l = 0.0
+    p_u = 1.0
     out_u3 = 1.0
     z = y
     if isfinite(l) || lmass != 0

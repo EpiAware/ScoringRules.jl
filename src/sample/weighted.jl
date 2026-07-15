@@ -220,7 +220,7 @@ function twes(X::AbstractMatrix, y::AbstractVector;
         v = chain_func
     end
     v_y = v(y)
-    v_dat = reduce(hcat, [v(view(X, :, i)) for i in 1:size(X, 2)])
+    v_dat = stack(v, eachcol(X))
     m = size(v_dat, 2)
     wv = fill(1.0 / m, m)
     return _esC_xy(v_y, v_dat, wv) - 0.5 * _esC_xx(v_dat, wv)
@@ -273,7 +273,7 @@ function owes(X::AbstractMatrix, y::AbstractVector;
         wf = weight_func
     end
     w_y = wf(y)
-    w_dat = [wf(view(X, :, i)) for i in 1:size(X, 2)]
+    w_dat = [wf(col) for col in eachcol(X)]
     sw = sum(w_dat)
     if sw == 0
         return NaN
@@ -324,7 +324,7 @@ function twvs(X::AbstractMatrix, y::AbstractVector;
         v = chain_func
     end
     v_y = v(y)
-    v_dat = reduce(hcat, [v(view(X, :, i)) for i in 1:size(X, 2)])
+    v_dat = stack(v, eachcol(X))
     return _vsC(v_y, v_dat, p)
 end
 
@@ -370,7 +370,7 @@ function owvs(X::AbstractMatrix, y::AbstractVector;
         wf = weight_func
     end
     w_y = wf(y)
-    w_dat = [wf(view(X, :, i)) for i in 1:size(X, 2)]
+    w_dat = [wf(col) for col in eachcol(X)]
     sw = sum(w_dat)
     if sw == 0
         return NaN
@@ -421,7 +421,7 @@ function twmmds(X::AbstractMatrix, y::AbstractVector;
         v = chain_func
     end
     v_y = v(y)
-    v_dat = reduce(hcat, [v(view(X, :, i)) for i in 1:size(X, 2)])
+    v_dat = stack(v, eachcol(X))
     m = size(v_dat, 2)
     wv = fill(1.0 / m, m)
     return 0.5 * _mmdsC_xx(v_dat, wv) - _mmdsC_xy(v_y, v_dat, wv)
@@ -469,7 +469,7 @@ function owmmds(X::AbstractMatrix, y::AbstractVector;
         wf = weight_func
     end
     w_y = wf(y)
-    w_dat = [wf(view(X, :, i)) for i in 1:size(X, 2)]
+    w_dat = [wf(col) for col in eachcol(X)]
     sw = sum(w_dat)
     if sw == 0
         return NaN

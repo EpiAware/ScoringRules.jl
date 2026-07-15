@@ -9,6 +9,10 @@
 # Dependencies (in the module): SpecialFunctions gamma, loggamma, digamma,
 #   expinti; gamma_inc from SpecialFunctions (returns (P,Q) regularised).
 
+# Below this |shape| the general closed forms are numerically unstable, so the
+# analytic limit (Gumbel for GEV, exponential for GPD) is used instead.
+const _SHAPE_ATOL = 1e-12
+
 # ---------------------------------------------------------------------------
 # GEV
 # ---------------------------------------------------------------------------
@@ -26,7 +30,7 @@ function _crps_gev(y::Real, shape::Real, location::Real = 0.0, scale::Real = 1.0
 
     y_std = (y - location) / scale   # standardised observation
 
-    out = if abs(shape) < 1e-12
+    out = if abs(shape) < _SHAPE_ATOL
         # Gumbel limit: use exponential integral Ei
         # out = -y_std - γ_E - log 2 - 2·Ei(-exp(-y_std))
         # where γ_E = -digamma(1)
@@ -71,7 +75,7 @@ function _crps_gpd(y::Real, shape::Real,
 
     z = (y - location) / scale   # standardised observation
 
-    x = if abs(shape) < 1e-12
+    x = if abs(shape) < _SHAPE_ATOL
         exp(-z)               # exponential limit
     else
         # Match R: clip 1 + shape·z at 0, then raise to -1/shape. Below the
