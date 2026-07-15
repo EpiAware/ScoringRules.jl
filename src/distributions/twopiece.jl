@@ -45,8 +45,8 @@ struct TwoPieceNormal{T <: Real} <: ContinuousUnivariateDistribution
     scale1::T  # left-arm scale  (> 0)
     scale2::T  # right-arm scale (> 0)
     function TwoPieceNormal{T}(location::T, scale1::T, scale2::T) where {T <: Real}
-        scale1 > zero(T) || error("scale1 must be positive")
-        scale2 > zero(T) || error("scale2 must be positive")
+        scale1 > zero(T) || throw(DomainError(scale1, "scale1 must be positive"))
+        scale2 > zero(T) || throw(DomainError(scale2, "scale2 must be positive"))
         return new{T}(location, scale1, scale2)
     end
 end
@@ -162,8 +162,8 @@ struct TwoPieceExponential{T <: Real} <: ContinuousUnivariateDistribution
     scale1::T  # left-arm scale  (> 0)
     scale2::T  # right-arm scale (> 0)
     function TwoPieceExponential{T}(location::T, scale1::T, scale2::T) where {T <: Real}
-        scale1 > zero(T) || error("scale1 must be positive")
-        scale2 > zero(T) || error("scale2 must be positive")
+        scale1 > zero(T) || throw(DomainError(scale1, "scale1 must be positive"))
+        scale2 > zero(T) || throw(DomainError(scale2, "scale2 must be positive"))
         return new{T}(location, scale1, scale2)
     end
 end

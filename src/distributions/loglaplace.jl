@@ -19,7 +19,7 @@ struct LogLaplace{T <: Real} <: ContinuousUnivariateDistribution
     μ::T  # location on log scale
     σ::T  # scale on log scale (> 0)
     function LogLaplace{T}(μ::T, σ::T) where {T <: Real}
-        σ > zero(T) || error("σ must be positive")
+        σ > zero(T) || throw(DomainError(σ, "σ must be positive"))
         return new{T}(μ, σ)
     end
 end
