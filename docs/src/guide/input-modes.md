@@ -26,7 +26,7 @@ logs(LogNormal(0.0, 0.5), 1.2)
 ```
 
 ```@example modes
-dss(StudentT(5.0), 1.0)
+dss(TDist(5.0), 1.0)
 ```
 
 Truncated and censored variants from Distributions.jl are also supported:
