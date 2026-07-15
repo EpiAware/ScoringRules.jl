@@ -37,6 +37,19 @@ What that means in practice:
 - `LogLaplace`, `TwoPieceNormal` and `TwoPieceExponential` are provided here, as
   Distributions.jl does not have them.
 
+## Overview
+
+- **Univariate scores** — CRPS (`crps`), the logarithmic score (`logs`) and the
+  Dawid–Sebastiani score (`dss`), for parametric (Distributions.jl) and ensemble
+  forecasts alike.
+- **Multivariate scores** — energy score (`es`), variogram score (`vs`) and the
+  maximum-mean-discrepancy score (`mmds`) for ensemble forecasts.
+- **Quantile and categorical scores** — `quantile_score`, `interval_score` and
+  the ranked probability score (`rps`).
+
+All scores are negatively oriented, so a lower score is a better forecast, and
+they broadcast with the usual dot syntax.
+
 ## Getting started
 
 ```julia

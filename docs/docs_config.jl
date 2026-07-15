@@ -55,7 +55,7 @@ const ORG_BRANDING = false
 # Regexes for URLs to skip during the (full-build) linkcheck, e.g. a page
 # published by a separate workflow that is not yet live.
 const LINKCHECK_IGNORE = Regex[
-    # The docs site's own URLs 404 until the first successful deploy exists.
+# The docs site's own URLs 404 until the first successful deploy exists.
     r"^https://epiaware\.org/ScoringRules\.jl"
 ]
 
