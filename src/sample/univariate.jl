@@ -60,7 +60,7 @@ end
 function _crps_edf_weighted(y::Real, dat::AbstractVector, w::AbstractVector)
     length(dat) == length(w) || throw(DimensionMismatch(
         "dat and w must have the same length"))
-    any(<(0), w) && return NaN
+    any(<(0), w) && throw(ArgumentError("weights w must be non-negative"))
 
     ord = sortperm(dat)
     x = dat[ord]
@@ -144,6 +144,8 @@ function crps(dat::AbstractVector{<:Real}, y::Real;
             return _crps_edf_weighted(y, dat, w)
         end
     elseif method === :kde
+        w === nothing ||
+            @warn "the `w` argument is ignored for method = :kde" maxlog=1
         return _crps_kde(y, dat, bw)
     else
         throw(ArgumentError("method must be :edf or :kde, got :$method"))

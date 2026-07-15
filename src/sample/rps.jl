@@ -85,5 +85,7 @@ rps(p, 2)
 ```
 """
 function rps(p::AbstractVector, y::Integer)
+    1 <= y <= length(p) ||
+        throw(ArgumentError("observed category y must satisfy 1 ≤ y ≤ length(p) = $(length(p)), got $y"))
     return _rps0(p, y)
 end

@@ -61,3 +61,42 @@
     # Until that is fixed upstream, those overloads are not tested here; the
     # reference CSV (quantile_sample_scores.csv) remains available for future use.
 end
+
+@testitem "ensemble quantile scores honour the interpolation `type`" begin
+    using ScoringRules
+
+    dat = [3.0, 7, 1, 9, 4, 2, 8, 5, 6, 10]
+    y = 4.3
+
+    # Oracle values from R scoringRules 1.1.3:
+    #   qs_sample(y, dat, alpha = 0.75, type = t)
+    #   ints_sample(y, matrix(dat, nrow = 1), target_coverage = 0.8, type = t)
+    qs_ref = Dict(1 => 0.925, 4 => 0.8, 6 => 0.9875, 7 => 0.8625,
+        8 => 0.945833333333333)
+    is_ref = Dict(1 => 8.0, 4 => 8.0, 6 => 8.8, 7 => 7.2,
+        8 => 8.26666666666667)
+
+    for (t, ref) in qs_ref
+        @test quantile_score(dat, y; alpha = 0.75, type = t)≈ref rtol=1e-12
+    end
+    for (t, ref) in is_ref
+        @test interval_score(dat, y; level = 0.8, type = t)≈ref rtol=1e-12
+    end
+
+    # Distinct types must give distinct results (guards against the `type`
+    # keyword silently collapsing to type 7).
+    @test quantile_score(dat, y; alpha = 0.75, type = 1) !=
+          quantile_score(dat, y; alpha = 0.75, type = 6)
+end
+
+@testitem "quantile / interval / rps input validation" begin
+    using ScoringRules
+
+    dat = collect(1.0:10.0)
+    @test_throws ArgumentError quantile_score(dat, 3.0; alpha = 1.5)
+    @test_throws ArgumentError quantile_score([0.1, 1.5], [1.0, 2.0], 0.5)
+    @test_throws ArgumentError interval_score(dat, 3.0; level = 1.0)
+    @test_throws ArgumentError interval_score(-1.0, 1.0, 0.0, 0.0)
+    @test_throws ArgumentError rps([0.2, 0.3, 0.5], 5)
+    @test_throws ArgumentError rps([0.2, 0.3, 0.5], 0)
+end

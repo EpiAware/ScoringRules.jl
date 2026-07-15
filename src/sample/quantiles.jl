@@ -18,6 +18,45 @@ export quantile_score, interval_score
 # ---------------------------------------------------------------------------
 
 """
+    _quantile_hf(x, p, qtype)
+
+Sample `p`-quantile of `x` using the Hyndman & Fan (1996) definition `qtype`
+(1–9), matching R's `quantile(x, p, type = qtype)`. `Statistics.quantile`
+only implements type 7, so this helper is needed to honour the `type`
+keyword of the ensemble-based scores.
+"""
+function _quantile_hf(x::AbstractVector, p::Real, qtype::Int)
+    1 <= qtype <= 9 ||
+        throw(ArgumentError("quantile type must be an integer 1–9, got $qtype"))
+    n = length(x)
+    xs = sort(x)
+    fuzz = 4 * eps(Float64)
+    if qtype <= 3
+        nppm = qtype == 3 ? n * p - 0.5 : n * p
+        j = floor(Int, nppm + fuzz)
+        h = if qtype == 1
+            nppm > j ? 1.0 : 0.0
+        elseif qtype == 2
+            ((nppm > j) + 1) / 2
+        else # qtype == 3
+            ((nppm != j) || isodd(j)) ? 1.0 : 0.0
+        end
+    else
+        a, b = qtype == 4 ? (0.0, 1.0) :
+               qtype == 5 ? (0.5, 0.5) :
+               qtype == 6 ? (0.0, 0.0) :
+               qtype == 7 ? (1.0, 1.0) :
+               qtype == 8 ? (1 / 3, 1 / 3) : (3 / 8, 3 / 8)
+        nppm = a + p * (n + 1 - a - b)
+        j = floor(Int, nppm + fuzz)
+        h = clamp(nppm - j, 0.0, 1.0)
+    end
+    lo = clamp(j, 1, n)
+    hi = clamp(j + 1, 1, n)
+    return (1 - h) * xs[lo] + h * xs[hi]
+end
+
+"""
     _qs_quantile(y, x, alpha)
 
 Pinball loss at a single quantile level `alpha` with quantile forecast `x` and
@@ -105,6 +144,8 @@ function quantile_score(q_levels::AbstractVector, q_forecasts::AbstractVector,
     length(q_levels) == length(q_forecasts) ||
         throw(DimensionMismatch(
             "q_levels and q_forecasts must have the same length"))
+    all(a -> 0 < a < 1, q_levels) ||
+        throw(ArgumentError("all quantile levels must lie strictly in (0, 1)"))
     return [_qs_quantile(y, q_forecasts[i], q_levels[i])
             for i in eachindex(q_levels)]
 end
@@ -144,7 +185,8 @@ quantile_score(dat, 0.5; alpha = 0.9)
 """
 function quantile_score(dat::AbstractVector, y::Real;
         alpha::Real, type::Int = 7)
-    q_hat = quantile(dat, alpha)   # type-7 by default in Julia
+    0 < alpha < 1 || throw(ArgumentError("alpha must lie strictly in (0, 1), got $alpha"))
+    q_hat = _quantile_hf(dat, alpha, type)
     return _qs_quantile(y, q_hat, alpha)
 end
 
@@ -186,6 +228,7 @@ interval_score(-1.64, 1.64, 0.5, 0.9)
 ```
 """
 function interval_score(lower::Real, upper::Real, y::Real, level::Real)
+    0 < level < 1 || throw(ArgumentError("level must lie strictly in (0, 1), got $level"))
     return _ints_quantile(y, lower, upper, level)
 end
 
@@ -216,8 +259,10 @@ interval_score(dat, 0.5; level = 0.9)
 """
 function interval_score(dat::AbstractVector, y::Real;
         level::Real, type::Int = 7)
+    0 < level < 1 || throw(ArgumentError("level must lie strictly in (0, 1), got $level"))
     alpha1 = 0.5 * (1 - level)
     alpha2 = 1 - alpha1
-    qs = quantile(dat, [alpha1, alpha2])
-    return _ints_quantile(y, qs[1], qs[2], level)
+    lower = _quantile_hf(dat, alpha1, type)
+    upper = _quantile_hf(dat, alpha2, type)
+    return _ints_quantile(y, lower, upper, level)
 end
