@@ -8,6 +8,7 @@ ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
 DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
 DifferentiationInterfaceTest = "a82114a7-5aa3-49a8-9643-716bb13727a3"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+EpiAwareADTools = "908e2895-a690-4874-a954-ca006cb9734d"
 EpiAwarePackageTools = "7aaea248-0d11-4a0d-a7dc-86da30abb951"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
@@ -24,3 +25,10 @@ ScoringRules = {path = "../.."}
 # the env resolves out of the box. Switch to a local path to
 # develop the kit alongside this package.
 EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main"}
+# The registered EpiAwareADTools (v0.1.0) predates its Beta-CDF support
+# (EpiAwareADTools#40): cdf_ad_safe(::Beta) only exists on git main.
+# [sources] entries only apply to a project's own direct deps, so the
+# root Project.toml's pin does not propagate to this nested test env —
+# it needs the same pin here. Drop both once the next EpiAwareADTools
+# release ships cdf_ad_safe(::Beta).
+EpiAwareADTools = {url = "https://github.com/EpiAware/EpiAwareADTools.jl", rev = "main"}

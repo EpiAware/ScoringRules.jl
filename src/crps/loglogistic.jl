@@ -24,9 +24,17 @@ function _crps_llogis(y::Real, locationlog::Real, scalelog::Real)
     c1 = y * (2 * p - 1)
     # beta(a,b) = Γ(a)Γ(b)/Γ(a+b); use logbeta for numerical stability
     c2 = 2 * exp(locationlog) * exp(logbeta(1 + scalelog, 1 - scalelog))
-    # pbeta(p, a, b) = regularised incomplete beta function I_p(a,b)
-    # beta_inc(a, b, p) from SpecialFunctions returns (I_p(a,b), 1-I_p(a,b))
-    Ip, _ = beta_inc(1 + scalelog, 1 - scalelog, p)
+    # pbeta(p, a, b) = regularised incomplete beta function I_p(a,b), routed
+    # through cdf_ad_safe rather than beta_inc directly: beta_inc cannot take
+    # a Dual in either shape argument, breaking `scalelog` differentiation
+    # (#6). Unlike crps/student.jl's `_t_cdf`, `p` depends on `scalelog` here
+    # too, but this composition needs no z==0-style guard: the beta density's
+    # x-derivative only diverges at the boundary whose shape argument is < 1,
+    # and that is the second argument (1 - scalelog, since scalelog ∈ (0,1)),
+    # so the risk is only at p == 1 — unreachable for any finite `y` (the
+    # first argument, 1 + scalelog, is always > 1, so p == 0, reachable at
+    # y == 0, is safe).
+    Ip = cdf_ad_safe(Beta(1 + scalelog, 1 - scalelog), p)
     c3 = (1 - scalelog) / 2 - Ip
     return c1 + c2 * c3
 end
