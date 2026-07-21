@@ -12,22 +12,24 @@ per structural class the package supports: a plain continuous family
 mixture, this package's own two-piece type (`TwoPieceNormal`), and a discrete
 family (Poisson).
 
-Six scenarios are declared broken on every backend rather than omitted, for two
-distinct reasons found by writing this registry:
+Three scenarios are declared broken on every backend rather than omitted:
+Student-t, Beta and LogLogistic `crps` all route through `beta_inc`/
+`cdf(TDist, ·)`, neither of which accepts a `ForwardDiff.Dual` (#6).
 
-- Student-t, Beta and LogLogistic `crps` all route through `beta_inc`/
-  `cdf(TDist, ·)`, neither of which accepts a `ForwardDiff.Dual` (#6).
-- Gamma, GEV and Poisson `crps` all route through `SpecialFunctions.gamma_inc`
-  with a *differentiated* shape/rate argument in its Dual-incompatible first
-  slot — directly for Gamma and GEV, and via `Distributions.cdf(Poisson, ·)`
-  for Poisson (#11).
+Gamma, GEV and Poisson `crps` were broken the same way (#11: all three routed
+through `SpecialFunctions.gamma_inc` with a *differentiated* shape/rate
+argument in its Dual-incompatible first slot — directly for Gamma and GEV, and
+via `Distributions.cdf(Poisson, ·)` for Poisson) until they were fixed to go
+through `EpiAwareADTools.cdf_ad_safe` instead, which types its arguments
+independently rather than sharing one promoted type; their scenarios below are
+now normal (non-broken), a regression test for that fix.
 
 Since even the *reference* gradient (computed with ForwardDiff) cannot be
-built for any of these six, their `res1` is `nothing` unconditionally rather
-than attempted — `check_broken` then marks them `@test_broken` on every
-backend by construction, and each scenario stays in the registry as a standing,
-honest record of its gap and a regression test for that issue's fix (flip it
-to a normal scenario once fixed).
+built for any of the three still-broken scenarios, their `res1` is `nothing`
+unconditionally rather than attempted — `check_broken` then marks them
+`@test_broken` on every backend by construction, and each stays in the
+registry as a standing, honest record of its gap and a regression test for
+that issue's fix (flip it to a normal scenario once fixed).
 
 All scenarios run across the ForwardDiff / ReverseDiff / Enzyme (forward and
 reverse) / Mooncake (forward and reverse) backend matrix declared in
@@ -78,15 +80,14 @@ function backends()
 end
 
 # Scenario names whose `crps` cannot be reference-differentiated at all: see
-# the module docstring, #6 and #11. Filled in by `scenarios()` below (kept as
-# a `Ref` so the single list of names lives next to the scenarios that declare
-# themselves broken, not duplicated here).
+# the module docstring, #6 (#11 was fixed). Filled in by `scenarios()` below
+# (kept as a `Ref` so the single list of names lives next to the scenarios
+# that declare themselves broken, not duplicated here).
 const _BROKEN_NAMES = Ref(String[])
 
-"Scenario names broken on every backend (#6: `beta_inc`/`cdf(TDist)`; #11:
-`gamma_inc` with a differentiated shape/rate argument — neither is dual-safe,
-so `crps` for these families cannot be reference-differentiated by ForwardDiff,
-let alone matched by any other backend)."
+"Scenario names broken on every backend (#6: `beta_inc`/`cdf(TDist)` — neither
+is dual-safe, so `crps` for these families cannot be reference-differentiated
+by ForwardDiff, let alone matched by any other backend)."
 broken_scenario_names() = _BROKEN_NAMES[]
 
 "Per-backend broken scenario names (`Dict{String, Set{String}}`). Empty until
@@ -141,11 +142,12 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         (θ, obs) -> sum(y -> crps(Logistic(θ[1], θ[2]), y), obs),
         [0.5, 1.5], (Constant([-1.0, 0.5, 2.0, 4.0]),))
 
-    # #11: `cdf(Gamma(shape, scale), y)` routes through `gamma_inc(shape, ·)`,
-    # not dual-safe in `shape`.
-    _push!("Gamma crps (#11 AD gap)",
+    # #11 (fixed): `_crps_gamma` now goes through `cdf_ad_safe` rather than a
+    # direct `cdf`/`gamma_inc(shape, ·)` call, which was not dual-safe in
+    # `shape`.
+    _push!("Gamma crps",
         (θ, obs) -> sum(y -> crps(Gamma(θ[1], θ[2]), y), obs),
-        [2.0, 1.5], (Constant([0.5, 1.2, 2.5, 4.0]),); broken = true)
+        [2.0, 1.5], (Constant([0.5, 1.2, 2.5, 4.0]),))
 
     _push!("Exponential crps",
         (θ, obs) -> sum(y -> crps(Exponential(θ[1]), y), obs),
@@ -171,12 +173,13 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
     # --- extreme-value family: shape held away from 0 (ξ = 0.2 / 0.3) to
     # exercise the general closed form, not the ξ ≈ 0 limiting-case branch --
 
-    # #11: `_crps_gev` calls `gamma_inc(1 - shape, x)` directly, not dual-safe
-    # in the first argument.
-    _push!("GEV crps (#11 AD gap)",
+    # #11 (fixed): `_crps_gev` now goes through `cdf_ad_safe` rather than a
+    # direct `gamma_inc(1 - shape, x)` call, which was not dual-safe in the
+    # first argument.
+    _push!("GEV crps",
         (θ, obs) -> sum(
             y -> crps(GeneralizedExtremeValue(θ[1], θ[2], θ[3]), y), obs),
-        [0.0, 1.0, 0.2], (Constant([-0.5, 0.5, 2.0]),); broken = true)
+        [0.0, 1.0, 0.2], (Constant([-0.5, 0.5, 2.0]),))
 
     # GPD's closed form uses only `^`/`exp`/`max`/`min` (no `gamma_inc`), so
     # unlike GEV above it is not affected by #11 — confirmed differentiable.
@@ -210,12 +213,14 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
     # --- discrete family: λ differentiated, obs real-valued (crps is defined
     # against the discrete step CDF at any real y, not just integers) -------
 
-    # #11: `cdf(Poisson(lambda), y)` routes through `StatsFuns.gammaccdf` →
-    # `gamma_inc(lambda, ·)`, not dual-safe in `lambda` — not the `besseli`
-    # calls elsewhere in `_crps_pois`, which are fine.
-    _push!("Poisson crps (#11 AD gap)",
+    # #11 (fixed): `_crps_pois` now goes through `cdf_ad_safe` rather than a
+    # direct `cdf(Poisson(lambda), y)` call, which routed through
+    # `StatsFuns.gammaccdf`'s shared-type-parameter promotion and was not
+    # dual-safe in `lambda` — not the `besseli` calls elsewhere in
+    # `_crps_pois`, which are fine.
+    _push!("Poisson crps",
         (θ, obs) -> sum(y -> crps(Poisson(θ[1]), y), obs),
-        [3.0], (Constant([0.0, 2.0, 3.0, 5.0]),); broken = true)
+        [3.0], (Constant([0.0, 2.0, 3.0, 5.0]),))
 
     # --- generic (any UnivariateDistribution) logs/dss, via the analytic
     # -logpdf / mean-var forms in src/generics.jl ----------------------------
