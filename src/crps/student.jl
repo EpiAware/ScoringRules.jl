@@ -9,15 +9,54 @@
 # antiderivative of the t CDF up to a sign; named G in the R source.
 @inline _t_G(z::Real, df::Real) = -(df + z^2) / (df - 1) * pdf(TDist(df), z)
 
+# AD-safe Student-t CDF, differentiable in `df` (#6). `cdf(::TDist)` routes
+# through StatsFuns' tdistcdf -> fdistccdf -> betaccdf chain, each step
+# sharing one type parameter across all its arguments the same way
+# StatsFuns.gammaccdf does for Poisson (see crps/discrete.jl): promoting `df`
+# to a Dual forces the untouched constant `1` (the numerator "ν1" argument)
+# to the same Dual type, and beta_inc has no method at all for a Dual shape
+# argument. Rebuilt here from the standard relation
+#   F(z; df) = 1/2 + 1/2 * sign(z) * I_w(1/2, df/2),  w = z²/(z²+df),
+# routed through cdf_ad_safe so the two shape arguments (1/2 fixed, df/2
+# differentiated) and the evaluation point w (also df-dependent) each keep
+# their own type instead of a shared one.
+#
+# Guarded at z == 0: there, w ≡ 0 for every df (so the true ∂F/∂df is 0), but
+# ∂I_w/∂w diverges as w → 0 (the beta density blows up there since the first
+# shape argument is 1/2 < 1) while ∂w/∂df → 0 with an explicit z² factor --
+# the product is the correct limit 0, but IEEE Inf * 0.0 evaluates to NaN
+# rather than taking that limit. z is a plain observation-derived constant in
+# every case this package differentiates (never itself part of the
+# differentiated parameter vector), so short-circuiting the whole expression
+# at z == 0 costs nothing and sidesteps the singularity entirely. Also
+# guarded at infinite z (reachable from `_crps_gtct_unit`'s point-mass
+# bookkeeping, where a truncation bound can be unbounded while its mass is
+# still nonzero): `w` would otherwise divide `Inf` by `Inf`.
+@inline function _t_cdf(df::Real, z::Real)
+    isinf(z) && return oftype(float(df) * one(z), z > 0 ? 1.0 : 0.0)
+    z == 0 && return oftype(float(df) * one(z), 0.5)
+    w = z^2 / (z^2 + df)
+    return 0.5 + 0.5 * sign(z) * cdf_ad_safe(Beta(0.5, df / 2), w)
+end
+
 # `_Phi_t2(x, df)` is the analogue of `_Phi_root2` from normal.jl for the t
 # family. The R source computes it as:
 #   p  = pt(x, df)
 #   pb = pbeta(df / (df + x²), df − 0.5, 0.5)
 #   0.5 * (p ≤ 0.5 ? pb : 2 − pb)
-# In Julia, R's `pbeta(x, a, b)` = `beta_inc(a, b, x)[1]`.
+# In Julia, R's `pbeta(x, a, b)` = `beta_inc(a, b, x)[1]`, replaced here by
+# `cdf_ad_safe(Beta(a, b), x)` for the same reason as `_t_cdf` above: the
+# shape argument `df - 0.5` is differentiated in `df`, and `beta_inc` cannot
+# take a Dual there. Guarded the same way at `x == 0` (where the argument
+# `df / (df + x²)` is identically 1 regardless of `df`, and the beta density
+# there diverges since the *second* shape argument, fixed at 0.5, is < 1).
 @inline function _Phi_t2(x::Real, df::Real)
-    p = cdf(TDist(df), x)
-    pb = beta_inc(df - 0.5, 0.5, df / (df + x^2))[1]
+    p = _t_cdf(df, x)
+    pb = if x == 0
+        oftype(float(df) * one(x), 1.0)
+    else
+        cdf_ad_safe(Beta(df - 0.5, 0.5), df / (df + x^2))
+    end
     return 0.5 * (p <= 0.5 ? pb : 2 - pb)
 end
 
@@ -39,9 +78,8 @@ function _crps_t(y::Real, df::Real, location::Real, scale::Real)
     scale == 0 && return abs(y - location)
     df <= 1 && return oftype(float(y), NaN)
     z = (y - location) / scale
-    d = TDist(df)
     G_z = _t_G(z, df)
-    out_z = z * (2 * cdf(d, z) - 1) - 2 * G_z
+    out_z = z * (2 * _t_cdf(df, z) - 1) - 2 * G_z
     return scale * (out_z - _t_bfrac(df))
 end
 
@@ -62,19 +100,18 @@ function _crps_tt_unit(y::Real, df::Real, l::Real, u::Real)
     if l > 3
         y, l, u = -y, -u, -l
     end
-    d = TDist(df)
     p_l = 0.0
     out_l = 0.0
     p_u = 1.0
     out_u = 1.0
     z = y
     if isfinite(l)
-        p_l = cdf(d, l)
+        p_l = _t_cdf(df, l)
         out_l = _Phi_t2(l, df)
         z = max(l, z)
     end
     if isfinite(u)
-        p_u = cdf(d, u)
+        p_u = _t_cdf(df, u)
         out_u = _Phi_t2(u, df)
         z = min(u, z)
     end
@@ -84,7 +121,7 @@ function _crps_tt_unit(y::Real, df::Real, l::Real, u::Real)
     b = out_u - out_l
     b == 0 && return oftype(float(y), NaN)
     G_z = _t_G(z, df)
-    out_z = z * (2 * cdf(d, z) - p_l - p_u) - 2 * G_z
+    out_z = z * (2 * _t_cdf(df, z) - p_l - p_u) - 2 * G_z
     out = (out_z - b / a * _t_bfrac(df)) / a
     return out + abs(y - z)
 end
@@ -119,21 +156,20 @@ end
 # --- censored t: _crps_ct(y, df, location, scale, lower, upper) --------------
 
 function _crps_ct_unit(y::Real, df::Real, l::Real, u::Real)
-    d = TDist(df)
     out_l1 = 0.0
     out_l2 = 0.0
     out_u1 = 0.0
     out_u2 = 1.0
     z = y
     if isfinite(l)
-        p_l = cdf(d, l)
+        p_l = _t_cdf(df, l)
         G_l = _t_G(l, df)
         out_l1 = -l * p_l^2 + 2 * G_l * p_l      # sign: G_l is negative
         out_l2 = _Phi_t2(l, df)
         z = max(l, z)
     end
     if isfinite(u)
-        p_u = ccdf(d, u)
+        p_u = 1 - _t_cdf(df, u)
         G_u = _t_G(u, df)
         out_u1 = u * p_u^2 + 2 * G_u * p_u        # G_u is negative, so this subtracts
         out_u2 = _Phi_t2(u, df)
@@ -143,7 +179,7 @@ function _crps_ct_unit(y::Real, df::Real, l::Real, u::Real)
     l == u && return abs(y - z)
     b = out_u2 - out_l2
     G_z = _t_G(z, df)
-    out_z = z * (2 * cdf(d, z) - 1) - 2 * G_z
+    out_z = z * (2 * _t_cdf(df, z) - 1) - 2 * G_z
     out = out_z + out_l1 + out_u1 - b * _t_bfrac(df)
     return out + abs(y - z)
 end
@@ -184,7 +220,6 @@ function _crps_gtct_unit(y::Real, df::Real, l::Real, u::Real,
         y, l, u = -y, -u, -l
         lmass, umass = umass, lmass
     end
-    d = TDist(df)
     out_l1 = 0.0
     out_l2 = 0.0
     out_l3 = 0.0
@@ -196,7 +231,7 @@ function _crps_gtct_unit(y::Real, df::Real, l::Real, u::Real,
     z = y
     if isfinite(l) || lmass != 0
         (lmass < 0 || lmass > 1) && return oftype(float(y), NaN)
-        p_l = cdf(d, l)
+        p_l = _t_cdf(df, l)
         G_l = isfinite(l) ? _t_G(l, df) : 0.0
         out_l1 = lmass == 0 ? 0.0 : l * lmass^2
         out_l2 = 2 * G_l * lmass
@@ -205,7 +240,7 @@ function _crps_gtct_unit(y::Real, df::Real, l::Real, u::Real,
     end
     if isfinite(u) || umass != 0
         (umass < 0 || umass > 1) && return oftype(float(y), NaN)
-        p_u = cdf(d, u)
+        p_u = _t_cdf(df, u)
         G_u = isfinite(u) ? _t_G(u, df) : 0.0
         out_u1 = umass == 0 ? 0.0 : u * umass^2
         out_u2 = 2 * G_u * umass

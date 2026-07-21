@@ -12,24 +12,35 @@ per structural class the package supports: a plain continuous family
 mixture, this package's own two-piece type (`TwoPieceNormal`), and a discrete
 family (Poisson).
 
-Three scenarios are declared broken on every backend rather than omitted:
-Student-t, Beta and LogLogistic `crps` all route through `beta_inc`/
-`cdf(TDist, ·)`, neither of which accepts a `ForwardDiff.Dual` (#6).
+Six scenarios were once declared broken rather than omitted, for two related
+reasons; all six are now fixed and their scenarios below are normal
+(non-broken), each a regression test for its issue's fix:
 
-Gamma, GEV and Poisson `crps` were broken the same way (#11: all three routed
-through `SpecialFunctions.gamma_inc` with a *differentiated* shape/rate
-argument in its Dual-incompatible first slot — directly for Gamma and GEV, and
-via `Distributions.cdf(Poisson, ·)` for Poisson) until they were fixed to go
-through `EpiAwareADTools.cdf_ad_safe` instead, which types its arguments
-independently rather than sharing one promoted type; their scenarios below are
-now normal (non-broken), a regression test for that fix.
+- Gamma, GEV and Poisson `crps` (#11) all routed through
+  `SpecialFunctions.gamma_inc` with a *differentiated* shape/rate argument in
+  its Dual-incompatible first slot — directly for Gamma and GEV, and via
+  `Distributions.cdf(Poisson, ·)` for Poisson (whose `StatsFuns.gammaccdf`
+  shares one type parameter across all three arguments, so promoting the
+  differentiated rate forces the untouched integer shape to the same Dual
+  type by ordinary promotion).
+- Student-t, Beta and LogLogistic `crps` (#6) all routed through
+  `SpecialFunctions.beta_inc` the same way — directly for Beta and
+  LogLogistic, and via `Distributions.cdf(TDist, ·)` for Student-t (which
+  shares StatsFuns' type-parameter-promotion pattern through its own
+  `tdistcdf -> fdistccdf -> betaccdf` chain).
 
-Since even the *reference* gradient (computed with ForwardDiff) cannot be
-built for any of the three still-broken scenarios, their `res1` is `nothing`
-unconditionally rather than attempted — `check_broken` then marks them
-`@test_broken` on every backend by construction, and each stays in the
-registry as a standing, honest record of its gap and a regression test for
-that issue's fix (flip it to a normal scenario once fixed).
+Both families are fixed by routing through `EpiAwareADTools.cdf_ad_safe`
+instead, whose `_gamma_cdf`/`_beta_cdf` type their arguments independently
+rather than sharing one promoted type. The Student-t fix additionally needed
+an explicit guard at the standardised observation `z == 0` (see
+`crps/student.jl`'s `_t_cdf`): there the true derivative is 0, but the naive
+composition hits an IEEE `Inf * 0.0 = NaN` rather than that limit.
+
+A scenario declared broken skips the (possibly-erroring) reference gradient
+computation unconditionally rather than attempting and catching, so `res1` is
+`nothing` and `check_broken` marks it `@test_broken` on every backend by
+construction; each stays in the registry as a standing, honest record of its
+gap until the fix lands (as all six now have).
 
 All scenarios run across the ForwardDiff / ReverseDiff / Enzyme (forward and
 reverse) / Mooncake (forward and reverse) backend matrix declared in
@@ -80,14 +91,16 @@ function backends()
 end
 
 # Scenario names whose `crps` cannot be reference-differentiated at all: see
-# the module docstring, #6 (#11 was fixed). Filled in by `scenarios()` below
-# (kept as a `Ref` so the single list of names lives next to the scenarios
-# that declare themselves broken, not duplicated here).
+# the module docstring. Empty now that #6 and #11 are both fixed; kept as a
+# `Ref` (rather than removed) so a future gap has the same standing place to
+# declare itself, next to the scenario that would declare it, not duplicated
+# here.
 const _BROKEN_NAMES = Ref(String[])
 
-"Scenario names broken on every backend (#6: `beta_inc`/`cdf(TDist)` — neither
-is dual-safe, so `crps` for these families cannot be reference-differentiated
-by ForwardDiff, let alone matched by any other backend)."
+"Scenario names broken on every backend. Empty: #6 and #11 (the two classes
+of families whose `crps` routed a differentiated shape/rate argument through
+`SpecialFunctions.gamma_inc`/`beta_inc`'s Dual-incompatible first slot) are
+both fixed; see the module docstring."
 broken_scenario_names() = _BROKEN_NAMES[]
 
 "Per-backend broken scenario names (`Dict{String, Set{String}}`). Empty until
@@ -246,21 +259,21 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         (dat, y) -> dss(dat, y),
         [0.5, 1.2, -0.3, 2.1, 0.0], (Constant(0.8),))
 
-    # --- known-broken (#6): beta_inc / cdf(TDist) are not dual-safe, so
-    # ForwardDiff itself cannot differentiate these — no reference is ever
-    # computed, and the scenario is `@test_broken` on every backend --------
+    # --- #6 (fixed): Student-t, Beta and LogLogistic `crps` now go through
+    # cdf_ad_safe rather than a direct beta_inc/cdf(TDist) call, which was
+    # not dual-safe in the differentiated shape argument -------------------
 
-    _push!("Student-t crps (#6 AD gap)",
+    _push!("Student-t crps",
         (θ, obs) -> sum(y -> crps(TDist(θ[1]), y), obs),
-        [5.0], (Constant([0.5, -0.3, 1.5]),); broken = true)
+        [5.0], (Constant([0.5, -0.3, 1.5]),))
 
-    _push!("Beta crps (#6 AD gap)",
+    _push!("Beta crps",
         (θ, obs) -> sum(y -> crps(Beta(θ[1], θ[2]), y), obs),
-        [2.0, 3.0], (Constant([0.2, 0.5, 0.8]),); broken = true)
+        [2.0, 3.0], (Constant([0.2, 0.5, 0.8]),))
 
-    _push!("LogLogistic crps (#6 AD gap)",
+    _push!("LogLogistic crps",
         (θ, obs) -> sum(y -> crps(LogLogistic(θ[1], θ[2]), y), obs),
-        [2.0, 3.0], (Constant([0.5, 1.5, 3.0]),); broken = true)
+        [2.0, 3.0], (Constant([0.5, 1.5, 3.0]),))
 
     _BROKEN_NAMES[] = broken_names
     return out
