@@ -16,7 +16,19 @@ SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
-Distributions = "0.25"
+# A plain "0.25" floor lets the downgrade-compat resolver pick an old 0.25.x
+# release that predates a type this package imports directly, failing with an
+# `UndefVarError`. Two such imports set the actual floor:
+#   - `Censored`, added in 0.25.45 (JuliaStats/Distributions.jl#1470, merged
+#     2022-01-31);
+#   - `LogLogistic`, added in 0.25.124 (JuliaStats/Distributions.jl#2008,
+#     merged 2026-01-29) — the later of the two, so it sets the floor.
+# `LogLaplace`/`TwoPieceNormal`/`TwoPieceExponential` are this package's own
+# types (src/distributions/), not Distributions imports, so they add no
+# further constraint. Verified locally: pinning exactly to 0.25.124 resolves
+# (0.25.60, the first release admitting a Julia-1.11-compatible FillArrays,
+# still lacks `LogLogistic` and fails the same way).
+Distributions = "0.25.124"
 DocStringExtensions = "0.9"
 HypergeometricFunctions = "0.3"
 LinearAlgebra = "1"
