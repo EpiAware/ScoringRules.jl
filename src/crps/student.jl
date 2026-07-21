@@ -256,7 +256,7 @@ function _crps_gtct_unit(y::Real, df::Real, l::Real, u::Real,
     b == 0 && return oftype(float(y), NaN)
     G_z = _t_G(z, df)
     out = out_u1 - out_l1 +
-          (z * (2 * a2 * cdf(d, z) -
+          (z * (2 * a2 * _t_cdf(df, z) -
                 (1 - 2 * lmass) * p_u -
                 (1 - 2 * umass) * p_l) -
            (2 * G_z - out_u2 - out_l2 +
