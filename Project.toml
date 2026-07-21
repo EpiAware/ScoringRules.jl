@@ -29,5 +29,14 @@ SpecialFunctions = "2"
 Statistics = "1"
 julia = "1.11, 1.12"
 
+[sources]
+# The registered EpiAwareADTools (currently v0.1.0, matching the "0.1" bound
+# above) predates its Beta-CDF support (EpiAwareADTools#40): _crps_beta,
+# _crps_llogis and _t_cdf (crps/student.jl) all need cdf_ad_safe(::Beta),
+# which only exists on git main. Pinned here until the next EpiAwareADTools
+# release; drop this once that ships and cdf_ad_safe(::Beta) resolves from
+# the registered version alone.
+EpiAwareADTools = {url = "https://github.com/EpiAware/EpiAwareADTools.jl", rev = "main"}
+
 [workspace]
 projects = ["test", "docs"]
