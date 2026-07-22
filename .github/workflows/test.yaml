@@ -18,5 +18,5 @@ jobs:
     secrets: inherit  # pragma: allowlist secret
 
   downgrade-compat:
-    uses: EpiAware/.github/.github/workflows/downgrade.yml@6fcdcde033ec670ac3832b239427fd2ded591bbc
+    uses: EpiAware/.github/.github/workflows/downgrade.yml@26387a36be3d093723b5f85e4f93d99af98456b8
     secrets: inherit  # pragma: allowlist secret
