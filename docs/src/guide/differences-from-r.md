@@ -53,6 +53,14 @@ which also uses the biased (population) estimator. Julia's `var` function uses
 the ``n-1`` denominator, so passing `var(dat)` directly would not match R.
 The implementation avoids `Statistics.var` deliberately.
 
+## Ensemble LogS: member weights
+
+`logs(dat, y; w)` accepts member weights, which R's `logs_sample` does not.
+The weighted score evaluates the kernel density
+``\sum_i w_i\,\varphi_{bw}(y - dat_i) / \sum_i w_i``, in line with the
+weighted mean and variance R's `dss_sample` uses. With `w = nothing` (the
+default) the score matches `logs_sample` exactly.
+
 ## Parameter conventions
 
 The following parameter conventions differ from R's function arguments:

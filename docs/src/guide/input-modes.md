@@ -67,11 +67,19 @@ dss(draws, 0.5)    # uses sample mean and population variance
 
 ### Weighted ensemble members
 
-Importance weights can be passed to `crps` with the EDF method:
+Importance weights can be passed to `crps` (EDF method), `logs` and `dss`:
 
 ```@example modes
 w = abs.(randn(1000)) .+ 0.01   # arbitrary positive weights (normalised internally)
 crps(draws, 0.5; w = w)
+```
+
+```@example modes
+logs(draws, 0.5; w = w)   # weighted KDE density
+```
+
+```@example modes
+dss(draws, 0.5; w = w)    # weighted mean and variance
 ```
 
 ## Moment-based forecasts

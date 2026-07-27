@@ -16,7 +16,9 @@ Lerch and Allen). See the README for attribution and provenance.
   (the log-logistic uses `Distributions.LogLogistic`).
 - Sample/ensemble forecasts: `crps` (empirical and kernel-density), `logs`,
   `dss` on vectors; the energy score `es`, variogram score `vs` and
-  maximum-mean-discrepancy score `mmds` on multivariate ensembles.
+  maximum-mean-discrepancy score `mmds` on multivariate ensembles. All
+  univariate sample scores take optional member weights `w` (for `logs` this
+  extends the R interface).
 - Threshold- and outcome-weighted scores (`twcrps`, `owcrps`, `twes`, `owes`,
   `twvs`, `owvs`, `twmmds`, `owmmds`).
 - Quantile and interval scores (`quantile_score`, `interval_score`), the ranked
