@@ -93,5 +93,12 @@
         @test_throws DimensionMismatch logs(dat, y; w = w[1:3])
         @test_throws ArgumentError dss(dat, y; w = -w)
         @test_throws ArgumentError logs(dat, y; w = -w)
+        # Non-finite weights and an all-zero weight vector throw too, so a
+        # degenerate w cannot leak NaN into an aggregated score.
+        for bad in ([NaN; w[2:end]], [Inf; w[2:end]], zero(w))
+            @test_throws ArgumentError dss(dat, y; w = bad)
+            @test_throws ArgumentError logs(dat, y; w = bad)
+            @test_throws ArgumentError crps(dat, y; w = bad)
+        end
     end
 end

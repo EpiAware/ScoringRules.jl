@@ -61,6 +61,10 @@ The weighted score evaluates the kernel density
 weighted mean and variance R's `dss_sample` uses. With `w = nothing` (the
 default) the score matches `logs_sample` exactly.
 
+Across all sample scores, member weights must be finite, non-negative and sum
+to a positive value, otherwise an error is thrown. R also errors on missing,
+infinite and negative weights but returns `NaN` for an all-zero weight vector.
+
 ## Parameter conventions
 
 The following parameter conventions differ from R's function arguments:

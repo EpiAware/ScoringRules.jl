@@ -23,11 +23,15 @@
 # CRPS below reuses `_crps_mixnorm`: a Gaussian KDE is an equally-weighted normal
 # mixture with common bandwidth as the standard deviation.
 
-# Validate a member-weight vector against its ensemble.
+# Validate a member-weight vector against its ensemble. R errors on missing,
+# infinite and negative weights too; the positive-sum requirement is stricter
+# than R, which returns NaN for an all-zero weight vector.
 function _check_member_weights(dat::AbstractVector, w::AbstractVector)
-    length(dat) == length(w) || throw(DimensionMismatch(
-        "dat and w must have the same length"))
-    any(<(0), w) && throw(ArgumentError("weights w must be non-negative"))
+    axes(dat) == axes(w) || throw(DimensionMismatch(
+        "dat and w must have the same axes"))
+    all(x -> isfinite(x) && x >= 0, w) ||
+        throw(ArgumentError("weights w must be finite and non-negative"))
+    sum(w) > 0 || throw(ArgumentError("weights w must have a positive sum"))
     return nothing
 end
 
@@ -108,7 +112,7 @@ observation `y`.
 Two approximation methods are available via `method`:
 
   - `:edf` (default) — empirical distribution function approximation using the
-    quantile decomposition of Laio & Tamea (2007).  Optional non-negative weights
+    quantile decomposition of Laio & Tamea (2007).  Optional finite, non-negative weights
     `w` (length `m`) are normalised to sum to one internally.
 
   - `:kde` — Gaussian kernel density estimate with bandwidth `bw`.  If `bw` is
@@ -125,7 +129,7 @@ Lower is better.
 # Keyword Arguments
 
   - `method`: `:edf` (default) or `:kde`.
-  - `w`: optional non-negative weight vector (length `m`); only used for `:edf`.
+  - `w`: optional finite, non-negative weight vector (length `m`) with a positive sum; only used for `:edf`.
   - `bw`: optional bandwidth; only used for `:kde`.
 
 # Provenance
@@ -165,7 +169,7 @@ Logarithmic score of an ensemble forecast `dat` (a vector of `m` simulation
 draws) at observation `y` using Gaussian kernel density estimation.
 
 If `bw` is `nothing`, Silverman's rule-of-thumb bandwidth is used (matching
-R's `bw.nrd`).  Optional non-negative member weights `w` (length `m`) are
+R's `bw.nrd`).  Optional finite, non-negative member weights `w` (length `m`) are
 normalised to sum to one internally, so the KDE density becomes
 ``\\sum_i w_i \\varphi_{bw}(y - dat_i) / \\sum_i w_i``.  The rule-of-thumb
 bandwidth is computed from `dat` alone and does not use `w`.  Lower is better.
@@ -178,7 +182,7 @@ bandwidth is computed from `dat` alone and does not use `w`.  Lower is better.
 # Keyword Arguments
 
   - `bw`: optional bandwidth; defaults to Silverman's rule-of-thumb.
-  - `w`: optional non-negative member weight vector (length `m`).
+  - `w`: optional finite, non-negative member weight vector (length `m`) with a positive sum.
 
 # Provenance
 
@@ -195,23 +199,18 @@ logs(dat, 0.5)
 ```
 """
 function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing, w = nothing)
+    w === nothing || _check_member_weights(dat, w)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     # KDE density at y: Σ_i wᵢ φ_{bw}(y − datᵢ) / Σ_i wᵢ
     # log score = −log density
     den = 0.0
-    if w === nothing
-        @inbounds for i in eachindex(dat)
-            den += _norm_pdf((y - dat[i]) / bw_val) / bw_val
-        end
-        den /= length(dat)
-    else
-        _check_member_weights(dat, w)
-        @inbounds for i in eachindex(dat)
-            den += w[i] * _norm_pdf((y - dat[i]) / bw_val) / bw_val
-        end
-        den /= sum(w)
+    wsum = 0.0
+    @inbounds for i in eachindex(dat)
+        wi = w === nothing ? 1.0 : w[i]
+        wsum += wi
+        den += wi * _norm_pdf((y - dat[i]) / bw_val) / bw_val
     end
-    return -log(den)
+    return -log(den / wsum)
 end
 
 """
@@ -226,7 +225,7 @@ simulation draws) at observation `y`:
 
 where ``\\bar{x}`` is the sample mean and ``s^2 = \\tfrac{1}{n}\\sum_i(x_i - \\bar{x})^2``
 is the **population** variance (R uses `mean(dat^2) - mean(dat)^2`, i.e. the
-biased estimator). Optional non-negative member weights `w` (length `m`) are
+biased estimator). Optional finite, non-negative member weights `w` (length `m`) are
 normalised to sum to one internally and replace the mean and variance with
 their weighted versions. Lower is better.
 
@@ -237,7 +236,7 @@ their weighted versions. Lower is better.
 
 # Keyword Arguments
 
-  - `w`: optional non-negative member weight vector (length `m`).
+  - `w`: optional finite, non-negative member weight vector (length `m`) with a positive sum.
 
 # Provenance
 
@@ -260,9 +259,14 @@ function dss(dat::AbstractVector{<:Real}, y::Real; w = nothing)
         v = mean(x^2 for x in dat) - m^2
     else
         _check_member_weights(dat, w)
-        W = sum(w)
-        m = sum(w[i] * dat[i] for i in eachindex(dat)) / W
-        v = sum(w[i] * dat[i]^2 for i in eachindex(dat)) / W - m^2
+        W = swx = swx2 = 0.0
+        @inbounds for i in eachindex(dat)
+            W += w[i]
+            swx += w[i] * dat[i]
+            swx2 += w[i] * dat[i]^2
+        end
+        m = swx / W
+        v = swx2 / W - m^2
     end
     return (y - m)^2 / v + log(v)
 end
