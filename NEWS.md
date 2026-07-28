@@ -23,6 +23,8 @@ Lerch and Allen). See the README for attribution and provenance.
   probability score `rps`, and the moment-based `dss_moments`.
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
   suite.
+- `owcrps` returns `NaN` when no ensemble member has positive weight, matching
+  R and the multivariate outcome-weighted scores.
 
 This file tracks notes for major releases and significant milestones; GitHub
 Releases (auto-generated from merged PRs) cover every release in between.

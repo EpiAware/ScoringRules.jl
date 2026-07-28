@@ -165,3 +165,32 @@
         end
     end
 end
+
+@testitem "ow* scores return NaN when no member has positive weight" begin
+    using ScoringRules
+
+    dat = collect(range(-2.0, 2.0; length = 20))
+    X = reshape(collect(range(-2.0, 2.0; length = 60)), 3, 20)
+    y_mv = [0.0, 0.0, 0.0]
+
+    # The interval (a, b) lies entirely outside the ensemble range, so every
+    # member weight is zero and no conditional forecast exists.
+    a, b = 100.0, 200.0
+
+    @test isnan(owcrps(dat, 0.5; a = a, b = b))
+    @test isnan(owes(X, y_mv; a = a, b = b))
+    @test isnan(owvs(X, y_mv; a = a, b = b))
+    @test isnan(owmmds(X, y_mv; a = a, b = b))
+
+    # Custom weight functions that assign zero weight everywhere behave the
+    # same way.
+    @test isnan(owcrps(dat, 0.5; weight_func = z -> 0.0))
+    @test isnan(owes(X, y_mv; weight_func = z -> 0.0))
+    @test isnan(owvs(X, y_mv; weight_func = z -> 0.0))
+    @test isnan(owmmds(X, y_mv; weight_func = z -> 0.0))
+
+    # Invalid (negative) member weights still error, even when they sum to
+    # zero: `dat` is symmetric about 0, so `z -> z` gives Σw = 0.
+    @test_throws ArgumentError owcrps(dat, 0.5; weight_func = z -> -1.0)
+    @test_throws ArgumentError owcrps(dat, 0.5; weight_func = z -> z)
+end

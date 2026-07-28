@@ -145,6 +145,11 @@ function owcrps(dat::AbstractVector, y::Real;
     end
     w_y = w_func(y)
     w_dat = w_func.(dat)
+    # No member in the region of interest: the conditional forecast
+    # distribution is undefined, so return NaN (matching R's owcrps_sample
+    # and the multivariate ow* scores). `all(iszero, ...)` keeps the error
+    # for invalid weight functions whose negative values happen to sum to zero.
+    all(iszero, w_dat) && return NaN
     # _crps_edf_weighted normalises internally so only relative weights matter
     return _crps_edf_weighted(y, dat, w_dat) * w_y
 end
