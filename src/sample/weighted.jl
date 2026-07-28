@@ -40,7 +40,7 @@ export twcrps, owcrps, twes, owes, twvs, owvs, twmmds, owmmds
 # ---------------------------------------------------------------------------
 
 """
-    twcrps(dat, y; a=-Inf, b=Inf, chain_func=nothing)
+    twcrps(dat, y; a=-Inf, b=Inf, chain_func=nothing, w=nothing)
 
 Threshold-weighted CRPS of the ensemble `dat` (a vector of m simulation draws)
 at observation `y`, emphasising outcomes in the interval (a, b).
@@ -62,6 +62,8 @@ Lower is better.
   - `a`: lower threshold (default `-Inf`).
   - `b`: upper threshold (default `Inf`).
   - `chain_func`: custom chaining function; overrides `a` and `b` when supplied.
+  - `w`: optional non-negative member weights (length `m`); normalised to sum
+    to one internally.
 
 # Provenance
 
@@ -78,7 +80,7 @@ twcrps(dat, 0.5; a = 0.0, b = 1.0)
 """
 function twcrps(dat::AbstractVector, y::Real;
         a::Real = -Inf, b::Real = Inf,
-        chain_func = nothing)
+        chain_func = nothing, w = nothing)
     if chain_func === nothing
         a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
         v = z -> clamp(z, a, b)
@@ -87,7 +89,12 @@ function twcrps(dat::AbstractVector, y::Real;
     end
     v_y = v(y)
     v_dat = v.(dat)
-    return _crps_edf_unweighted(v_y, v_dat)
+    if w === nothing
+        return _crps_edf_unweighted(v_y, v_dat)
+    end
+    # Member weights are attached to the transformed members, matching R's
+    # `crps_sample(v_y, v_dat, w = w)`.
+    return _crps_edf_weighted(v_y, v_dat, _member_weights(length(dat), w))
 end
 
 # ---------------------------------------------------------------------------
@@ -95,7 +102,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    owcrps(dat, y; a=-Inf, b=Inf, weight_func=nothing)
+    owcrps(dat, y; a=-Inf, b=Inf, weight_func=nothing, w=nothing)
 
 Outcome-weighted CRPS of the ensemble `dat` at observation `y`, emphasising
 outcomes in the interval (a, b).
@@ -103,11 +110,12 @@ outcomes in the interval (a, b).
 Each ensemble member xᵢ receives weight w(xᵢ) = 1{a < xᵢ < b}; the
 observation gets weight w(y) = 1{a < y < b}.  The weighted EDF-CRPS
 (normalised by the sum of member weights) is then multiplied by w(y).
+Optional member weights `w` multiply the outcome weights, as in R.
 
 Alternatively, supply a custom vectorised `weight_func` (takes a `Real`,
 returns a non-negative `Real`); supplying `weight_func` ignores `a` and `b`.
 
-Returns `NaN` when all ensemble weights are zero (no member in the region).
+Returns `NaN` when all combined weights are zero (no member in the region).
 Lower is better.
 
 # Arguments
@@ -120,6 +128,8 @@ Lower is better.
   - `a`: lower threshold (default `-Inf`).
   - `b`: upper threshold (default `Inf`).
   - `weight_func`: custom weight function; overrides `a` and `b` when supplied.
+  - `w`: optional non-negative member weights (length `m`); multiplied with the
+    outcome weights.
 
 # Provenance
 
@@ -136,7 +146,7 @@ owcrps(dat, 0.5; a = 0.0, b = 1.0)
 """
 function owcrps(dat::AbstractVector, y::Real;
         a::Real = -Inf, b::Real = Inf,
-        weight_func = nothing)
+        weight_func = nothing, w = nothing)
     if weight_func === nothing
         a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
         w_func = z -> Float64(a < z < b)
@@ -144,7 +154,7 @@ function owcrps(dat::AbstractVector, y::Real;
         w_func = weight_func
     end
     w_y = w_func(y)
-    w_dat = w_func.(dat)
+    w_dat = _member_weights(length(dat), w) .* w_func.(dat)
     # _crps_edf_weighted normalises internally so only relative weights matter
     return _crps_edf_weighted(y, dat, w_dat) * w_y
 end
@@ -174,12 +184,23 @@ function _broadcast_bound(v, d::Int, name::String)
     end
 end
 
+# Combined normalised weights for the outcome-weighted multivariate scores:
+# member weights times per-column outcome weights wf(Xᵢ), rescaled to sum to
+# one. Returns `nothing` when every combined weight is zero (the caller then
+# returns NaN, as R does).
+function _ow_weights(X::AbstractMatrix, wf, w)
+    wm = _w_helper(X, w)
+    cw = wm .* [wf(col) for col in eachcol(X)]
+    sw = sum(cw)
+    return sw == 0 ? nothing : cw ./ sw
+end
+
 # ---------------------------------------------------------------------------
 # Multivariate threshold-weighted energy score  (twes_sample in R)
 # ---------------------------------------------------------------------------
 
 """
-    twes(X, y; a=-Inf, b=Inf, chain_func=nothing)
+    twes(X, y; a=-Inf, b=Inf, chain_func=nothing, w=nothing)
 
 Threshold-weighted energy score of the ensemble `X` (a `d × m` matrix, each
 column one member) at the `d`-dimensional observation `y`.
@@ -188,7 +209,8 @@ The chaining function `v(z) = clamp.(z, a, b)` (element-wise) is applied to
 `y` and every column of `X`; the standard energy score of the transformed
 forecast is returned.  `a` and `b` may be scalars (broadcast to all dimensions)
 or length-`d` vectors.  A custom `chain_func` (takes a length-`d` vector,
-returns a length-`d` vector) overrides `a` and `b`.
+returns a length-`d` vector) overrides `a` and `b`.  Optional member weights
+`w` (length `m`) are normalised to sum to one internally.
 
 Lower is better.
 
@@ -207,7 +229,7 @@ twes(X, y; a = -1.0, b = 1.0)
 ```
 """
 function twes(X::AbstractMatrix, y::AbstractVector;
-        a = -Inf, b = Inf, chain_func = nothing)
+        a = -Inf, b = Inf, chain_func = nothing, w = nothing)
     _check_multiv(X, y)
     d = length(y)
     if chain_func === nothing
@@ -221,8 +243,7 @@ function twes(X::AbstractMatrix, y::AbstractVector;
     end
     v_y = v(y)
     v_dat = stack(v, eachcol(X))
-    m = size(v_dat, 2)
-    wv = fill(1.0 / m, m)
+    wv = _w_helper(v_dat, w)
     return _esC_xy(v_y, v_dat, wv) - 0.5 * _esC_xx(v_dat, wv)
 end
 
@@ -231,19 +252,20 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    owes(X, y; a=-Inf, b=Inf, weight_func=nothing)
+    owes(X, y; a=-Inf, b=Inf, weight_func=nothing, w=nothing)
 
 Outcome-weighted energy score of the ensemble `X` (a `d × m` matrix) at the
 `d`-dimensional observation `y`.
 
 Each column Xᵢ of `X` receives weight w(Xᵢ) where the default weight function
 is w(z) = 1{∀k: a[k] < z[k] < b[k]}.  The observation weight is w(y).  The
-energy score is computed with the normalised member weights and then multiplied
-by w(y).
+energy score is computed with the normalised column weights and then multiplied
+by w(y).  Optional member weights `w` (length `m`) multiply the outcome
+weights, as in R.
 
-Returns `NaN` when all member weights are zero.  A custom `weight_func` (takes
-a length-`d` vector, returns a non-negative scalar) overrides `a` and `b`.
-Lower is better.
+Returns `NaN` when all combined weights are zero.  A custom `weight_func`
+(takes a length-`d` vector, returns a non-negative scalar) overrides `a` and
+`b`.  Lower is better.
 
 # Provenance
 
@@ -260,7 +282,7 @@ owes(X, y; a = -1.0, b = 1.0)
 ```
 """
 function owes(X::AbstractMatrix, y::AbstractVector;
-        a = -Inf, b = Inf, weight_func = nothing)
+        a = -Inf, b = Inf, weight_func = nothing, w = nothing)
     _check_multiv(X, y)
     d = length(y)
     if weight_func === nothing
@@ -273,12 +295,8 @@ function owes(X::AbstractMatrix, y::AbstractVector;
         wf = weight_func
     end
     w_y = wf(y)
-    w_dat = [wf(col) for col in eachcol(X)]
-    sw = sum(w_dat)
-    if sw == 0
-        return NaN
-    end
-    wv = w_dat ./ sw
+    wv = _ow_weights(X, wf, w)
+    wv === nothing && return NaN
     return (_esC_xy(y, X, wv) - 0.5 * _esC_xx(X, wv)) * w_y
 end
 
@@ -287,14 +305,15 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    twvs(X, y; p=0.5, a=-Inf, b=Inf, chain_func=nothing)
+    twvs(X, y; p=0.5, a=-Inf, b=Inf, chain_func=nothing, w=nothing)
 
 Threshold-weighted variogram score of order `p` of the ensemble `X` (a
 `d × m` matrix) at the `d`-dimensional observation `y`.
 
 The chaining function is applied to `y` and each column of `X`; the standard
-variogram score is then evaluated on the transformed forecast.  See `twes` for
-the conventions on `a`, `b`, and `chain_func`.  Lower is better.
+variogram score is then evaluated on the transformed forecast.  Optional
+member weights `w` (length `m`) are normalised to sum to one internally.  See
+`twes` for the conventions on `a`, `b`, and `chain_func`.  Lower is better.
 
 # Provenance
 
@@ -311,7 +330,7 @@ twvs(X, y; a = -1.0, b = 1.0)
 ```
 """
 function twvs(X::AbstractMatrix, y::AbstractVector;
-        p::Real = 0.5, a = -Inf, b = Inf, chain_func = nothing)
+        p::Real = 0.5, a = -Inf, b = Inf, chain_func = nothing, w = nothing)
     _check_multiv(X, y)
     d = length(y)
     if chain_func === nothing
@@ -325,7 +344,7 @@ function twvs(X::AbstractMatrix, y::AbstractVector;
     end
     v_y = v(y)
     v_dat = stack(v, eachcol(X))
-    return _vsC(v_y, v_dat, p)
+    return vs(v_dat, v_y; p = p, w = w)
 end
 
 # ---------------------------------------------------------------------------
@@ -333,14 +352,16 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    owvs(X, y; p=0.5, a=-Inf, b=Inf, weight_func=nothing)
+    owvs(X, y; p=0.5, a=-Inf, b=Inf, weight_func=nothing, w=nothing)
 
 Outcome-weighted variogram score of order `p` of the ensemble `X` (a `d × m`
 matrix) at the `d`-dimensional observation `y`.
 
-The variogram score is computed using the normalised per-member weights w(Xᵢ),
-then multiplied by w(y).  Returns `NaN` when all member weights are zero.  See
-`owes` for conventions on `a`, `b`, and `weight_func`.  Lower is better.
+The variogram score is computed using the normalised per-column weights w(Xᵢ),
+then multiplied by w(y).  Optional member weights `w` (length `m`) multiply
+the outcome weights, as in R.  Returns `NaN` when all combined weights are
+zero.  See `owes` for conventions on `a`, `b`, and `weight_func`.  Lower is
+better.
 
 # Provenance
 
@@ -357,7 +378,7 @@ owvs(X, y; a = -1.0, b = 1.0)
 ```
 """
 function owvs(X::AbstractMatrix, y::AbstractVector;
-        p::Real = 0.5, a = -Inf, b = Inf, weight_func = nothing)
+        p::Real = 0.5, a = -Inf, b = Inf, weight_func = nothing, w = nothing)
     _check_multiv(X, y)
     d = length(y)
     if weight_func === nothing
@@ -370,12 +391,8 @@ function owvs(X::AbstractMatrix, y::AbstractVector;
         wf = weight_func
     end
     w_y = wf(y)
-    w_dat = [wf(col) for col in eachcol(X)]
-    sw = sum(w_dat)
-    if sw == 0
-        return NaN
-    end
-    wv = w_dat ./ sw
+    wv = _ow_weights(X, wf, w)
+    wv === nothing && return NaN
     return _vsC_w(y, X, ones(d, d), wv, p) * w_y
 end
 
@@ -384,14 +401,15 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    twmmds(X, y; a=-Inf, b=Inf, chain_func=nothing)
+    twmmds(X, y; a=-Inf, b=Inf, chain_func=nothing, w=nothing)
 
 Threshold-weighted MMD score (Gaussian kernel, σ = 1) of the ensemble `X` (a
 `d × m` matrix) at the `d`-dimensional observation `y`.
 
 The chaining function is applied to `y` and each column of `X`; the standard
-MMD score is evaluated on the transformed forecast.  See `twes` for conventions
-on `a`, `b`, and `chain_func`.  Lower is better.
+MMD score is evaluated on the transformed forecast.  Optional member weights
+`w` (length `m`) are normalised to sum to one internally.  See `twes` for
+conventions on `a`, `b`, and `chain_func`.  Lower is better.
 
 # Provenance
 
@@ -408,7 +426,7 @@ twmmds(X, y; a = -1.0, b = 1.0)
 ```
 """
 function twmmds(X::AbstractMatrix, y::AbstractVector;
-        a = -Inf, b = Inf, chain_func = nothing)
+        a = -Inf, b = Inf, chain_func = nothing, w = nothing)
     _check_multiv(X, y)
     d = length(y)
     if chain_func === nothing
@@ -422,8 +440,7 @@ function twmmds(X::AbstractMatrix, y::AbstractVector;
     end
     v_y = v(y)
     v_dat = stack(v, eachcol(X))
-    m = size(v_dat, 2)
-    wv = fill(1.0 / m, m)
+    wv = _w_helper(v_dat, w)
     return 0.5 * _mmdsC_xx(v_dat, wv) - _mmdsC_xy(v_y, v_dat, wv)
 end
 
@@ -432,14 +449,15 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    owmmds(X, y; a=-Inf, b=Inf, weight_func=nothing)
+    owmmds(X, y; a=-Inf, b=Inf, weight_func=nothing, w=nothing)
 
 Outcome-weighted MMD score (Gaussian kernel, σ = 1) of the ensemble `X` (a
 `d × m` matrix) at the `d`-dimensional observation `y`.
 
-The MMD score is computed using the normalised per-member weights w(Xᵢ), then
-multiplied by w(y).  Returns `NaN` when all member weights are zero.  See
-`owes` for conventions on `a`, `b`, and `weight_func`.  Lower is better.
+The MMD score is computed using the normalised per-column weights w(Xᵢ), then
+multiplied by w(y).  Optional member weights `w` (length `m`) multiply the
+outcome weights, as in R.  Returns `NaN` when all combined weights are zero.
+See `owes` for conventions on `a`, `b`, and `weight_func`.  Lower is better.
 
 # Provenance
 
@@ -456,7 +474,7 @@ owmmds(X, y; a = -1.0, b = 1.0)
 ```
 """
 function owmmds(X::AbstractMatrix, y::AbstractVector;
-        a = -Inf, b = Inf, weight_func = nothing)
+        a = -Inf, b = Inf, weight_func = nothing, w = nothing)
     _check_multiv(X, y)
     d = length(y)
     if weight_func === nothing
@@ -469,11 +487,7 @@ function owmmds(X::AbstractMatrix, y::AbstractVector;
         wf = weight_func
     end
     w_y = wf(y)
-    w_dat = [wf(col) for col in eachcol(X)]
-    sw = sum(w_dat)
-    if sw == 0
-        return NaN
-    end
-    wv = w_dat ./ sw
+    wv = _ow_weights(X, wf, w)
+    wv === nothing && return NaN
     return (0.5 * _mmdsC_xx(X, wv) - _mmdsC_xy(y, X, wv)) * w_y
 end

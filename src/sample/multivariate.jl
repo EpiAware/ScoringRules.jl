@@ -25,22 +25,45 @@ function _check_multiv(X::AbstractMatrix, y::AbstractVector)
 end
 
 """
-    _w_helper(X, w)
+    _member_weights(m, w)
 
-Return a normalised weight vector of length `m = size(X, 2)`. If `w` is
-`nothing`, uniform weights `1/m` are used. Otherwise `w` is rescaled so that
-its entries sum to one (analogous to `w.helper.multiv` in R).
+Return a normalised member-weight vector of length `m`. If `w` is `nothing`,
+uniform weights `1/m` are used. Otherwise `w` is validated (length `m`,
+non-negative) and rescaled so that its entries sum to one (analogous to
+`w.helper.multiv` in R).
 """
-function _w_helper(X::AbstractMatrix, w)
-    m = size(X, 2)
+function _member_weights(m::Integer, w)
     if w === nothing
         return fill(1.0 / m, m)
     end
     length(w) == m || throw(DimensionMismatch(
         "length of w ($(length(w))) must equal the number of ensemble members ($m)"))
-    any(<(0), w) && throw(ArgumentError("weights w must be non-negative"))
+    any(<(0), w) && throw(ArgumentError("member weights w must be non-negative"))
     sw = sum(w)
     return w ./ sw
+end
+
+"""
+    _w_helper(X, w)
+
+Normalised member weights for the columns of the `d × m` ensemble matrix `X`
+(see [`_member_weights`](@ref)).
+"""
+_w_helper(X::AbstractMatrix, w) = _member_weights(size(X, 2), w)
+
+"""
+    _check_w_vs(w_vs, d)
+
+Validate a `d × d` pairwise weight matrix for the variogram score: square of
+the right size, non-negative and symmetric (the checks R's `vs_sample` applies
+to `w_vs`).
+"""
+function _check_w_vs(w_vs::AbstractMatrix, d::Integer)
+    size(w_vs) == (d, d) || throw(DimensionMismatch(
+        "w_vs must be a $d × $d matrix, got $(size(w_vs))"))
+    any(<(0), w_vs) && throw(ArgumentError("weight matrix w_vs must be non-negative"))
+    isapprox(w_vs, w_vs'; atol = 1e-12) || throw(ArgumentError(
+        "weight matrix w_vs must be symmetric"))
 end
 
 # ---------------------------------------------------------------------------
@@ -165,7 +188,7 @@ function _vsC_w(y::AbstractVector, X::AbstractMatrix, w_vs::AbstractMatrix,
 end
 
 """
-    vs(X, y; p=0.5, w=nothing)
+    vs(X, y; p=0.5, w=nothing, w_vs=nothing)
 
 Variogram score of order `p` of the ensemble forecast `X` (a `d × m` matrix)
 at the `d`-dimensional observation `y`:
@@ -175,9 +198,12 @@ at the `d`-dimensional observation `y`:
   \\bigl(|y_k - y_l|^p - \\overline{|X_{k,\\cdot} - X_{l,\\cdot}|^p}\\bigr)^2
 ```
 
-`w` is an optional `d × d` non-negative symmetric weight matrix (defaults to all
-ones). Per-member weights are not supported; pass `nothing` for `w` to use the
-unweighted form.
+`w` is an optional per-member weight vector (length `m`, as in `es`); it is
+normalised to sum to one internally. `w_vs` is an optional `d × d` non-negative
+symmetric pairwise weight matrix (R's `w_vs`; defaults to all ones). When `w`
+is supplied the score uses the weighted-ensemble form of the variogram kernel.
+R's `vs_sample` silently ignores `w_vs` when `w` is given; here both are
+honoured together. Lower is better.
 
 # Provenance
 
@@ -193,21 +219,17 @@ y = [0.0, 0.0]
 vs(X, y)
 ```
 """
-function vs(X::AbstractMatrix, y::AbstractVector; p::Real = 0.5, w = nothing)
+function vs(X::AbstractMatrix, y::AbstractVector;
+        p::Real = 0.5, w = nothing, w_vs = nothing)
     _check_multiv(X, y)
     d = length(y)
-    if w !== nothing
-        # `w` here follows the R `w_vs` argument: a d × d weight matrix.
-        isa(w, AbstractMatrix) || throw(ArgumentError("w must be a d × d matrix for vs"))
-        size(w) == (d, d) || throw(DimensionMismatch(
-            "w must be a $d × $d matrix, got $(size(w))"))
-        any(<(0), w) && throw(ArgumentError("weight matrix w must be non-negative"))
-        isapprox(w, w'; atol = 1e-12) || throw(ArgumentError(
-            "weight matrix w must be symmetric"))
-        return _vsC_w_vs(y, X, w, p)
-    else
-        return _vsC(y, X, p)
+    w_vs === nothing || _check_w_vs(w_vs, d)
+    if w === nothing
+        return w_vs === nothing ? _vsC(y, X, p) : _vsC_w_vs(y, X, w_vs, p)
     end
+    wv = _w_helper(X, w)
+    wvs = w_vs === nothing ? ones(d, d) : w_vs
+    return _vsC_w(y, X, wvs, wv, p)
 end
 
 # ---------------------------------------------------------------------------
@@ -239,7 +261,7 @@ function _mmdsC_xx(X::AbstractMatrix, w::AbstractVector)
 end
 
 """
-    mmds(X, y)
+    mmds(X, y; w=nothing)
 
 Maximum-mean-discrepancy score (Gaussian kernel with σ = 1) of the ensemble
 forecast `X` (a `d × m` matrix) at the `d`-dimensional observation `y`:
@@ -249,8 +271,8 @@ forecast `X` (a `d × m` matrix) at the `d`-dimensional observation `y`:
 \\quad k(x,z) = \\exp(-\\tfrac{1}{2}\\|x-z\\|^2)
 ```
 
-Uniform weights `w_i = 1/m` are used (weighted form not currently exposed).
-Lower is better.
+Optional per-member weights `w` (length `m`); they are normalised to sum to one
+internally. If `w` is `nothing`, uniform weights are used. Lower is better.
 
 # Provenance
 
@@ -267,9 +289,8 @@ y = [0.0, 0.0]
 mmds(X, y)
 ```
 """
-function mmds(X::AbstractMatrix, y::AbstractVector)
+function mmds(X::AbstractMatrix, y::AbstractVector; w = nothing)
     _check_multiv(X, y)
-    m = size(X, 2)
-    w = fill(1.0 / m, m)
-    return 0.5 * _mmdsC_xx(X, w) - _mmdsC_xy(y, X, w)
+    wv = _w_helper(X, w)
+    return 0.5 * _mmdsC_xx(X, wv) - _mmdsC_xy(y, X, wv)
 end
