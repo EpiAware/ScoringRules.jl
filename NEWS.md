@@ -23,6 +23,11 @@ Lerch and Allen). See the README for attribution and provenance.
   probability score `rps`, and the moment-based `dss_moments`.
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
   suite.
+- The sample quantile helper behind `quantile_score(dat, y; ...)` and
+  `interval_score(dat, y; ...)` mirrors the index fuzz of R's
+  `stats::quantile`, so quantile levels whose `n * p` lands just below an
+  integer in floating point (e.g. `0.5 * (1 - 0.9)` at `n = 500`) pick the
+  same order statistic as R.
 
 This file tracks notes for major releases and significant milestones; GitHub
 Releases (auto-generated from merged PRs) cover every release in between.
