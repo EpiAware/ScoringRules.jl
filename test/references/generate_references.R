@@ -375,6 +375,41 @@ rows_wtu <- do.call(rbind, lapply(1:2, function(eid) {
 }))
 write_ref("sample_weighted_univ", rows_wtu)
 
+## ---- censored/conditional likelihood score (clogs vs R clogs_sample) ----
+# Ensembles of size 5, 30 and 500; windows one- and two-sided, y inside and
+# outside (including exactly on a bound), default and explicit bandwidth,
+# censored and conditional variants.
+set.seed(789)
+ns_clogs <- c(5, 30, 500)
+clogs_ens <- lapply(ns_clogs, function(n) rnorm(n, mean = 0.2, sd = 1.1))
+names(clogs_ens) <- as.character(ns_clogs)
+for (n in ns_clogs) {
+  write_ens(sprintf("ens_clogs_%d", n), t(matrix(clogs_ens[[as.character(n)]])))
+}
+
+ys_clogs <- c(-2, -0.5, 0, 0.5, 1, 3)
+ab_pairs_clogs <- list(c(-Inf, Inf), c(-1, 1), c(0, 2), c(-0.5, Inf), c(-Inf, 0.5))
+bws_clogs <- c(NA, 0.4)
+rows_clogs <- do.call(rbind, lapply(ns_clogs, function(n) {
+  dat <- clogs_ens[[as.character(n)]]
+  do.call(rbind, lapply(ys_clogs, function(yval) {
+    do.call(rbind, lapply(seq_along(ab_pairs_clogs), function(ki) {
+      ab <- ab_pairs_clogs[[ki]]
+      do.call(rbind, lapply(bws_clogs, function(bwval) {
+        bw_arg <- if (is.na(bwval)) NULL else bwval
+        data.frame(
+          n = n, y = yval, ab_id = ki, a = ab[1], b = ab[2], bw = bwval,
+          clogs_cens = clogs_sample(yval, dat = dat, a = ab[1], b = ab[2],
+                                    bw = bw_arg, cens = TRUE),
+          clogs_cond = clogs_sample(yval, dat = dat, a = ab[1], b = ab[2],
+                                    bw = bw_arg, cens = FALSE)
+        )
+      }))
+    }))
+  }))
+}))
+write_ref("sample_clogs", rows_clogs)
+
 ## ---- weighted multivariate (twes/owes/twvs/owvs/twmmds/owmmds) ----
 # Use multivariate ensembles; scalar [a,b] intervals broadcast to all dims.
 ab_pairs_mv <- list(c(-Inf, Inf), c(-1, 1), c(0, 2))

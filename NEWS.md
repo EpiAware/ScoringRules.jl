@@ -18,7 +18,8 @@ Lerch and Allen). See the README for attribution and provenance.
   `dss` on vectors; the energy score `es`, variogram score `vs` and
   maximum-mean-discrepancy score `mmds` on multivariate ensembles.
 - Threshold- and outcome-weighted scores (`twcrps`, `owcrps`, `twes`, `owes`,
-  `twvs`, `owvs`, `twmmds`, `owmmds`).
+  `twvs`, `owvs`, `twmmds`, `owmmds`), and the censored and conditional
+  likelihood scores (`clogs`) of Diks et al. (2011).
 - Quantile and interval scores (`quantile_score`, `interval_score`), the ranked
   probability score `rps`, and the moment-based `dss_moments`.
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
