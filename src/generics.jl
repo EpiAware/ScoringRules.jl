@@ -105,7 +105,8 @@ mode. Lower is better.
 
   - `y`: scalar observation.
   - `mean`: forecast mean.
-  - `var`: forecast variance.
+  - `var`: forecast variance; must be non-negative (a negative value throws a
+    `DomainError`, where R returns `NaN` with a warning).
   - `skew`: forecast skewness.
 
 # Example
