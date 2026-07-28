@@ -23,6 +23,9 @@ Lerch and Allen). See the README for attribution and provenance.
   probability score `rps`, and the moment-based `dss_moments`.
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
   suite.
+- `dss` returns `NaN` whenever the forecast variance is not finite and
+  positive (for example t with `df ≤ 2`, GEV/GPD with `shape ≥ 1/2`,
+  log-Laplace with `σ ≥ 1/2`, log-logistic with `β ≤ 2`), matching R.
 
 This file tracks notes for major releases and significant milestones; GitHub
 Releases (auto-generated from merged PRs) cover every release in between.

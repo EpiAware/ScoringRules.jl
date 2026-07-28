@@ -68,13 +68,17 @@ function Distributions.quantile(d::LogLaplace, p::Real)
     end
 end
 
-# Mean: E[X] = exp(μ) / (1 - σ²)   (requires σ < 1)
+# Mean: E[X] = exp(μ) / (1 - σ²) for σ < 1; the first moment diverges for
+# σ ≥ 1, where the closed form would go negative.
 function Distributions.mean(d::LogLaplace)
+    d.σ >= 1 && return oftype(float(d.σ), Inf)
     return exp(d.μ) / (1 - d.σ^2)
 end
 
-# Var[X] = exp(2μ) * (1/(1 - 4σ²) - 1/(1 - σ²)²)   (requires σ < 1/2)
+# Var[X] = exp(2μ) * (1/(1 - 4σ²) - 1/(1 - σ²)²) for σ < 1/2; the second
+# moment diverges for σ ≥ 1/2, where the closed form would go negative.
 function Distributions.var(d::LogLaplace)
+    d.σ >= 0.5 && return oftype(float(d.σ), Inf)
     sl2 = d.σ^2
     e2 = exp(2 * d.μ)
     return e2 * (1 / (1 - 4 * sl2) - 1 / (1 - sl2)^2)

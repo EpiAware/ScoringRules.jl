@@ -44,6 +44,11 @@ Dawid–Sebastiani score of the forecast distribution `d` at the observation `y`
 where ``\\mu_F`` and ``\\sigma_F^2`` are the mean and variance of `d`. Only the
 first two moments of the forecast enter. Lower is better.
 
+Returns `NaN` when the forecast variance is not finite and positive (for
+example a Student-t with `df ≤ 2`, a GEV/GPD with `shape ≥ 1/2`, a
+[`LogLaplace`](@ref) with `σ ≥ 1/2` or a log-logistic with `β ≤ 2`), matching
+the `dss_*` functions in R scoringRules.
+
 # Arguments
 
   - `d`: forecast distribution (any `UnivariateDistribution`).
@@ -57,10 +62,20 @@ dss(Normal(0, 1), 0.5)
 ```
 """
 function dss(d::UnivariateDistribution, y::Real)
+    v = _forecast_var(d)
+    # A nonexistent variance means the DSS is undefined; return NaN, as the
+    # dss_* functions in R scoringRules do.
+    (isfinite(v) && v > 0) || return NaN
     m = mean(d)
-    v = var(d)
     return (y - m)^2 / v + log(v)
 end
+
+# Forecast variance for `dss`, evaluating to `Inf`/`NaN` where the variance
+# does not exist. `Distributions.var` already follows this convention for most
+# families; `LogLogistic` instead throws, so its heavy-tailed case (infinite
+# second moment for shape β ≤ 2) is guarded here.
+_forecast_var(d::UnivariateDistribution) = var(d)
+_forecast_var(d::LogLogistic) = d.β > 2 ? var(d) : oftype(float(d.β), Inf)
 
 """
     dss_moments(y, mean, var)
