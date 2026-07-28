@@ -36,7 +36,7 @@ using Distributions: Distributions, Beta, Binomial, Censored, Continuous,
                      Logistic, MixtureModel, NegativeBinomial, Normal, Poisson, TDist,
                      Truncated, Uniform, Univariate, UnivariateDistribution,
                      ccdf, cdf, components, dof, location, logpdf, params, pdf, probs,
-                     scale, shape
+                     scale, shape, truncated
 using SpecialFunctions: erfc, gamma, digamma, beta_inc, logbeta,
                         besseli, expinti, gamma_inc
 using LogExpFunctions: logistic
@@ -56,7 +56,7 @@ export twcrps, owcrps, twes, owes, twvs, owvs, twmmds, owmmds
 # Quantile / interval scores and the ranked probability score
 export quantile_score, interval_score, rps
 # Distribution types provided here (not in Distributions.jl)
-export LogLaplace, TwoPieceNormal, TwoPieceExponential
+export LogLaplace, TwoPieceNormal, TwoPieceExponential, BoundaryMass
 
 include("docstrings.jl")
 include("utils.jl")
@@ -66,6 +66,7 @@ include("generics.jl")
 # (log-logistic is Distributions.LogLogistic; only these are missing upstream)
 include("distributions/loglaplace.jl")
 include("distributions/twopiece.jl")
+include("distributions/boundarymass.jl")
 
 # Closed-form CRPS per distribution family
 include("crps/normal.jl")
@@ -83,6 +84,7 @@ include("crps/discrete.jl")
 include("crps/loglogistic.jl")
 include("crps/loglaplace.jl")
 include("crps/twopiece.jl")
+include("crps/boundarymass.jl")
 
 # Simulated / ensemble forecasts and sample-based scores
 include("sample/univariate.jl")
