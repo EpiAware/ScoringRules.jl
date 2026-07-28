@@ -5,30 +5,6 @@ ScoringRules.jl is a port of the R package
 most cases the two packages produce identical numerical results, but there are
 known divergences that users coming from R should be aware of.
 
-## DSS for Log-Logistic
-
-R's `dss_llogis` has an operator-precedence bug: in the variance computation
-`v <- ell^2 * 2*b/sin(2*b) - b^2/sb^2`, the squared location factor `ell^2`
-multiplies only the first term. The consequences depend on the location
-parameter:
-
-  * `locationlog = 0`: the factor equals one, the bug cancels, and R agrees
-    with ScoringRules.jl to machine precision.
-  * `locationlog > 0`: R returns wrong finite values (observed relative errors
-    up to 166%).
-  * `locationlog < 0`: the mis-scaled variance goes negative and R returns
-    `NaN`.
-
-ScoringRules.jl uses the correct variance:
-
-```math
-\mathrm{Var}[X] = \alpha^2 \left(\frac{2/\beta}{\sin(2\pi/\beta)} - \left(\frac{\pi/\beta}{\sin(\pi/\beta)}\right)^2\right)
-```
-
-via Distributions.jl's `var(LogLogistic(α, β))`, so `dss(LogLogistic(α, β), y)`
-returns a finite result wherever the variance exists (requires ``\beta > 2``),
-verified against a manual computation from the log-logistic moments.
-
 ## CRPS for the negative binomial: half-integer `size`
 
 R's `crps_nbinom` returns `-Inf` whenever the `size` parameter is a
