@@ -489,6 +489,57 @@ rows_mw_mv <- do.call(rbind, lapply(1:2, function(eid) {
 }))
 write_ref("member_w_weighted_mv", rows_mw_mv)
 
+## ---- pairwise weight matrix (w_vs) in twvs / owvs ----
+# Two non-uniform symmetric d x d matrices, mirrored in the Julia tests.
+# w_id 0 means no member weights (uniform).
+#
+# The public twvs_sample/owvs_sample ignore w_vs whenever member weights are in
+# play (always in owvs, where the outcome weights become member weights), so
+# those reference values come from the internal C++ kernel vsC_w, which the
+# Julia port exposes through both scores. The w_id 0 twvs rows double as a
+# cross-check of the kernel against the public API.
+wvs_list <- list(
+  outer(seq_len(d_mv), seq_len(d_mv), function(k, l) 1 / (1 + abs(k - l))),
+  outer(seq_len(d_mv), seq_len(d_mv), function(k, l) (k + l) / 2)
+)
+rows_pw <- do.call(rbind, lapply(1:2, function(eid) {
+  Xmat <- if (eid == 1) ens_mv1 else ens_mv2
+  m <- ncol(Xmat)
+  do.call(rbind, lapply(seq_along(ys_mv), function(yi) {
+    y <- ys_mv[[yi]]
+    do.call(rbind, lapply(seq_along(ab_pairs_mv), function(ki) {
+      ab <- ab_pairs_mv[[ki]]
+      a  <- ab[1]; b <- ab[2]
+      do.call(rbind, lapply(0:3, function(wi) {
+        wv <- if (wi == 0) rep(1, m) else member_w(m, wi)
+        do.call(rbind, lapply(seq_along(wvs_list), function(vi) {
+          wvs <- wvs_list[[vi]]
+          # twvs: chain the ensemble, then the member- and pair-weighted
+          # variogram kernel.
+          v_y   <- pmin(pmax(y, a), b)
+          v_dat <- apply(Xmat, 2, function(x) pmin(pmax(x, a), b))
+          twvs_val <- scoringRules:::vsC_w(v_y, v_dat, wvs, wv / sum(wv), 0.5)
+          if (wi == 0) {
+            pub <- twvs_sample(y, dat = Xmat, a = a, b = b, w_vs = wvs, p = 0.5)
+            stopifnot(abs(twvs_val - pub) < 1e-10)
+          }
+          # owvs: combined outcome and member weights on the untransformed
+          # ensemble, times the outcome weight of y.
+          w_y   <- as.numeric(all(y > a & y < b))
+          w_dat <- apply(Xmat, 2, function(x) as.numeric(all(x > a & x < b)))
+          cw <- wv * w_dat
+          owvs_val <- if (sum(cw) == 0) NaN else
+            scoringRules:::vsC_w(y, Xmat, wvs, cw / sum(cw), 0.5) * w_y
+          data.frame(ens_id = eid, y_id = yi, ab_id = ki, a = a, b = b,
+                     w_id = wi, wvs_id = vi, p_vs = 0.5,
+                     twvs = twvs_val, owvs = owvs_val)
+        }))
+      }))
+    }))
+  }))
+}))
+write_ref("vs_pairwise_w", rows_pw)
+
 ## ---- quantile / interval scores (qs_quantiles / ints_quantiles / qs_sample / ints_sample) ----
 q_levels <- c(0.1, 0.25, 0.5, 0.75, 0.9)
 q_forecasts_list <- list(

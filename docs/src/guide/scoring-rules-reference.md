@@ -140,6 +140,12 @@ twvs(X, y; a = 0.0)
 owvs(X, y; a = 0.0)
 ```
 
+Both take the pairwise weight matrix `w_vs` of `vs`:
+
+```@example ref
+twvs(X, y; a = 0.0, w_vs = w_vs)
+```
+
 ### Threshold- and outcome-weighted MMD score
 
 ```@example ref

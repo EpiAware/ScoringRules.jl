@@ -25,7 +25,10 @@ Lerch and Allen). See the README for attribution and provenance.
 - Threshold- and outcome-weighted scores (`twcrps`, `owcrps`, `twes`, `owes`,
   `twvs`, `owvs`, `twmmds`, `owmmds`), all with optional member weights `w`:
   the tw\* scores weight the chained ensemble, and in the ow\* scores the
-  outcome weights multiply the member weights, as in R.
+  outcome weights multiply the member weights, as in R. `twvs` and `owvs` also
+  take the pairwise `d × d` weight matrix `w_vs`; unlike R, which drops `w_vs`
+  whenever member or outcome weights are active, both scores honour it
+  alongside `w`.
 - Quantile and interval scores (`quantile_score`, `interval_score`), the ranked
   probability score `rps`, and the moment-based `dss_moments`.
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
