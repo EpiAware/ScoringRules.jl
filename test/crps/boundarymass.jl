@@ -114,6 +114,17 @@ end
         end
     end
 
+    @testset "logistic closed form stays finite for far-out bounds" begin
+        # logistic(z) rounds to 1 for z ≳ 37, where a naive log(1 - p) is -Inf
+        w = BoundaryMass(Logistic(0, 1); lower = -5.0, upper = 100.0,
+            lmass = 0.1, umass = 0.1)
+        for y in (-10.0, 0.0, 50.0, 200.0)
+            quad = invoke(crps, Tuple{ContinuousUnivariateDistribution, Real}, w, y)
+            @test isfinite(crps(w, y))
+            @test crps(w, y)≈quad rtol=1e-6
+        end
+    end
+
     @testset "distribution interface" begin
         w = BoundaryMass(Normal(0, 1); lower = -1, upper = 2,
             lmass = 0.1, umass = 0.2)

@@ -39,7 +39,7 @@ using Distributions: Distributions, Beta, Binomial, Censored, Continuous,
                      scale, shape, truncated
 using SpecialFunctions: erfc, gamma, digamma, beta_inc, logbeta,
                         besseli, expinti, gamma_inc
-using LogExpFunctions: logistic
+using LogExpFunctions: log1pexp, logistic
 using HypergeometricFunctions: _₂F₁
 using QuadGK: quadgk
 using Statistics: mean, var, std, quantile
