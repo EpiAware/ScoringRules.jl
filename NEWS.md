@@ -20,7 +20,8 @@ Lerch and Allen). See the README for attribution and provenance.
 - Threshold- and outcome-weighted scores (`twcrps`, `owcrps`, `twes`, `owes`,
   `twvs`, `owvs`, `twmmds`, `owmmds`).
 - Quantile and interval scores (`quantile_score`, `interval_score`), the ranked
-  probability score `rps`, and the moment-based `dss_moments`.
+  probability score `rps`, and the moment-based `dss_moments` and `ess_moments`
+  (error-spread score of Christensen, Moroz and Palmer 2015).
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
   suite.
 

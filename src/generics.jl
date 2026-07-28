@@ -87,6 +87,40 @@ dss_moments(0.5, 0.0, 1.0)
 dss_moments(y::Real, mean::Real, var::Real) = (y - mean)^2 / var + log(var)
 
 """
+    ess_moments(y, mean, var, skew)
+
+Error-spread score (Christensen, Moroz and Palmer 2015) from a moment forecast
+given directly as its `mean`, `var`iance and `skew`ness,
+
+```math
+\\mathrm{ESS}(y) = \\bigl(\\sigma^2 - (\\mu - y)^2 - (\\mu - y)\\,\\sigma\\,\\gamma\\bigr)^2,
+```
+
+where ``\\mu``, ``\\sigma^2`` and ``\\gamma`` are the forecast mean, variance
+and skewness. The score assesses whether the spread and skewness of an ensemble
+forecast are consistent with its error. This is the moment-based forecast input
+mode. Lower is better.
+
+# Arguments
+
+  - `y`: scalar observation.
+  - `mean`: forecast mean.
+  - `var`: forecast variance.
+  - `skew`: forecast skewness.
+
+# Example
+
+```@example
+using ScoringRules
+ess_moments(0.5, 0.0, 1.0, 0.5)
+```
+"""
+function ess_moments(y::Real, mean::Real, var::Real, skew::Real)
+    e = mean - y
+    return (var - e^2 - e * sqrt(var) * skew)^2
+end
+
+"""
     crps(d::UnivariateDistribution, y)
 
 Continuous ranked probability score of the forecast distribution `d` at the
