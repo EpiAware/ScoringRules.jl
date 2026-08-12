@@ -34,12 +34,9 @@ ScoringRules = "1fcf7366-10ae-49d1-a4dc-286b3bf402d3"
 [sources]
 ScoringRules = {path = ".."}
 ADFixtures = {path = "../test/ADFixtures"}
-# Until EpiAwarePackageTools is registered, it is pinned by git so
-# the env resolves out of the box. Switch to a local path to
-# develop the kit alongside this package.
-EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main"}
 
 [compat]
+EpiAwarePackageTools = "=0.3.0"
 AlgebraOfGraphics = "0.13"
 CairoMakie = "0.15"
 Chairmarks = "1"
