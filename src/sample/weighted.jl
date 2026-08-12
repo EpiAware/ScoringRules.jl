@@ -154,8 +154,23 @@ function owcrps(dat::AbstractVector, y::Real;
         w_func = weight_func
     end
     w_y = w_func(y)
-    w_dat = _member_weights(length(dat), w) .* w_func.(dat)
-    # _crps_edf_weighted normalises internally so only relative weights matter
+    # Combined member × outcome weights, kept un-normalised: _crps_edf_weighted
+    # normalises internally, and leaving them un-normalised lets an all-zero
+    # combination reach the NaN return below rather than becoming a NaN vector
+    # (normalising an all-zero member-weight vector divides by zero).
+    if w === nothing
+        w_mem = ones(length(dat))
+    else
+        length(w) == length(dat) || throw(DimensionMismatch(
+            "length of w ($(length(w))) must equal the number of ensemble members ($(length(dat)))"))
+        any(<(0), w) && throw(ArgumentError("member weights w must be non-negative"))
+        w_mem = w
+    end
+    w_dat = w_mem .* w_func.(dat)
+    # No member has positive weight (empty region or all-zero member weights):
+    # the conditional forecast distribution is undefined, so return NaN, matching
+    # R's owcrps_sample and the multivariate ow* scores.
+    all(iszero, w_dat) && return NaN
     return _crps_edf_weighted(y, dat, w_dat) * w_y
 end
 

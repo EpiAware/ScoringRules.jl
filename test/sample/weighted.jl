@@ -257,4 +257,18 @@ end
         @test_throws DimensionMismatch owcrps(dat, 0.0; w = ones(length(dat) + 1))
         @test_throws ArgumentError twcrps(dat, 0.0; w = fill(-1.0, length(dat)))
     end
+
+    @testset "all-zero member weights give NaN for outcome-weighted scores" begin
+        # No member has positive weight, so the outcome-weighted scores are
+        # undefined: R's ow*_sample return NaN, and so must we, consistently
+        # across the univariate and multivariate scores.
+        X = mv_ens[1]
+        y = ys_mv[1]
+        m = size(X, 2)
+        dat = univ_ens[1]
+        @test isnan(owcrps(dat, 0.0; w = zeros(length(dat))))
+        @test isnan(owes(X, y; w = zeros(m)))
+        @test isnan(owvs(X, y; w = zeros(m)))
+        @test isnan(owmmds(X, y; w = zeros(m)))
+    end
 end
