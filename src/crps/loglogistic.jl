@@ -20,20 +20,23 @@ CRPS of a log-logistic forecast with log-scale parameters `locationlog` and
 function _crps_llogis(y::Real, locationlog::Real, scalelog::Real)
     (scalelog <= 0 || scalelog >= 1) && return oftype(float(y), NaN)
     y1 = max(y, zero(y))
-    p = logistic((log(y1) - locationlog) / scalelog)
+    # At y ≤ 0 the CDF is 0 (left support boundary) for every parameter value.
+    # Compute it as a constant there rather than pushing log(0) = -Inf through
+    # an AD dual: the primal `logistic(-Inf)` is a clean 0, but its `scalelog`
+    # partial is NaN, which would poison the whole gradient (#6 review).
+    p = y1 > 0 ? logistic((log(y1) - locationlog) / scalelog) :
+        oftype(float(locationlog) * float(scalelog) * one(y), 0)
     c1 = y * (2 * p - 1)
     # beta(a,b) = Γ(a)Γ(b)/Γ(a+b); use logbeta for numerical stability
     c2 = 2 * exp(locationlog) * exp(logbeta(1 + scalelog, 1 - scalelog))
     # pbeta(p, a, b) = regularised incomplete beta function I_p(a,b), routed
     # through cdf_ad_safe rather than beta_inc directly: beta_inc cannot take
     # a Dual in either shape argument, breaking `scalelog` differentiation
-    # (#6). Unlike crps/student.jl's `_t_cdf`, `p` depends on `scalelog` here
-    # too, but this composition needs no z==0-style guard: the beta density's
-    # x-derivative only diverges at the boundary whose shape argument is < 1,
-    # and that is the second argument (1 - scalelog, since scalelog ∈ (0,1)),
-    # so the risk is only at p == 1 — unreachable for any finite `y` (the
-    # first argument, 1 + scalelog, is always > 1, so p == 0, reachable at
-    # y == 0, is safe).
+    # (#6). The incomplete-beta term itself needs no p==0/p==1 guard: the beta
+    # density's x-derivative only diverges at the boundary whose shape argument
+    # is < 1 (the second, 1 - scalelog, at p == 1 — unreachable for finite y),
+    # while at p == 0 the first argument 1 + scalelog > 1 keeps the density
+    # finite. The only NaN risk was `p`'s log(0) above, now guarded.
     Ip = cdf_ad_safe(Beta(1 + scalelog, 1 - scalelog), p)
     c3 = (1 - scalelog) / 2 - Ip
     return c1 + c2 * c3
