@@ -26,6 +26,7 @@ ScoringRules = "1fcf7366-10ae-49d1-a4dc-286b3bf402d3"
 # The package under test and EpiAwarePackageTools are pinned by `[sources]`, so
 # they carry no compat entry. Add a bound for each test-only dep you add.
 [compat]
+EpiAwarePackageTools = "=0.3.0"
 ADTypes = "1"
 Aqua = "0.8"
 BenchmarkTools = "1"
@@ -45,7 +46,3 @@ TestItems = "1"
 
 [sources]
 ScoringRules = {path = ".."}
-# Until EpiAwarePackageTools is registered, it is pinned by git so
-# the env resolves out of the box. Switch to a local path to
-# develop the kit alongside this package.
-EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main"}
