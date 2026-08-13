@@ -39,7 +39,7 @@ using Distributions: Distributions, Beta, Binomial, Censored, Continuous,
                      scale, shape
 using SpecialFunctions: erfc, gamma, digamma, logbeta,
                         besseli, expinti
-using EpiAwareADTools: cdf_ad_safe
+using EpiAwareADTools: cdf_ad_safe, ccdf_ad_safe
 using LogExpFunctions: logistic
 using HypergeometricFunctions: _₂F₁
 using QuadGK: quadgk
