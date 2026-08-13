@@ -36,6 +36,8 @@ Lerch and Allen). See the README for attribution and provenance.
 - `dss` returns `NaN` whenever the forecast variance is not finite and
   positive (for example t with `df ≤ 2`, GEV/GPD with `shape ≥ 1/2`,
   log-Laplace with `σ ≥ 1/2`, log-logistic with `β ≤ 2`), matching R.
+- `owcrps` returns `NaN` when no ensemble member has positive weight, matching
+  R and the multivariate outcome-weighted scores.
 - The sample quantile helper behind `quantile_score(dat, y; ...)` and
   `interval_score(dat, y; ...)` mirrors the index fuzz of R's
   `stats::quantile`, so quantile levels whose `n * p` lands just below an
