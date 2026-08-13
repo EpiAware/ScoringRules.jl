@@ -11,10 +11,15 @@ Formula:
 where F₁ = CDF of Gamma(shape, scale) at y,
       F₂ = CDF of Gamma(shape+1, scale) at y,
       B(a,b) = exp(logbeta(a, b)).
+
+F₁/F₂ go through `cdf_ad_safe` rather than `cdf` directly: the stock
+`cdf(::Gamma)` routes through `SpecialFunctions.gamma_inc`, whose
+`ChainRule` leaves the shape-parameter partial unimplemented, breaking
+`shape` differentiation on every AD backend (#11).
 """
 function _crps_gamma(y::Real, shape::Real, scale::Real)
-    p1 = cdf(Gamma(shape, scale), y)
-    p2 = cdf(Gamma(shape + 1, scale), y)
+    p1 = cdf_ad_safe(Gamma(shape, scale), y)
+    p2 = cdf_ad_safe(Gamma(shape + 1, scale), y)
     return y * (2 * p1 - 1) -
            scale * (shape * (2 * p2 - 1) + exp(-logbeta(oftype(float(shape), 0.5), shape)))
 end

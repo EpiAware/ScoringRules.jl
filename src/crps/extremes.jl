@@ -6,8 +6,8 @@
 #   GeneralizedExtremeValue(μ, σ, ξ)  — location μ, scale σ, shape ξ
 #   GeneralizedPareto(μ, σ, ξ)        — location μ, scale σ, shape ξ
 #
-# Dependencies (in the module): SpecialFunctions gamma, loggamma, digamma,
-#   expinti; gamma_inc from SpecialFunctions (returns (P,Q) regularised).
+# Dependencies (in the module): SpecialFunctions gamma, digamma, expinti;
+#   EpiAwareADTools cdf_ad_safe (the Gamma CDF, dual-safe in shape and x).
 
 # Below this |shape| the general closed forms are numerically unstable, so the
 # analytic limit (Gumbel for GEV, exponential for GPD) is used instead.
@@ -46,8 +46,13 @@ function _crps_gev(y::Real, shape::Real, location::Real = 0.0, scale::Real = 1.0
         x = (x_inner <= 0 ? zero(float(y_std)) : x_inner)^(-1 / shape)
         c1 = 2 * exp(-x) - 1
         g = gamma(1 - shape)
-        # pgamma(x, 1-shape) is the lower regularised incomplete gamma P(1-shape, x)
-        p = gamma_inc(1 - shape, x)[1]
+        # pgamma(x, 1-shape) is the lower regularised incomplete gamma
+        # P(1-shape, x) = cdf(Gamma(1-shape, 1), x). Goes through
+        # cdf_ad_safe rather than a direct gamma_inc call: both the shape
+        # argument (1-shape) and the evaluation point x depend on `shape`
+        # here, and gamma_inc's ChainRule leaves the shape partial
+        # unimplemented (#11).
+        p = cdf_ad_safe(Gamma(1 - shape, 1.0), x)
         (y_std + 1 / shape) * c1 + g / shape * (2 * p - 2^shape)
     end
     return scale * out

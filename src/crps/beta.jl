@@ -14,16 +14,23 @@ where
     c3 = 1 − 2·I_y(shape1+1, shape2)
     c4 = (2/shape1) · B(2·shape1, 2·shape2) / B(shape1, shape2)²
 
-and I_x(a,b) is the regularised incomplete beta (= `beta_inc(a,b,x)[1]`).
+and I_x(a,b) is the regularised incomplete beta (= `cdf_ad_safe(Beta(a,b), x)`,
+routed through the AD-safe hook rather than `beta_inc` directly: `beta_inc`
+cannot take a Dual in either shape argument, breaking `shape1`/`shape2`
+differentiation on every AD backend, #6). `z` here is a fixed function of the
+observation alone (never of `shape1`/`shape2`), so — unlike the Student-t CDF
+in crps/student.jl — there is no risk of a singular chain-rule composition:
+only the well-behaved shape-parameter partials of the incomplete beta are
+ever needed.
 A Stirling approximation is substituted for c4 when the beta-function ratio
 overflows.  Non-unit intervals are handled by linear rescaling.
 """
 function _crps_beta(y::Real, shape1::Real, shape2::Real, lower::Real, upper::Real)
     if lower == 0 && upper == 1
         z = clamp(y, zero(y), one(y))
-        c1 = y * (2 * beta_inc(shape1, shape2, z)[1] - 1)
+        c1 = y * (2 * cdf_ad_safe(Beta(shape1, shape2), z) - 1)
         c2 = shape1 / (shape1 + shape2)
-        c3 = 1 - 2 * beta_inc(shape1 + 1, shape2, z)[1]
+        c3 = 1 - 2 * cdf_ad_safe(Beta(shape1 + 1, shape2), z)
         lb = logbeta(shape1, shape2)
         c4_log = log(2) - log(shape1) + logbeta(2 * shape1, 2 * shape2) - 2 * lb
         c4 = isfinite(c4_log) ? exp(c4_log) :

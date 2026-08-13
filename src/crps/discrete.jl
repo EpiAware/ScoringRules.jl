@@ -15,9 +15,22 @@
 # The two calls share the same argument x = 2λ, so we factor out exp(-2λ).
 """
 CRPS of a `Poisson(λ)` forecast, in closed form.
+
+`cdf(::Poisson)` routes through `StatsFuns.poiscdf`, which calls
+`gammaccdf(k::T, θ::T, x::T) where {T<:Real}` — a single shared type
+parameter across all three arguments. Differentiating `λ` (passed as
+`x`) under any AD backend therefore promotes the untouched integer
+shape `k` to the same Dual type by ordinary type promotion, and
+`SpecialFunctions.gamma_inc` has no method at all for a Dual shape
+argument, spurious or not (#11). `cdf_ad_safe`'s `_gamma_cdf` types its
+three arguments independently, so it sidesteps the promotion entirely;
+`1 - cdf_ad_safe(...)` reproduces `gammaccdf`'s upper-tail value via
+`P = 1 - Q`. `pdf(::Poisson)` is unaffected (it never calls
+`gamma_inc`, only `xlogy`/`loggamma`, both already Dual-safe).
 """
 function _crps_pois(y::Real, lambda::Real)
-    c1 = (y - lambda) * (2 * cdf(Poisson(lambda), y) - 1)
+    poiscdf = 1 - cdf_ad_safe(Gamma(max(0, floor(y + 1)), 1.0), lambda)
+    c1 = (y - lambda) * (2 * poiscdf - 1)
     x = 2 * lambda
     c2 = 2 * pdf(Poisson(lambda), floor(Int, y)) -
          exp(-x) * (besseli(0, x) + besseli(1, x))
