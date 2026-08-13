@@ -53,17 +53,13 @@ which also uses the biased (population) estimator. Julia's `var` function uses
 the ``n-1`` denominator, so passing `var(dat)` directly would not match R.
 The implementation avoids `Statistics.var` deliberately.
 
-## Ensemble LogS: member weights
+## Ensemble member weights
 
-`logs(dat, y; w)` accepts member weights, which R's `logs_sample` does not.
-The weighted score evaluates the kernel density
-``\sum_i w_i\,\varphi_{bw}(y - dat_i) / \sum_i w_i``, in line with the
-weighted mean and variance R's `dss_sample` uses. With `w = nothing` (the
-default) the score matches `logs_sample` exactly.
-
-Across all sample scores, member weights must be finite, non-negative and sum
-to a positive value, otherwise an error is thrown. R also errors on missing,
-infinite and negative weights but returns `NaN` for an all-zero weight vector.
+The sample `crps` (`method = :edf`) and `dss` accept member weights `w`,
+matching R's `crps_sample` and `dss_sample`. Member weights must be finite,
+non-negative and sum to a positive value, otherwise an error is thrown. R also
+errors on missing, infinite and negative weights but returns `NaN` for an
+all-zero weight vector.
 
 ## Parameter conventions
 
