@@ -567,6 +567,32 @@ rows_qs_samp <- do.call(rbind, lapply(1:2, function(eid) {
 }))
 write_ref("quantile_sample_scores", rows_qs_samp)
 
+# Near-integer n*p boundary cases for the sample quantile helper. Coverage 0.9
+# gives alpha1 = 0.5 * (1 - 0.9) = 0.04999..., so n * alpha1 lands just below
+# an integer in floating point (24.99... at n = 500) and the complementary
+# upper level lands just above one; R's quantile() index fuzz decides which
+# order statistic is used. The ensembles are simply 1:n, reproduced exactly in
+# the Julia tests, so no ensemble CSV is needed.
+alpha_lo <- 0.5 * (1 - 0.9)
+alpha_hi <- 1 - alpha_lo
+fuzz_cases <- list(list(n = 500L, ys = c(10, 250.5, 490)),
+                   list(n = 20L,  ys = c(0, 10.5, 20)))
+rows_qfuzz <- do.call(rbind, lapply(fuzz_cases, function(cas) {
+  dat <- as.numeric(1:cas$n)
+  do.call(rbind, lapply(1:9, function(t) {
+    do.call(rbind, lapply(cas$ys, function(yval) {
+      data.frame(
+        n = cas$n, type = t, y = yval,
+        qs_lo = qs_sample(yval, dat = dat, alpha = alpha_lo, type = t),
+        qs_hi = qs_sample(yval, dat = dat, alpha = alpha_hi, type = t),
+        ints_90 = ints_sample(yval, dat = dat, target_coverage = 0.9,
+                              type = t)
+      )
+    }))
+  }))
+}))
+write_ref("quantile_fuzz_scores", rows_qfuzz)
+
 ## ---- RPS (rps_probs vs Julia rps) ----
 # x (R) = probability vector over K categories; y = observed category (1-indexed).
 rps_cases <- list(
