@@ -19,24 +19,24 @@
         fill="#1a1a2e" stroke="#e8e8f0" stroke-width="5" stroke-linejoin="round"/>
 
   <!-- CRPS area between the CDF and the step -->
-  <path d="M60 148 C 111 148, 89 48, 140 48 L 100 48 L 100 148 Z"
+  <path d="M60 141 C 111 141, 89 42, 140 42 L 100 42 L 100 141 Z"
         fill="url(#crps)"/>
 
   <!-- forecast CDF F(x): a symmetric S centred on the observation -->
-  <path d="M60 148 C 111 148, 89 48, 140 48"
+  <path d="M60 141 C 111 141, 89 42, 140 42"
         fill="none" stroke="#4063d8" stroke-width="7.5"
         stroke-linecap="round"/>
 
   <!-- observation step function 1{x >= y} -->
-  <path d="M60 148 L 100 148 L 100 48 L 140 48"
+  <path d="M60 141 L 100 141 L 100 42 L 140 42"
         fill="none" stroke="#cb3c33" stroke-width="6"
         stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- the observation y -->
-  <circle cx="100" cy="148" r="7" fill="#cb3c33" stroke="#1a1a2e" stroke-width="2.5"/>
+  <circle cx="100" cy="141" r="7" fill="#cb3c33" stroke="#1a1a2e" stroke-width="2.5"/>
 
   <!-- wordmark in the bottom band -->
-  <text x="100" y="187" text-anchor="middle"
+  <text x="100" y="174" text-anchor="middle"
         font-family="'DejaVu Sans', Helvetica, Arial, sans-serif"
         font-weight="700" font-size="14" letter-spacing="0"
         fill="#e8e8f0">ScoringRules.jl</text>
