@@ -68,6 +68,23 @@ crps(randn(1000), 0.4)           # ensemble (sample) forecast
 See the [documentation](https://epiaware.org/ScoringRules.jl/dev/) for the
 full list of supported families and scores.
 
+## Related packages
+
+- [scoringRules](https://github.com/FK83/scoringRules) (R) — the reference
+  implementation this package ports; the source of the parametric, sample and
+  weighted scoring rules provided here, and of the values the test suite
+  validates against.
+- [scoringutils](https://github.com/epiforecasts/scoringutils) (R) — applied
+  forecast-evaluation utilities built on top of `scoringRules`.
+- [Distributions.jl](https://github.com/JuliaStats/Distributions.jl) — supplies
+  the distribution types that the parametric scores dispatch on.
+- [CensoredDistributions.jl](https://github.com/EpiAware/CensoredDistributions.jl)
+  — sibling EpiAware package whose structure, testing and CI this package
+  follows.
+- [PostForecasts.jl](https://github.com/lipiecki/PostForecasts.jl) and
+  [ForecastBaselines.jl](https://github.com/ManuelStapper/ForecastBaselines.jl)
+  — other Julia packages that touch probabilistic-forecast scoring.
+
 ## Where to learn more
 
 - [GitHub Discussions](https://github.com/EpiAware/ScoringRules.jl/discussions)
