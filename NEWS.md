@@ -16,12 +16,13 @@ Lerch and Allen). See the README for attribution and provenance.
   (the log-logistic uses `Distributions.LogLogistic`).
 - Sample/ensemble forecasts: `crps` (empirical and kernel-density), `logs`,
   `dss` on vectors; the energy score `es`, variogram score `vs` and
-  maximum-mean-discrepancy score `mmds` on multivariate ensembles. All three
-  multivariate scores take optional member weights `w`, matching R. The
-  pairwise `d × d` weight matrix of `vs` is named `w_vs` (as in R); it was
-  briefly exposed as `w`, so any early code passing a matrix via `w` must
-  switch to `w_vs`. Unlike R's `vs_sample`, which ignores `w_vs` when member
-  weights are given, `vs` honours both together.
+  maximum-mean-discrepancy score `mmds` on multivariate ensembles. The sample
+  `crps` (`method = :edf`) and `dss` take optional member weights `w`, matching
+  R's `crps_sample` and `dss_sample`. All three multivariate scores also take
+  optional member weights `w`, matching R. The pairwise `d × d` weight matrix of
+  `vs` is named `w_vs` (as in R); it was briefly exposed as `w`, so any early
+  code passing a matrix via `w` must switch to `w_vs`. Unlike R's `vs_sample`,
+  which ignores `w_vs` when member weights are given, `vs` honours both together.
 - Threshold- and outcome-weighted scores (`twcrps`, `owcrps`, `twes`, `owes`,
   `twvs`, `owvs`, `twmmds`, `owmmds`), all with optional member weights `w`:
   the tw\* scores weight the chained ensemble, and in the ow\* scores the
