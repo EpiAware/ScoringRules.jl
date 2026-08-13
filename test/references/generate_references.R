@@ -551,6 +551,16 @@ rows_rps <- do.call(rbind, lapply(seq_along(rps_cases), function(ci) {
 }))
 write_ref("rps_scores", rows_rps)
 
+## ---- error-spread score (ess_moments) ----
+# Moment-based input mode; includes skew = 0, negative skew and near-zero
+# variance (the score stays finite there, tending to the fourth power of the
+# forecast error).
+g <- grid(mean = c(-1, 0, 2.5), var = c(1e-8, 0.25, 1, 4),
+          skew = c(-1.5, -0.5, 0, 0.5, 2),
+          y = c(-2, 0, 0.7, 3))
+g$ess <- ess_moments(g$y, mean = g$mean, var = g$var, skew = g$skew)
+write_ref("ess", g)
+
 ## ---- extra distributions: LogLogistic, LogLaplace, TwoPieceNormal, TwoPieceExponential ----
 
 # LogLogistic: R uses (locationlog, scalelog); Julia uses LogLogistic(α, β)
