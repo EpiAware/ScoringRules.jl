@@ -226,14 +226,16 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
     # --- discrete family: λ differentiated, obs real-valued (crps is defined
     # against the discrete step CDF at any real y, not just integers) -------
 
-    # #11 (fixed): `_crps_pois` now goes through `cdf_ad_safe` rather than a
+    # #11 (fixed): `_crps_pois` now goes through `ccdf_ad_safe` rather than a
     # direct `cdf(Poisson(lambda), y)` call, which routed through
     # `StatsFuns.gammaccdf`'s shared-type-parameter promotion and was not
     # dual-safe in `lambda` — not the `besseli` calls elsewhere in
-    # `_crps_pois`, which are fine.
+    # `_crps_pois`, which are fine. The negative observation guards the
+    # empty-support branch (`y < 0` ⇒ CDF 0), which an earlier `Gamma(0, 1)`
+    # construction turned into a `DomainError`.
     _push!("Poisson crps",
         (θ, obs) -> sum(y -> crps(Poisson(θ[1]), y), obs),
-        [3.0], (Constant([0.0, 2.0, 3.0, 5.0]),))
+        [3.0], (Constant([-1.5, 0.0, 2.0, 3.0, 5.0]),))
 
     # --- generic (any UnivariateDistribution) logs/dss, via the analytic
     # -logpdf / mean-var forms in src/generics.jl ----------------------------
@@ -271,9 +273,12 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         (θ, obs) -> sum(y -> crps(Beta(θ[1], θ[2]), y), obs),
         [2.0, 3.0], (Constant([0.2, 0.5, 0.8]),))
 
+    # The `y == 0` observation guards the left-support boundary, where the CDF
+    # is a parameter-independent 0 but a naive `logistic(log(0))` would push
+    # `-Inf` through the dual and poison the gradient with `NaN`.
     _push!("LogLogistic crps",
         (θ, obs) -> sum(y -> crps(LogLogistic(θ[1], θ[2]), y), obs),
-        [2.0, 3.0], (Constant([0.5, 1.5, 3.0]),))
+        [2.0, 3.0], (Constant([0.0, 0.5, 1.5, 3.0]),))
 
     _BROKEN_NAMES[] = broken_names
     return out
