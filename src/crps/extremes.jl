@@ -46,12 +46,9 @@ function _crps_gev(y::Real, shape::Real, location::Real = 0.0, scale::Real = 1.0
         x = (x_inner <= 0 ? zero(float(y_std)) : x_inner)^(-1 / shape)
         c1 = 2 * exp(-x) - 1
         g = gamma(1 - shape)
-        # pgamma(x, 1-shape) is the lower regularised incomplete gamma
-        # P(1-shape, x) = cdf(Gamma(1-shape, 1), x). Goes through
-        # cdf_ad_safe rather than a direct gamma_inc call: both the shape
-        # argument (1-shape) and the evaluation point x depend on `shape`
-        # here, and gamma_inc's ChainRule leaves the shape partial
-        # unimplemented (#11).
+        # pgamma(x, 1-shape) = P(1-shape, x) = cdf(Gamma(1-shape, 1), x), via
+        # cdf_ad_safe: a direct gamma_inc call is not Dual-safe in its shape
+        # argument (1-shape), which depends on `shape` here (#11).
         p = cdf_ad_safe(Gamma(1 - shape, 1.0), x)
         (y_std + 1 / shape) * c1 + g / shape * (2 * p - 2^shape)
     end

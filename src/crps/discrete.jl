@@ -17,19 +17,10 @@
 CRPS of a `Poisson(λ)` forecast, in closed form.
 
 The Poisson CDF is `F(y) = P(Y ≤ ⌊y⌋) = Q(⌊y⌋+1, λ) = ccdf(Gamma(⌊y⌋+1, 1), λ)`,
-and `0` for `y < 0` (empty support — matching R's `crps_pois`).
-
-`cdf(::Poisson)` routes through `StatsFuns.poiscdf`, which calls
-`gammaccdf(k::T, θ::T, x::T) where {T<:Real}` — a single shared type
-parameter across all three arguments. Differentiating `λ` (passed as
-`x`) under any AD backend therefore promotes the untouched integer
-shape `k` to the same Dual type by ordinary type promotion, and
-`SpecialFunctions.gamma_inc` has no method at all for a Dual shape
-argument, spurious or not (#11). `ccdf_ad_safe`'s `_gamma_cdf` types its
-arguments independently, so it sidesteps the promotion entirely, and
-returns `Q` directly rather than `1 - P` — keeping the far upper tail
-(where the CDF rounds to 1) accurate. `pdf(::Poisson)` is unaffected (it
-never calls `gamma_inc`, only `xlogy`/`loggamma`, both already Dual-safe).
+and `0` for `y < 0` (empty support — matching R's `crps_pois`). Routed through
+`ccdf_ad_safe` so `λ` stays differentiable: the stock `cdf(::Poisson)` reaches
+`gamma_inc`, which has no method for a Dual shape argument (#11). `ccdf_ad_safe`
+returns `Q` directly rather than `1 - P`, keeping the far upper tail accurate.
 """
 function _crps_pois(y::Real, lambda::Real)
     k = floor(y + 1)

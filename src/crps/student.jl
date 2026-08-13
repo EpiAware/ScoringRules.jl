@@ -9,29 +9,14 @@
 # antiderivative of the t CDF up to a sign; named G in the R source.
 @inline _t_G(z::Real, df::Real) = -(df + z^2) / (df - 1) * pdf(TDist(df), z)
 
-# AD-safe Student-t CDF, differentiable in `df` (#6). `cdf(::TDist)` routes
-# through StatsFuns' tdistcdf -> fdistccdf -> betaccdf chain, each step
-# sharing one type parameter across all its arguments the same way
-# StatsFuns.gammaccdf does for Poisson (see crps/discrete.jl): promoting `df`
-# to a Dual forces the untouched constant `1` (the numerator "ν1" argument)
-# to the same Dual type, and beta_inc has no method at all for a Dual shape
-# argument. Rebuilt here from the standard relation
+# AD-safe Student-t CDF, differentiable in `df` (#6): the stock `cdf(::TDist)`
+# reaches `beta_inc`, which has no method for a Dual shape argument. Rebuilt from
 #   F(z; df) = 1/2 + 1/2 * sign(z) * I_w(1/2, df/2),  w = z²/(z²+df),
-# routed through cdf_ad_safe so the two shape arguments (1/2 fixed, df/2
-# differentiated) and the evaluation point w (also df-dependent) each keep
-# their own type instead of a shared one.
-#
-# Guarded at z == 0: there, w ≡ 0 for every df (so the true ∂F/∂df is 0), but
-# ∂I_w/∂w diverges as w → 0 (the beta density blows up there since the first
-# shape argument is 1/2 < 1) while ∂w/∂df → 0 with an explicit z² factor --
-# the product is the correct limit 0, but IEEE Inf * 0.0 evaluates to NaN
-# rather than taking that limit. z is a plain observation-derived constant in
-# every case this package differentiates (never itself part of the
-# differentiated parameter vector), so short-circuiting the whole expression
-# at z == 0 costs nothing and sidesteps the singularity entirely. Also
-# guarded at infinite z (reachable from `_crps_gtct_unit`'s point-mass
-# bookkeeping, where a truncation bound can be unbounded while its mass is
-# still nonzero): `w` would otherwise divide `Inf` by `Inf`.
+# through `cdf_ad_safe`. Short-circuited at z == 0 (w ≡ 0, so ∂F/∂df = 0, but the
+# beta density diverges as w → 0 and IEEE `Inf * 0.0` returns NaN, not the true
+# limit; `z` is always an observation-derived constant here, never a
+# differentiated parameter, so this is exact) and at infinite z (from
+# `_crps_gtct_unit`'s point-mass bookkeeping, where `w` would be `Inf / Inf`).
 @inline function _t_cdf(df::Real, z::Real)
     isinf(z) && return oftype(float(df) * one(z), z > 0 ? 1.0 : 0.0)
     z == 0 && return oftype(float(df) * one(z), 0.5)
@@ -39,17 +24,10 @@
     return 0.5 + 0.5 * sign(z) * cdf_ad_safe(Beta(0.5, df / 2), w)
 end
 
-# `_Phi_t2(x, df)` is the analogue of `_Phi_root2` from normal.jl for the t
-# family. The R source computes it as:
-#   p  = pt(x, df)
-#   pb = pbeta(df / (df + x²), df − 0.5, 0.5)
-#   0.5 * (p ≤ 0.5 ? pb : 2 − pb)
-# In Julia, R's `pbeta(x, a, b)` = `beta_inc(a, b, x)[1]`, replaced here by
-# `cdf_ad_safe(Beta(a, b), x)` for the same reason as `_t_cdf` above: the
-# shape argument `df - 0.5` is differentiated in `df`, and `beta_inc` cannot
-# take a Dual there. Guarded the same way at `x == 0` (where the argument
-# `df / (df + x²)` is identically 1 regardless of `df`, and the beta density
-# there diverges since the *second* shape argument, fixed at 0.5, is < 1).
+# `_Phi_t2(x, df)`: the t-family analogue of normal.jl's `_Phi_root2`.
+# R: pb = pbeta(df / (df + x²), df − 0.5, 0.5); 0.5 * (pt(x, df) ≤ 0.5 ? pb : 2 − pb).
+# `pbeta` → `cdf_ad_safe` for the same #6 reason, guarded at x == 0 (where the
+# beta argument is identically 1 and its density diverges).
 @inline function _Phi_t2(x::Real, df::Real)
     p = _t_cdf(df, x)
     pb = if x == 0
