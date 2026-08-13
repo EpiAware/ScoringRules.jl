@@ -53,8 +53,9 @@ structure between the forecast ensemble and the observation:
   \bigl(|y_k - y_l|^p - \overline{|X_{k,\cdot} - X_{l,\cdot}|^p}\bigr)^2
 ```
 
-The default order is ``p = 0.5``; a ``d \times d`` non-negative symmetric
-weight matrix ``w_{kl}`` can be supplied.
+The default order is ``p = 0.5``. A ``d \times d`` non-negative symmetric
+pairwise weight matrix ``w_{kl}`` can be supplied as `w_vs`, and per-member
+weights as `w` (as for `es`).
 
 ```@example ref
 vs(X, y)            # default order p = 0.5
@@ -62,6 +63,11 @@ vs(X, y)            # default order p = 0.5
 
 ```@example ref
 vs(X, y; p = 1.0)   # order p = 1
+```
+
+```@example ref
+w_vs = [1 / (1 + abs(k - l)) for k in 1:d, l in 1:d]
+vs(X, y; w = w, w_vs = w_vs)
 ```
 
 ### MMD score
@@ -74,6 +80,10 @@ The maximum-mean-discrepancy score uses a Gaussian kernel ``k(x, z) = \exp(-\tfr
 
 ```@example ref
 mmds(X, y)
+```
+
+```@example ref
+mmds(X, y; w = w)   # per-member weights
 ```
 
 ## Weighted scores
@@ -166,7 +176,10 @@ owmmds(X, y; a = 0.0)
 
 For multivariate weighted scores, `a` and `b` can be scalars (broadcast to
 all dimensions) or length-`d` vectors. A custom `chain_func` or `weight_func`
-can be supplied when the default interval-based functions do not suit.
+can be supplied when the default interval-based functions do not suit. All
+weighted scores also take per-member weights `w`: the `tw*` scores weight the
+chained ensemble, and the `ow*` scores multiply the outcome weights by the
+member weights, as in R.
 
 ## Quantile and interval scores
 

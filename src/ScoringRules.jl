@@ -48,7 +48,7 @@ using Random: AbstractRNG
 using DocStringExtensions: TYPEDSIGNATURES, TYPEDEF, TYPEDFIELDS, DOCSTRING, @template
 
 # Generic scoring-rule interface (parametric + ensemble via dispatch)
-export crps, logs, dss, dss_moments
+export crps, logs, dss, dss_moments, ess_moments
 # Multivariate ensemble scores
 export es, vs, mmds
 # Weighted (threshold- and outcome-weighted) ensemble scores
