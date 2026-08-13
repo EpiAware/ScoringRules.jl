@@ -29,6 +29,18 @@ export clogs
 # CRPS below reuses `_crps_mixnorm`: a Gaussian KDE is an equally-weighted normal
 # mixture with common bandwidth as the standard deviation.
 
+# Validate a member-weight vector against its ensemble. R errors on missing,
+# infinite and negative weights too; the positive-sum requirement is stricter
+# than R, which returns NaN for an all-zero weight vector.
+function _check_member_weights(dat::AbstractVector, w::AbstractVector)
+    axes(dat) == axes(w) || throw(DimensionMismatch(
+        "dat and w must have the same axes"))
+    all(x -> isfinite(x) && x >= 0, w) ||
+        throw(ArgumentError("weights w must be finite and non-negative"))
+    sum(w) > 0 || throw(ArgumentError("weights w must have a positive sum"))
+    return nothing
+end
+
 # Silverman's rule-of-thumb bandwidth, matching R's `bw.nrd`.
 # bw.nrd(x) = 1.06 * min(sd(x), IQR(x)/1.34) * n^(-1/5)
 # R's var() uses the (n − 1) denominator and quantile() uses type 7 (linear
@@ -64,9 +76,7 @@ end
 # Weighted path.
 # Weights are normalised so that Σw = 1 (or equivalently divided by P = Σw).
 function _crps_edf_weighted(y::Real, dat::AbstractVector, w::AbstractVector)
-    length(dat) == length(w) || throw(DimensionMismatch(
-        "dat and w must have the same length"))
-    any(<(0), w) && throw(ArgumentError("weights w must be non-negative"))
+    _check_member_weights(dat, w)
 
     ord = sortperm(dat)
     x = dat[ord]
@@ -108,7 +118,7 @@ observation `y`.
 Two approximation methods are available via `method`:
 
   - `:edf` (default) — empirical distribution function approximation using the
-    quantile decomposition of Laio & Tamea (2007).  Optional non-negative weights
+    quantile decomposition of Laio & Tamea (2007).  Optional finite, non-negative weights
     `w` (length `m`) are normalised to sum to one internally.
 
   - `:kde` — Gaussian kernel density estimate with bandwidth `bw`.  If `bw` is
@@ -125,7 +135,7 @@ Lower is better.
 # Keyword Arguments
 
   - `method`: `:edf` (default) or `:kde`.
-  - `w`: optional non-negative weight vector (length `m`); only used for `:edf`.
+  - `w`: optional finite, non-negative weight vector (length `m`) with a positive sum; only used for `:edf`.
   - `bw`: optional bandwidth; only used for `:kde`.
 
 # Provenance
@@ -161,15 +171,15 @@ end
 """
     logs(dat::AbstractVector{<:Real}, y::Real; bw=nothing)
 
-Logarithmic score of an ensemble forecast `dat` at observation `y` using
-Gaussian kernel density estimation.
+Logarithmic score of an ensemble forecast `dat` (a vector of `m` simulation
+draws) at observation `y` using Gaussian kernel density estimation.
 
 If `bw` is `nothing`, Silverman's rule-of-thumb bandwidth is used (matching
 R's `bw.nrd`).  Lower is better.
 
 # Arguments
 
-  - `dat`: ensemble of simulation draws.
+  - `dat`: ensemble of `m` simulation draws.
   - `y`: scalar observation.
 
 # Keyword Arguments
@@ -192,8 +202,6 @@ logs(dat, 0.5)
 function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     n = length(dat)
-    # KDE density at y: (1/n) Σ_i φ_{bw}(y − datᵢ)
-    # log score = −log density
     den = 0.0
     @inbounds for i in eachindex(dat)
         den += _norm_pdf((y - dat[i]) / bw_val) / bw_val
@@ -273,9 +281,10 @@ function clogs(dat::AbstractVector{<:Real}, y::Real;
 end
 
 """
-    dss(dat::AbstractVector{<:Real}, y::Real)
+    dss(dat::AbstractVector{<:Real}, y::Real; w=nothing)
 
-Dawid–Sebastiani score of an ensemble forecast `dat` at observation `y`:
+Dawid–Sebastiani score of an ensemble forecast `dat` (a vector of `m`
+simulation draws) at observation `y`:
 
 ```math
 \\mathrm{DSS} = \\frac{(y - \\bar{x})^2}{s^2} + \\log s^2
@@ -283,17 +292,24 @@ Dawid–Sebastiani score of an ensemble forecast `dat` at observation `y`:
 
 where ``\\bar{x}`` is the sample mean and ``s^2 = \\tfrac{1}{n}\\sum_i(x_i - \\bar{x})^2``
 is the **population** variance (R uses `mean(dat^2) - mean(dat)^2`, i.e. the
-biased estimator). Lower is better.
+biased estimator). Optional finite, non-negative member weights `w` (length `m`) are
+normalised to sum to one internally and replace the mean and variance with
+their weighted versions. Lower is better.
 
 # Arguments
 
-  - `dat`: ensemble of simulation draws.
+  - `dat`: ensemble of `m` simulation draws.
   - `y`: scalar observation.
+
+# Keyword Arguments
+
+  - `w`: optional finite, non-negative member weight vector (length `m`) with a positive sum.
 
 # Provenance
 
 Ported from `dss_sample` / `dss_edf` in R scoringRules (scores_sample_univ.R;
-Jordan, Krüger, Lerch, Allen).
+Jordan, Krüger, Lerch, Allen), including the member-weight handling of
+`dss_edf`.
 
 # Example
 
@@ -303,9 +319,21 @@ dat = randn(100)
 dss(dat, 0.5)
 ```
 """
-function dss(dat::AbstractVector{<:Real}, y::Real)
-    m = mean(dat)
-    # Population variance: mean(dat.^2) - mean(dat).^2  (matches R dss_edf)
-    v = mean(x^2 for x in dat) - m^2
+function dss(dat::AbstractVector{<:Real}, y::Real; w = nothing)
+    if w === nothing
+        m = mean(dat)
+        # Population variance: mean(dat.^2) - mean(dat).^2  (matches R dss_edf)
+        v = mean(x^2 for x in dat) - m^2
+    else
+        _check_member_weights(dat, w)
+        W = swx = swx2 = 0.0
+        @inbounds for i in eachindex(dat)
+            W += w[i]
+            swx += w[i] * dat[i]
+            swx2 += w[i] * dat[i]^2
+        end
+        m = swx / W
+        v = swx2 / W - m^2
+    end
     return (y - m)^2 / v + log(v)
 end

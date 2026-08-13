@@ -328,6 +328,26 @@ rows_univ <- do.call(rbind, lapply(ens_ids, function(i) {
 }))
 write_ref("sample_univ_scores", rows_univ)
 
+## ---- member-weighted univariate sample scores -----------------------------
+# crps_sample() and dss_sample() take member weights directly.
+set.seed(789)
+w_list <- lapply(ens_ids, function(i) rexp(20))
+for (i in ens_ids) write_ens(sprintf("ens_univ_w_%d", i), t(matrix(w_list[[i]])))
+
+rows_wm <- do.call(rbind, lapply(ens_ids, function(i) {
+  dat <- ens_list[[i]]
+  w <- w_list[[i]]
+  do.call(rbind, lapply(ys_univ, function(yval) {
+    data.frame(
+      ens_id = i,
+      y      = yval,
+      crps_w = crps_sample(yval, dat = dat, w = w),
+      dss_w  = dss_sample(yval, dat = dat, w = w)
+    )
+  }))
+}))
+write_ref("sample_univ_weighted_members", rows_wm)
+
 ## ---- sample multivariate (es / vs / mmds vs R es_sample / vs_sample / mmds_sample) ----
 # Two 3-dimensional ensembles of size 15 each.
 set.seed(456)
