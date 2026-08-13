@@ -27,6 +27,7 @@ Lerch and Allen). See the README for attribution and provenance.
   `twvs`, `owvs`, `twmmds`, `owmmds`), all with optional member weights `w`:
   the tw\* scores weight the chained ensemble, and in the ow\* scores the
   outcome weights multiply the member weights, as in R.
+- Censored and conditional likelihood scores (`clogs`) of Diks et al. (2011).
 - Quantile and interval scores (`quantile_score`, `interval_score`), the ranked
   probability score `rps`, and the moment-based `dss_moments` and `ess_moments`
   (error-spread score of Christensen, Moroz and Palmer 2015).

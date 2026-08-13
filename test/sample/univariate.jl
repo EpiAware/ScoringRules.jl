@@ -95,3 +95,49 @@
         end
     end
 end
+
+@testitem "sample censored/conditional likelihood score matches R scoringRules" setup=[References] begin
+    using ScoringRules
+
+    # Load the fixed ensembles (each stored as a 1-row CSV of m columns).
+    function load_ens(m::Int)
+        c, _ = References.load("ens_clogs_$m")
+        return [c["m$j"][1] for j in 1:length(c)]
+    end
+
+    ensembles = Dict(m => load_ens(m) for m in (5, 30, 500))
+
+    c, n = References.load("sample_clogs")
+    for i in 1:n
+        dat = ensembles[Int(c["n"][i])]
+        y = c["y"][i]
+        a = c["a"][i]
+        b = c["b"][i]
+        # NaN in the bw column marks R's default (bw.nrd) bandwidth.
+        bw = isnan(c["bw"][i]) ? nothing : c["bw"][i]
+        @test clogs(dat, y; a, b, bw, cens = true)≈c["clogs_cens"][i] atol=1e-9 rtol=1e-6
+        @test clogs(dat, y; a, b, bw, cens = false)≈c["clogs_cond"][i] atol=1e-9 rtol=1e-6
+    end
+end
+
+@testitem "clogs edge cases" begin
+    using ScoringRules
+
+    dat = [-1.2, -0.3, 0.1, 0.8, 1.5]
+
+    # Unbounded window: both variants reduce to the plain KDE log score.
+    @test clogs(dat, 0.4)≈logs(dat, 0.4) atol=1e-12
+    @test clogs(dat, 0.4; cens = false)≈logs(dat, 0.4) atol=1e-12
+
+    # Observation outside the window: conditional score is exactly zero,
+    # censored score is the log probability of falling outside.
+    @test clogs(dat, 3.0; a = -1.0, b = 1.0, cens = false) == 0.0
+    @test clogs(dat, 3.0; a = -1.0, b = 1.0, cens = true) > 0.0
+
+    # Bounds use strict inequalities: y on a bound counts as outside.
+    @test clogs(dat, 1.0; a = -1.0, b = 1.0, cens = false) == 0.0
+
+    # Degenerate window is rejected.
+    @test_throws ArgumentError clogs(dat, 0.0; a = 1.0, b = 1.0)
+    @test_throws ArgumentError clogs(dat, 0.0; a = 2.0, b = 1.0)
+end

@@ -1,9 +1,10 @@
-# Univariate ensemble (sample-based) scoring rules: CRPS, LogS, DSS.
+# Univariate ensemble (sample-based) scoring rules: CRPS, LogS, DSS, and the
+# censored/conditional likelihood scores.
 # Ported from R scoringRules v1.1.3 (scores_sample_univ.R; mixn.cpp;
 # Jordan, Krüger, Lerch, Allen) under GPL-2.0-or-later.
 #
-# Three scoring rules are exposed via the existing generics `crps`, `logs` and
-# `dss` (all exported from the parent module). No new exports are needed here.
+# CRPS, LogS and DSS are exposed via the existing generics `crps`, `logs` and
+# `dss` (all exported from the parent module); `clogs` is exported here.
 #
 # References
 # ----------
@@ -13,6 +14,11 @@
 # Laio & Tamea (2007): Verification tools for probabilistic forecasts of
 #   continuous hydrological variables. Hydrology and Earth System Sciences 11,
 #   1267–1277.
+# Diks, Panchenko & van Dijk (2011): Likelihood-based scoring rules for
+#   comparing density forecasts in tails. Journal of Econometrics 163,
+#   215–230. doi:10.1016/j.jeconom.2011.04.001
+
+export clogs
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -202,6 +208,76 @@ function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing)
     end
     den /= n
     return -log(den)
+end
+
+"""
+    clogs(dat::AbstractVector{<:Real}, y::Real; a=-Inf, b=Inf, bw=nothing, cens=true)
+
+Censored likelihood score (`cens = true`, the default) or conditional
+likelihood score (`cens = false`) of an ensemble forecast `dat` at observation
+`y`, emphasising the window `(a, b)` (Diks, Panchenko & van Dijk 2011).
+
+Both scores are based on the Gaussian kernel density estimate ``\\hat{f}`` of
+the ensemble, with its probability mass in the window
+``P = \\hat{F}(b) - \\hat{F}(a)`` and the indicator
+``w(y) = \\mathbf{1}\\{a < y < b\\}`` (strict inequalities):
+
+  - censored: ``-\\log \\hat{f}(y)`` when `y` is inside the window and
+    ``-\\log(1 - P)`` otherwise, so outcomes outside the window enter only
+    through their total probability.
+  - conditional: ``-\\log\\bigl(\\hat{f}(y) / P\\bigr)`` when `y` is inside
+    the window and `0` otherwise.
+
+With the default unbounded window both variants reduce to `logs(dat, y; bw)`.
+If `bw` is `nothing`, Silverman's rule-of-thumb bandwidth is used (matching
+R's `bw.nrd`).  Lower is better.
+
+# Arguments
+
+  - `dat`: ensemble of simulation draws.
+  - `y`: scalar observation.
+
+# Keyword Arguments
+
+  - `a`: lower end of the window (default `-Inf`).
+  - `b`: upper end of the window (default `Inf`).
+  - `bw`: optional bandwidth; defaults to Silverman's rule-of-thumb.
+  - `cens`: `true` for the censored score, `false` for the conditional score.
+
+# Provenance
+
+Ported from `clogs_sample` in R scoringRules (scores_sample_univ_weighted.R;
+mixn.cpp; Jordan, Krüger, Lerch, Allen).
+
+# Example
+
+```@example
+using ScoringRules
+dat = randn(100)
+clogs(dat, 0.5; a = 0.0, b = 1.0)
+```
+"""
+function clogs(dat::AbstractVector{<:Real}, y::Real;
+        a::Real = -Inf, b::Real = Inf, bw = nothing, cens::Bool = true)
+    a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
+    bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
+    n = length(dat)
+    # KDE mass in the window, P = F̂(b) − F̂(a), and KDE density at y; the KDE
+    # is an equally weighted normal mixture with the bandwidth as common sd.
+    mass = 0.0
+    den = 0.0
+    @inbounds for x in dat
+        mass += _norm_cdf((b - x) / bw_val) - _norm_cdf((a - x) / bw_val)
+        den += _norm_pdf((y - x) / bw_val) / bw_val
+    end
+    mass /= n
+    den /= n
+    inside = a < y < b
+    if cens
+        return inside ? -log(den) : -log1p(-mass)
+    else
+        return inside ? log(mass) - log(den) : 0.0
+    end
 end
 
 """
