@@ -18,7 +18,8 @@ Lerch and Allen). See the README for attribution and provenance.
   `dss` on vectors; the energy score `es`, variogram score `vs` and
   maximum-mean-discrepancy score `mmds` on multivariate ensembles. The sample
   `crps` (`method = :edf`) and `dss` take optional member weights `w`, matching
-  R's `crps_sample` and `dss_sample`.
+  R's `crps_sample` and `dss_sample`; `logs` also accepts `w`, which extends the
+  R interface (R's `logs_sample` has no member weights).
 - Threshold- and outcome-weighted scores (`twcrps`, `owcrps`, `twes`, `owes`,
   `twvs`, `owvs`, `twmmds`, `owmmds`).
 - Quantile and interval scores (`quantile_score`, `interval_score`), the ranked
