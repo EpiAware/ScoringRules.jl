@@ -402,6 +402,93 @@ rows_wtmv <- do.call(rbind, lapply(1:2, function(eid) {
 }))
 write_ref("sample_weighted_mv", rows_wtmv)
 
+## ---- member weights (es / vs / mmds and the tw*/ow* scores) ----
+# Deterministic member-weight vectors, mirrored in the Julia tests:
+#   w_id 1: constant 2 (exercises rescaling to sum one)
+#   w_id 2: linearly increasing 1..m
+#   w_id 3: first five members zero, then 1..(m-5)
+member_w <- function(m, w_id) {
+  switch(w_id,
+         rep(2, m),
+         seq_len(m),
+         c(rep(0, 5), seq_len(m - 5)))
+}
+w_ids <- 1:3
+
+# Pairwise d x d weight matrix for the variogram score (R's w_vs).
+wvs_mv <- outer(seq_len(d_mv), seq_len(d_mv), function(k, l) 1 / (1 + abs(k - l)))
+
+# es / vs / mmds with member weights, plus vs with the pairwise matrix.
+# `vs_w_wvs` combines member and pairwise weights via the internal C++ kernel
+# vsC_w: the public vs_sample ignores w_vs whenever w is given, but the Julia
+# port honours both, so the kernel provides the reference value.
+rows_mw <- do.call(rbind, lapply(1:2, function(eid) {
+  Xmat <- if (eid == 1) ens_mv1 else ens_mv2
+  do.call(rbind, lapply(seq_along(ys_mv), function(yi) {
+    y <- ys_mv[[yi]]
+    do.call(rbind, lapply(w_ids, function(wi) {
+      wv <- member_w(ncol(Xmat), wi)
+      do.call(rbind, lapply(ps_vs, function(p) {
+        suppressMessages(data.frame(
+          ens_id = eid, y_id = yi, w_id = wi, p_vs = p,
+          es   = es_sample(y, dat = Xmat, w = wv),
+          vs   = vs_sample(y, dat = Xmat, w = wv, p = p),
+          mmds = mmds_sample(y, dat = Xmat, w = wv),
+          vs_wvs = vs_sample(y, dat = Xmat, w_vs = wvs_mv, p = p),
+          vs_w_wvs = scoringRules:::vsC_w(y, Xmat, wvs_mv, wv / sum(wv), p)
+        ))
+      }))
+    }))
+  }))
+}))
+write_ref("member_w_mv", rows_mw)
+
+# twcrps / owcrps with member weights.
+rows_mw_univ <- do.call(rbind, lapply(1:2, function(eid) {
+  dat <- ens_list[[eid]]
+  do.call(rbind, lapply(ys_univ, function(yval) {
+    do.call(rbind, lapply(seq_along(ab_pairs), function(ki) {
+      ab <- ab_pairs[[ki]]
+      a  <- ab[1]; b <- ab[2]
+      do.call(rbind, lapply(w_ids, function(wi) {
+        wv <- member_w(length(dat), wi)
+        suppressMessages(data.frame(
+          ens_id = eid, y = yval, ab_id = ki, a = a, b = b, w_id = wi,
+          twcrps = twcrps_sample(yval, dat = dat, a = a, b = b, w = wv),
+          owcrps = owcrps_sample(yval, dat = dat, a = a, b = b, w = wv)
+        ))
+      }))
+    }))
+  }))
+}))
+write_ref("member_w_weighted_univ", rows_mw_univ)
+
+# tw*/ow* multivariate scores with member weights.
+rows_mw_mv <- do.call(rbind, lapply(1:2, function(eid) {
+  Xmat <- if (eid == 1) ens_mv1 else ens_mv2
+  do.call(rbind, lapply(seq_along(ys_mv), function(yi) {
+    y <- ys_mv[[yi]]
+    do.call(rbind, lapply(seq_along(ab_pairs_mv), function(ki) {
+      ab <- ab_pairs_mv[[ki]]
+      a  <- ab[1]; b <- ab[2]
+      do.call(rbind, lapply(w_ids, function(wi) {
+        wv <- member_w(ncol(Xmat), wi)
+        suppressMessages(data.frame(
+          ens_id = eid, y_id = yi, ab_id = ki, a = a, b = b, w_id = wi,
+          p_vs   = 0.5,
+          twes   = twes_sample(y, dat = Xmat, a = a, b = b, w = wv),
+          owes   = owes_sample(y, dat = Xmat, a = a, b = b, w = wv),
+          twvs   = twvs_sample(y, dat = Xmat, a = a, b = b, w = wv, p = 0.5),
+          owvs   = owvs_sample(y, dat = Xmat, a = a, b = b, w = wv, p = 0.5),
+          twmmds = twmmds_sample(y, dat = Xmat, a = a, b = b, w = wv),
+          owmmds = owmmds_sample(y, dat = Xmat, a = a, b = b, w = wv)
+        ))
+      }))
+    }))
+  }))
+}))
+write_ref("member_w_weighted_mv", rows_mw_mv)
+
 ## ---- quantile / interval scores (qs_quantiles / ints_quantiles / qs_sample / ints_sample) ----
 q_levels <- c(0.1, 0.25, 0.5, 0.75, 0.9)
 q_forecasts_list <- list(
@@ -463,6 +550,16 @@ rows_rps <- do.call(rbind, lapply(seq_along(rps_cases), function(ci) {
   }))
 }))
 write_ref("rps_scores", rows_rps)
+
+## ---- error-spread score (ess_moments) ----
+# Moment-based input mode; includes skew = 0, negative skew and near-zero
+# variance (the score stays finite there, tending to the fourth power of the
+# forecast error).
+g <- grid(mean = c(-1, 0, 2.5), var = c(1e-8, 0.25, 1, 4),
+          skew = c(-1.5, -0.5, 0, 0.5, 2),
+          y = c(-2, 0, 0.7, 3))
+g$ess <- ess_moments(g$y, mean = g$mean, var = g$var, skew = g$skew)
+write_ref("ess", g)
 
 ## ---- extra distributions: LogLogistic, LogLaplace, TwoPieceNormal, TwoPieceExponential ----
 

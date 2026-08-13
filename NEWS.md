@@ -16,11 +16,19 @@ Lerch and Allen). See the README for attribution and provenance.
   (the log-logistic uses `Distributions.LogLogistic`).
 - Sample/ensemble forecasts: `crps` (empirical and kernel-density), `logs`,
   `dss` on vectors; the energy score `es`, variogram score `vs` and
-  maximum-mean-discrepancy score `mmds` on multivariate ensembles.
+  maximum-mean-discrepancy score `mmds` on multivariate ensembles. All three
+  multivariate scores take optional member weights `w`, matching R. The
+  pairwise `d × d` weight matrix of `vs` is named `w_vs` (as in R); it was
+  briefly exposed as `w`, so any early code passing a matrix via `w` must
+  switch to `w_vs`. Unlike R's `vs_sample`, which ignores `w_vs` when member
+  weights are given, `vs` honours both together.
 - Threshold- and outcome-weighted scores (`twcrps`, `owcrps`, `twes`, `owes`,
-  `twvs`, `owvs`, `twmmds`, `owmmds`).
+  `twvs`, `owvs`, `twmmds`, `owmmds`), all with optional member weights `w`:
+  the tw\* scores weight the chained ensemble, and in the ow\* scores the
+  outcome weights multiply the member weights, as in R.
 - Quantile and interval scores (`quantile_score`, `interval_score`), the ranked
-  probability score `rps`, and the moment-based `dss_moments`.
+  probability score `rps`, and the moment-based `dss_moments` and `ess_moments`
+  (error-spread score of Christensen, Moroz and Palmer 2015).
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
   suite.
 - `owcrps` returns `NaN` when no ensemble member has positive weight, matching
