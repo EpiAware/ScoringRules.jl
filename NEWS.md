@@ -32,6 +32,9 @@ Lerch and Allen). See the README for attribution and provenance.
   (error-spread score of Christensen, Moroz and Palmer 2015).
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
   suite.
+- `dss` returns `NaN` whenever the forecast variance is not finite and
+  positive (for example t with `df ≤ 2`, GEV/GPD with `shape ≥ 1/2`,
+  log-Laplace with `σ ≥ 1/2`, log-logistic with `β ≤ 2`), matching R.
 - The sample quantile helper behind `quantile_score(dat, y; ...)` and
   `interval_score(dat, y; ...)` mirrors the index fuzz of R's
   `stats::quantile`, so quantile levels whose `n * p` lands just below an
