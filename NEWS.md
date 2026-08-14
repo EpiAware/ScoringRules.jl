@@ -43,6 +43,12 @@ Lerch and Allen). See the README for attribution and provenance.
   `stats::quantile`, so quantile levels whose `n * p` lands just below an
   integer in floating point (e.g. `0.5 * (1 - 0.9)` at `n = 500`) pick the
   same order statistic as R.
+- Closed-form CRPS is automatic-differentiation-safe for the Student-t, beta,
+  log-logistic, gamma, GEV and Poisson families, whose CDFs route through
+  `EpiAwareADTools` AD-safe primitives so gradients propagate dual numbers
+  instead of hitting the non-differentiable `beta_inc`/`gamma_inc`. The
+  per-backend AD test matrix (ForwardDiff, ReverseDiff, Enzyme, Mooncake)
+  exercises real score gradients over these families.
 
 This file tracks notes for major releases and significant milestones; GitHub
 Releases (auto-generated from merged PRs) cover every release in between.
