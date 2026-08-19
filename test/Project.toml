@@ -25,7 +25,7 @@ ScoringRules = "1fcf7366-10ae-49d1-a4dc-286b3bf402d3"
 # The package under test and EpiAwarePackageTools are pinned by `[sources]`, so
 # they carry no compat entry. Add a bound for each test-only dep you add.
 [compat]
-EpiAwarePackageTools = "=0.3.0"
+EpiAwarePackageTools = "=0.3.0, 0.4"
 ADTypes = "1"
 Aqua = "0.8"
 BenchmarkTools = "1"
