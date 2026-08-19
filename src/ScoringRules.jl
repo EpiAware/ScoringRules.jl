@@ -37,8 +37,9 @@ using Distributions: Distributions, Beta, Binomial, Censored, Continuous,
                      Truncated, Uniform, Univariate, UnivariateDistribution,
                      ccdf, cdf, components, dof, location, logpdf, params, pdf, probs,
                      scale, shape, truncated
-using SpecialFunctions: erfc, gamma, digamma, beta_inc, logbeta,
-                        besseli, expinti, gamma_inc
+using SpecialFunctions: erfc, gamma, digamma, logbeta,
+                        besseli, expinti
+using EpiAwareADTools: cdf_ad_safe, ccdf_ad_safe
 using LogExpFunctions: log1pexp, logistic
 using HypergeometricFunctions: _₂F₁
 using QuadGK: quadgk
@@ -48,11 +49,13 @@ using Random: AbstractRNG
 using DocStringExtensions: TYPEDSIGNATURES, TYPEDEF, TYPEDFIELDS, DOCSTRING, @template
 
 # Generic scoring-rule interface (parametric + ensemble via dispatch)
-export crps, logs, dss, dss_moments
+export crps, logs, dss, dss_moments, ess_moments
 # Multivariate ensemble scores
 export es, vs, mmds
 # Weighted (threshold- and outcome-weighted) ensemble scores
 export twcrps, owcrps, twes, owes, twvs, owvs, twmmds, owmmds
+# Censored and conditional likelihood scores for ensembles
+export clogs
 # Quantile / interval scores and the ranked probability score
 export quantile_score, interval_score, rps
 # Distribution types provided here (not in Distributions.jl)
