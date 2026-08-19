@@ -23,8 +23,10 @@ using TestItemRunner
 # picks up a current release (kit #451).
 
 if "skip_quality" in ARGS
-    TestItemRunner.run_tests(@__DIR__;
-        filter = ti -> !(:quality in ti.tags) && !(:ad in ti.tags))
+    TestItemRunner.run_tests(
+        @__DIR__;
+        filter = ti -> !(:quality in ti.tags) && !(:ad in ti.tags)
+    )
 elseif "quality_only" in ARGS
     TestItemRunner.run_tests(@__DIR__; filter = ti -> :quality in ti.tags)
 elseif "readme_only" in ARGS

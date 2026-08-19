@@ -28,7 +28,7 @@ function _crps_pois(y::Real, lambda::Real)
     c1 = (y - lambda) * (2 * poiscdf - 1)
     x = 2 * lambda
     c2 = 2 * pdf(Poisson(lambda), floor(Int, y)) -
-         exp(-x) * (besseli(0, x) + besseli(1, x))
+        exp(-x) * (besseli(0, x) + besseli(1, x))
     return c1 + lambda * c2
 end
 
@@ -51,9 +51,11 @@ function _crps_nbinom(y::Real, size::Real, prob::Real)
     c1 = y * (2 * cdf(NegativeBinomial(size, prob), y) - 1)
     c2 = (1 - prob) / prob^2
     # pnbinom(y-1, size+1, prob) is the CDF of NB(size+1, prob) at y-1
-    c3 = (prob * (2 * cdf(NegativeBinomial(size + 1, prob), y - 1) - 1)
-          +
-          _₂F₁(size + 1, 0.5, 2.0, -4 * c2))
+    c3 = (
+        prob * (2 * cdf(NegativeBinomial(size + 1, prob), y - 1) - 1)
+            +
+            _₂F₁(size + 1, 0.5, 2.0, -4 * c2)
+    )
     return c1 - size * c2 * c3
 end
 

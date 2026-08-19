@@ -1,10 +1,10 @@
 @template (FUNCTIONS, METHODS, MACROS) = """
-                                        $(TYPEDSIGNATURES)
-                                        $(DOCSTRING)
-                                        """
+$(TYPEDSIGNATURES)
+$(DOCSTRING)
+"""
 
 @template TYPES = """
-                  $(TYPEDEF)
-                  $(TYPEDFIELDS)
-                  $(DOCSTRING)
-                  """
+$(TYPEDEF)
+$(TYPEDFIELDS)
+$(DOCSTRING)
+"""

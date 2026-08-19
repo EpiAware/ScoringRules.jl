@@ -21,7 +21,7 @@ function _crps_lnorm(y::Real, meanlog::Real, sdlog::Real)
     c1 = y * (2 * cdf(LogNormal(meanlog, sdlog), y) - 1)
     c2 = 2 * exp(meanlog + oftype(float(sdlog), 0.5) * sdlog^2)
     c3 = cdf(LogNormal(meanlog + sdlog^2, sdlog), y) +
-         _norm_cdf(sdlog / sqrt(oftype(float(sdlog), 2))) - 1
+        _norm_cdf(sdlog / sqrt(oftype(float(sdlog), 2))) - 1
     return c1 - c2 * c3
 end
 

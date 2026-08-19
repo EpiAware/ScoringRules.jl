@@ -10,7 +10,7 @@
 
 # Below this tail probability, log F(-z) is evaluated via its Taylor expansion
 # to avoid catastrophic cancellation (mirrors the R source).
-const _LOGIS_TAYLOR_ATOL = 1e-8
+const _LOGIS_TAYLOR_ATOL = 1.0e-8
 
 # --- logistic helpers ---------------------------------------------------------
 
@@ -78,9 +78,11 @@ function _crps_clogis(y::Real, location::Real, scale::Real, l::Real, u::Real)
         l0 <= u0 || return oftype(float(y), NaN)
         return abs(y0 - max(l0, zero(l0)) - min(u0, zero(u0)))
     end
-    return scale * _crps_clogis_unit(y0 / scale,
+    return scale * _crps_clogis_unit(
+        y0 / scale,
         isfinite(l0) ? l0 / scale : l0,
-        isfinite(u0) ? u0 / scale : u0)
+        isfinite(u0) ? u0 / scale : u0
+    )
 end
 
 function crps(d::Censored{<:Logistic}, y::Real)
@@ -134,9 +136,11 @@ function _crps_tlogis(y::Real, location::Real, scale::Real, l::Real, u::Real)
     if scale == 0
         return (l0 < 0 && u0 > 0) ? abs(y0) : oftype(float(y), NaN)
     end
-    return scale * _crps_tlogis_unit(y0 / scale,
+    return scale * _crps_tlogis_unit(
+        y0 / scale,
         isfinite(l0) ? l0 / scale : l0,
-        isfinite(u0) ? u0 / scale : u0)
+        isfinite(u0) ? u0 / scale : u0
+    )
 end
 
 function crps(d::Truncated{<:Logistic}, y::Real)
@@ -147,8 +151,10 @@ end
 # --- generalised truncated/censored logistic ----------------------------------
 # Point masses `lmass`, `umass` at the (finite) lower/upper truncation points.
 # Internal only — no Distributions.jl type captures this directly.
-function _crps_gtclogis(y::Real, location::Real, scale::Real,
-        l::Real, u::Real, lmass::Real, umass::Real)
+function _crps_gtclogis(
+        y::Real, location::Real, scale::Real,
+        l::Real, u::Real, lmass::Real, umass::Real
+    )
     scale < 0 && return oftype(float(y), NaN)
     y0 = y - location
     l0 = isfinite(l) ? l - location : l
@@ -156,16 +162,18 @@ function _crps_gtclogis(y::Real, location::Real, scale::Real,
     if scale == 0
         if l0 < 0 && u0 > 0
             return (min(y0, zero(y0)) - l0) * lmass^2 -
-                   min(y0, zero(y0)) * (1 - lmass)^2 +
-                   (u0 - max(y0, zero(y0))) * umass^2 +
-                   max(y0, zero(y0)) * (1 - umass)^2
+                min(y0, zero(y0)) * (1 - lmass)^2 +
+                (u0 - max(y0, zero(y0))) * umass^2 +
+                max(y0, zero(y0)) * (1 - umass)^2
         end
         return oftype(float(y), NaN)
     end
-    return scale * _crps_gtclogis_unit(y0 / scale,
+    return scale * _crps_gtclogis_unit(
+        y0 / scale,
         isfinite(l0) ? l0 / scale : l0,
         isfinite(u0) ? u0 / scale : u0,
-        lmass, umass)
+        lmass, umass
+    )
 end
 
 function _crps_gtclogis_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real)
@@ -213,8 +221,10 @@ function _crps_gtclogis_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real
     lp_mz = log1p(-logistic(z))   # log F(-z)
 
     out = out_u1 - out_l1 -
-          (z * ((1 - 2 * lmass) * p_u + (1 - 2 * umass) * p_l) +
-           (2 * lp_mz - out_u2 - out_l2 + a2 * b / a1) * a2) / a1
+        (
+        z * ((1 - 2 * lmass) * p_u + (1 - 2 * umass) * p_l) +
+            (2 * lp_mz - out_u2 - out_l2 + a2 * b / a1) * a2
+    ) / a1
 
     return out + abs(y - z)
 end

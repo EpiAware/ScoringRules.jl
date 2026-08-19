@@ -62,10 +62,12 @@ distribution function (`:edf`, the default) or a Gaussian kernel estimate
 
 ensemble = rand(rng, Normal(0.0, 1.0), 500)
 
-(edf = crps(ensemble, y),
+(
+    edf = crps(ensemble, y),
     kde = crps(ensemble, y; method = :kde),
     logs = logs(ensemble, y),
-    dss = dss(ensemble, y))
+    dss = dss(ensemble, y),
+)
 
 md"""
 ## Comparing two forecasters
@@ -120,9 +122,11 @@ to the ordinary CRPS when the region is the whole line.
 tail_ensemble = rand(rng, Normal(0.0, 1.0), 500)
 y_tail = 1.5
 
-(unweighted = crps(tail_ensemble, y_tail),
+(
+    unweighted = crps(tail_ensemble, y_tail),
     threshold_weighted = twcrps(tail_ensemble, y_tail; a = 1.0),
-    outcome_weighted = owcrps(tail_ensemble, y_tail; a = 1.0))
+    outcome_weighted = owcrps(tail_ensemble, y_tail; a = 1.0),
+)
 
 md"""
 Here `a = 1.0` focuses the score on outcomes above 1. The same `a`/`b` interval

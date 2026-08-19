@@ -9,27 +9,27 @@
 # every backend the kit knows about; add/trim backends and categories to
 # match the package afterwards (this file is write-once).
 
-@testitem "ForwardDiff gradients (marginal)" tags=[:ad, :forwarddiff] setup=[ADHelpers] begin
+@testitem "ForwardDiff gradients (marginal)" tags = [:ad, :forwarddiff] setup = [ADHelpers] begin
     test_working_backend("ForwardDiff")
 end
 
-@testitem "ReverseDiff (tape) gradients (marginal)" tags=[:ad, :reversediff] setup=[ADHelpers] begin
+@testitem "ReverseDiff (tape) gradients (marginal)" tags = [:ad, :reversediff] setup = [ADHelpers] begin
     test_working_backend("ReverseDiff (tape)")
 end
 
-@testitem "Enzyme forward gradients (marginal)" tags=[:ad, :enzyme, :enzyme_forward] setup=[ADHelpers] begin
+@testitem "Enzyme forward gradients (marginal)" tags = [:ad, :enzyme, :enzyme_forward] setup = [ADHelpers] begin
     test_working_backend("Enzyme forward")
 end
 
-@testitem "Enzyme reverse gradients (marginal)" tags=[:ad, :enzyme, :enzyme_reverse] setup=[ADHelpers] begin
+@testitem "Enzyme reverse gradients (marginal)" tags = [:ad, :enzyme, :enzyme_reverse] setup = [ADHelpers] begin
     test_working_backend("Enzyme reverse")
 end
 
-@testitem "Mooncake reverse gradients (marginal)" tags=[:ad, :mooncake, :mooncake_reverse] setup=[ADHelpers] begin
+@testitem "Mooncake reverse gradients (marginal)" tags = [:ad, :mooncake, :mooncake_reverse] setup = [ADHelpers] begin
     test_working_backend("Mooncake reverse")
 end
 
-@testitem "Mooncake forward gradients (marginal)" tags=[:ad, :mooncake, :mooncake_forward] setup=[ADHelpers] begin
+@testitem "Mooncake forward gradients (marginal)" tags = [:ad, :mooncake, :mooncake_forward] setup = [ADHelpers] begin
     test_working_backend("Mooncake forward")
 end
 

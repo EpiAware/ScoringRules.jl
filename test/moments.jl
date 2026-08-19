@@ -1,14 +1,14 @@
-@testitem "moment-based scores match R scoringRules" setup=[References] begin
+@testitem "moment-based scores match R scoringRules" setup = [References] begin
     using ScoringRules
 
-    atol = 1e-9
-    rtol = 1e-7
+    atol = 1.0e-9
+    rtol = 1.0e-7
 
     @testset "ess_moments" begin
         c, n = References.load("ess")
         for i in 1:n
             score = ess_moments(c["y"][i], c["mean"][i], c["var"][i], c["skew"][i])
-            @test score≈c["ess"][i] atol=atol rtol=rtol
+            @test score ≈ c["ess"][i] atol = atol rtol = rtol
         end
     end
 

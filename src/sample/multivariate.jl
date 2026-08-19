@@ -20,8 +20,9 @@ Verify that `X` is a `d × m` matrix and `y` is a length-`d` vector.
 """
 function _check_multiv(X::AbstractMatrix, y::AbstractVector)
     d = length(y)
-    size(X, 1) == d || throw(
-        DimensionMismatch("rows of X ($(size(X,1))) must equal length of y ($d)"))
+    return size(X, 1) == d || throw(
+        DimensionMismatch("rows of X ($(size(X, 1))) must equal length of y ($d)")
+    )
 end
 
 """
@@ -36,8 +37,11 @@ function _member_weights(m::Integer, w)
     if w === nothing
         return fill(1.0 / m, m)
     end
-    length(w) == m || throw(DimensionMismatch(
-        "length of w ($(length(w))) must equal the number of ensemble members ($m)"))
+    length(w) == m || throw(
+        DimensionMismatch(
+            "length of w ($(length(w))) must equal the number of ensemble members ($m)"
+        )
+    )
     any(<(0), w) && throw(ArgumentError("member weights w must be non-negative"))
     sw = sum(w)
     return w ./ sw
@@ -59,11 +63,17 @@ the right size, non-negative and symmetric (the checks R's `vs_sample` applies
 to `w_vs`).
 """
 function _check_w_vs(w_vs::AbstractMatrix, d::Integer)
-    size(w_vs) == (d, d) || throw(DimensionMismatch(
-        "w_vs must be a $d × $d matrix, got $(size(w_vs))"))
+    size(w_vs) == (d, d) || throw(
+        DimensionMismatch(
+            "w_vs must be a $d × $d matrix, got $(size(w_vs))"
+        )
+    )
     any(<(0), w_vs) && throw(ArgumentError("weight matrix w_vs must be non-negative"))
-    isapprox(w_vs, w_vs'; atol = 1e-12) || throw(ArgumentError(
-        "weight matrix w_vs must be symmetric"))
+    return isapprox(w_vs, w_vs'; atol = 1.0e-12) || throw(
+        ArgumentError(
+            "weight matrix w_vs must be symmetric"
+        )
+    )
 end
 
 # ---------------------------------------------------------------------------
@@ -171,8 +181,10 @@ function _vskernel(x1::AbstractVector, x2::AbstractVector, w_vs::AbstractMatrix,
 end
 
 # Member-weight path (w per column, default w_vs = ones)
-function _vsC_w(y::AbstractVector, X::AbstractMatrix, w_vs::AbstractMatrix,
-        w::AbstractVector, p::Real)
+function _vsC_w(
+        y::AbstractVector, X::AbstractMatrix, w_vs::AbstractMatrix,
+        w::AbstractVector, p::Real
+    )
     m = size(X, 2)
     s1 = 0.0
     @inbounds for i in 1:m
@@ -219,8 +231,10 @@ y = [0.0, 0.0]
 vs(X, y)
 ```
 """
-function vs(X::AbstractMatrix, y::AbstractVector;
-        p::Real = 0.5, w = nothing, w_vs = nothing)
+function vs(
+        X::AbstractMatrix, y::AbstractVector;
+        p::Real = 0.5, w = nothing, w_vs = nothing
+    )
     _check_multiv(X, y)
     d = length(y)
     w_vs === nothing || _check_w_vs(w_vs, d)

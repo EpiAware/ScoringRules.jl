@@ -176,9 +176,9 @@ function crps(d::DiscreteUnivariateDistribution, y::Real)
     lo = minimum(d)
     hi = maximum(d)
     if !isfinite(hi)
-        hi = ceil(Int, quantile(d, 1 - 1e-12)) + 1
+        hi = ceil(Int, quantile(d, 1 - 1.0e-12)) + 1
     end
-    lo = isfinite(lo) ? ceil(Int, lo) : floor(Int, quantile(d, 1e-12)) - 1
+    lo = isfinite(lo) ? ceil(Int, lo) : floor(Int, quantile(d, 1.0e-12)) - 1
     s = 0.0
     for k in lo:hi
         Fk = cdf(d, k)

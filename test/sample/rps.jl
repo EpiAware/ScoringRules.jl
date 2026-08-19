@@ -1,7 +1,7 @@
-@testitem "RPS matches R scoringRules rps_probs" setup=[References] begin
+@testitem "RPS matches R scoringRules rps_probs" setup = [References] begin
     using ScoringRules
-    atol = 1e-9
-    rtol = 1e-7
+    atol = 1.0e-9
+    rtol = 1.0e-7
 
     c, n = References.load("rps_scores")
 
@@ -12,7 +12,7 @@
             # Reconstruct probability vector from p1..p4 columns.
             p_vals = [c["p$j"][i] for j in 1:K]
             ref = c["rps"][i]
-            @test rps(p_vals, y)≈ref atol=atol rtol=rtol
+            @test rps(p_vals, y) ≈ ref atol = atol rtol = rtol
         end
     end
 end
