@@ -10,22 +10,25 @@
 #   quality_only  — run only the QA testset
 #   readme_only   — run only `:readme`-tagged items (README/tutorial tests)
 
-using EpiAwarePackageTools: run_package_tests
+using TestItemRunner
 
-# `run_package_tests` roots discovery at this package's own `test/` tree rather
-# than the whole package root, so a nested worktree checked out under the repo
-# (the `worktrees/wt-*` convention) is never scanned and cannot inject test
-# items or silently shadow a same-named `@testsnippet` (kit #191). It is
-# otherwise a drop-in for TestItemRunner's `@run_package_tests`: pass the same
-# `filter` predicate over `ti.tags`.
+# `run_tests` roots discovery at this package's own `test/` tree rather than the
+# whole package root, so a nested worktree checked out under the repo (the
+# `worktrees/wt-*` convention) is never scanned and cannot inject test items or
+# silently shadow a same-named `@testsnippet` (kit #191).
+#
+# This is TestItemRunner's public API, matching `test/ad/runtests.jl`. The
+# equivalent kit helper drives an unexported TestItemRunner internal whose
+# signature changed in TestItemRunner 1.2, so it breaks on any resolve that
+# picks up a current release (kit #451).
 
 if "skip_quality" in ARGS
-    run_package_tests(@__DIR__;
+    TestItemRunner.run_tests(@__DIR__;
         filter = ti -> !(:quality in ti.tags) && !(:ad in ti.tags))
 elseif "quality_only" in ARGS
-    run_package_tests(@__DIR__; filter = ti -> :quality in ti.tags)
+    TestItemRunner.run_tests(@__DIR__; filter = ti -> :quality in ti.tags)
 elseif "readme_only" in ARGS
-    run_package_tests(@__DIR__; filter = ti -> :readme in ti.tags)
+    TestItemRunner.run_tests(@__DIR__; filter = ti -> :readme in ti.tags)
 else
-    run_package_tests(@__DIR__; filter = ti -> !(:ad in ti.tags))
+    TestItemRunner.run_tests(@__DIR__; filter = ti -> !(:ad in ti.tags))
 end
