@@ -320,15 +320,18 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    twvs(X, y; p=0.5, a=-Inf, b=Inf, chain_func=nothing, w=nothing)
+    twvs(X, y; p=0.5, a=-Inf, b=Inf, chain_func=nothing, w=nothing, w_vs=nothing)
 
 Threshold-weighted variogram score of order `p` of the ensemble `X` (a
 `d × m` matrix) at the `d`-dimensional observation `y`.
 
 The chaining function is applied to `y` and each column of `X`; the standard
 variogram score is then evaluated on the transformed forecast.  Optional
-member weights `w` (length `m`) are normalised to sum to one internally.  See
-`twes` for the conventions on `a`, `b`, and `chain_func`.  Lower is better.
+member weights `w` (length `m`) are normalised to sum to one internally, and
+`w_vs` is an optional `d × d` non-negative symmetric pairwise weight matrix
+(see `vs`).  R's `twvs_sample` silently ignores `w_vs` when `w` is given; here
+both are honoured together.  See `twes` for the conventions on `a`, `b`, and
+`chain_func`.  Lower is better.
 
 # Provenance
 
@@ -345,7 +348,8 @@ twvs(X, y; a = -1.0, b = 1.0)
 ```
 """
 function twvs(X::AbstractMatrix, y::AbstractVector;
-        p::Real = 0.5, a = -Inf, b = Inf, chain_func = nothing, w = nothing)
+        p::Real = 0.5, a = -Inf, b = Inf, chain_func = nothing, w = nothing,
+        w_vs = nothing)
     _check_multiv(X, y)
     d = length(y)
     if chain_func === nothing
@@ -359,7 +363,7 @@ function twvs(X::AbstractMatrix, y::AbstractVector;
     end
     v_y = v(y)
     v_dat = stack(v, eachcol(X))
-    return vs(v_dat, v_y; p = p, w = w)
+    return vs(v_dat, v_y; p = p, w = w, w_vs = w_vs)
 end
 
 # ---------------------------------------------------------------------------
@@ -367,14 +371,17 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    owvs(X, y; p=0.5, a=-Inf, b=Inf, weight_func=nothing, w=nothing)
+    owvs(X, y; p=0.5, a=-Inf, b=Inf, weight_func=nothing, w=nothing, w_vs=nothing)
 
 Outcome-weighted variogram score of order `p` of the ensemble `X` (a `d × m`
 matrix) at the `d`-dimensional observation `y`.
 
 The variogram score is computed using the normalised per-column weights w(Xᵢ),
 then multiplied by w(y).  Optional member weights `w` (length `m`) multiply
-the outcome weights, as in R.  Returns `NaN` when all combined weights are
+the outcome weights, as in R, and `w_vs` is an optional `d × d` non-negative
+symmetric pairwise weight matrix (see `vs`).  R's `owvs_sample` accepts `w_vs`
+but the outcome weights make it unreachable there; here it weights the
+variogram pairs as intended.  Returns `NaN` when all combined weights are
 zero.  See `owes` for conventions on `a`, `b`, and `weight_func`.  Lower is
 better.
 
@@ -393,9 +400,11 @@ owvs(X, y; a = -1.0, b = 1.0)
 ```
 """
 function owvs(X::AbstractMatrix, y::AbstractVector;
-        p::Real = 0.5, a = -Inf, b = Inf, weight_func = nothing, w = nothing)
+        p::Real = 0.5, a = -Inf, b = Inf, weight_func = nothing, w = nothing,
+        w_vs = nothing)
     _check_multiv(X, y)
     d = length(y)
+    w_vs === nothing || _check_w_vs(w_vs, d)
     if weight_func === nothing
         av = _broadcast_bound(a, d, "a")
         bv = _broadcast_bound(b, d, "b")
@@ -408,7 +417,8 @@ function owvs(X::AbstractMatrix, y::AbstractVector;
     w_y = wf(y)
     wv = _ow_weights(X, wf, w)
     wv === nothing && return NaN
-    return _vsC_w(y, X, ones(d, d), wv, p) * w_y
+    wvs = w_vs === nothing ? ones(d, d) : w_vs
+    return _vsC_w(y, X, wvs, wv, p) * w_y
 end
 
 # ---------------------------------------------------------------------------

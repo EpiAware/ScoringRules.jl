@@ -301,3 +301,76 @@ end
         @test isnan(owmmds(X, y; w = zeros(m)))
     end
 end
+
+@testitem "pairwise-weighted twvs/owvs match R scoringRules" setup=[References] begin
+    using ScoringRules
+    atol = 1e-9
+    rtol = 1e-7
+
+    function load_mv_ens(id::Int)
+        c, nrows = References.load("ens_mv_$id")
+        m = length(c)
+        d = nrows
+        X = Matrix{Float64}(undef, d, m)
+        for j in 1:m
+            X[:, j] = c["m$j"]
+        end
+        return X
+    end
+
+    mv_ens = [load_mv_ens(i) for i in 1:2]
+
+    ys_mv = [
+        [0.0, 0.0, 0.0],
+        [1.0, -1.0, 0.5],
+        [-2.0, 2.0, -1.0]
+    ]
+
+    # Deterministic member-weight vectors, mirroring generate_references.R;
+    # w_id 0 means no member weights.
+    function member_w(m::Int, w_id::Int)
+        w_id == 0 && return nothing
+        w_id == 1 && return fill(2.0, m)
+        w_id == 2 && return collect(1.0:m)
+        return vcat(zeros(5), collect(1.0:(m - 5)))
+    end
+
+    # Pairwise weight matrices, mirroring wvs_list in generate_references.R.
+    d = 3
+    wvs_list = [
+        [1 / (1 + abs(k - l)) for k in 1:d, l in 1:d],
+        [(k + l) / 2 for k in 1:d, l in 1:d]
+    ]
+
+    c, n = References.load("vs_pairwise_w")
+
+    @testset "twvs / owvs with w_vs" begin
+        for i in 1:n
+            X = mv_ens[Int(c["ens_id"][i])]
+            y = ys_mv[Int(c["y_id"][i])]
+            a = c["a"][i]
+            b = c["b"][i]
+            p = c["p_vs"][i]
+            wv = member_w(size(X, 2), Int(c["w_id"][i]))
+            wvs = wvs_list[Int(c["wvs_id"][i])]
+            @test twvs(X, y; p = p, a = a, b = b, w = wv, w_vs = wvs)≈c["twvs"][i] atol=atol rtol=rtol
+            got = owvs(X, y; p = p, a = a, b = b, w = wv, w_vs = wvs)
+            ref = c["owvs"][i]
+            if isnan(ref)
+                @test isnan(got)
+            else
+                @test got≈ref atol=atol rtol=rtol
+            end
+        end
+    end
+
+    @testset "argument validation" begin
+        X = mv_ens[1]
+        y = ys_mv[1]
+        @test_throws DimensionMismatch twvs(X, y; w_vs = ones(2, 2))
+        @test_throws DimensionMismatch owvs(X, y; w_vs = ones(2, 2))
+        @test_throws ArgumentError owvs(X, y; w_vs = -ones(3, 3))
+        @test_throws ArgumentError twvs(
+            X, y; w_vs = [1.0 2.0 3.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+    end
+end
