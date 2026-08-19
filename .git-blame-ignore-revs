@@ -3,3 +3,6 @@
 # List such a commit's SHA below this block to have it skipped. Configure git
 # to use this file once, locally:
 #   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: reformat with Runic
+60bafee3bde5136b63cb2594eb1826bca2e41e16
