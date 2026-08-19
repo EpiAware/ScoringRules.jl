@@ -5,39 +5,13 @@ ScoringRules.jl is a port of the R package
 most cases the two packages produce identical numerical results, but there are
 known divergences that users coming from R should be aware of.
 
-## CRPS for the negative binomial: half-integer `size`
-
-R's `crps_nbinom` returns `-Inf` whenever the `size` parameter is a
-half-integer (0.5, 1.5, 2.5, … — all tested values). Its Gaussian
-hypergeometric dependency evaluates a gamma function at a pole in exactly
-those configurations. ScoringRules.jl's `crps(NegativeBinomial(r, p), y)`
-returns the correct value there, matching a brute-force evaluation of
-``\sum_k (F(k) - \mathbb{1}\{y \le k\})^2`` to about twelve significant
-digits. For all other `size` values the two packages agree to machine
-precision.
-
 ## CRPS gradients and Hessians
 
 R exports closed-form CRPS derivatives with respect to location and scale
 (`gradcrps_*`, `hesscrps_*`) for the normal, logistic and Student's ``t``
-families and their truncated/censored variants. ScoringRules.jl provides no
-closed-form derivatives; gradients come from automatic differentiation of
+families and their truncated and censored variants. ScoringRules.jl provides
+no closed-form derivatives; gradients come from automatic differentiation of
 `crps`.
-
-Validation against R found three errors in R's closed forms for the ``t``
-families. Finite differences of R's *own* CRPS functions confirm each one,
-and agree with automatic differentiation of the Julia implementation:
-
-  * `gradcrps_tt` is wrong whenever the observation is not clipped clear of a
-    finite truncation bound (sign flips and errors of up to two orders of
-    magnitude).
-  * `hesscrps_ct` and `hesscrps_tt` omit the ``1/\sigma`` factor in their
-    location–scale branch, so every result with `scale ≠ 1` is off by exactly
-    that factor.
-
-`gradcrps_norm`, `gradcrps_logis`, `gradcrps_t` and the remaining censored and
-truncated variants agree with automatic differentiation of the Julia
-implementation to about ``10^{-9}`` or better.
 
 ## GEV CRPS: Gumbel case (shape ≈ 0)
 
