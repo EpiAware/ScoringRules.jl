@@ -63,7 +63,20 @@ end
 @testitem "Quality: formatting" tags=[:quality] begin
     using EpiAwarePackageTools
     include(joinpath(@__DIR__, "qa_config.jl"))
-    test_formatting(QA_CONFIG.mod)
+    # `formatter_env` is a newer `QA_CONFIG` field; an adopter predating it
+    # has none. Fall back to the in-process check, which floats with the
+    # shared test environment's resolved Runic, rather than erroring; warn
+    # so a typoed key doesn't silently revert.
+    env = if hasproperty(QA_CONFIG, :formatter_env)
+        QA_CONFIG.formatter_env
+    else
+        @warn "QA_CONFIG has no `formatter_env` field; checking formatting " *
+              "in-process against the shared test environment, whose " *
+              "Runic version floats with the CI Julia in use. Add one to " *
+              "qa_config.jl to pin it via the isolated formatter env."
+        nothing
+    end
+    test_formatting(QA_CONFIG.mod; env = env)
 end
 
 @testitem "Quality: linting (JET)" tags=[:quality] begin
