@@ -30,10 +30,14 @@ function _quantile_hf(x::AbstractVector, p::Real, qtype::Int)
         throw(ArgumentError("quantile type must be an integer 1–9, got $qtype"))
     n = length(x)
     xs = sort(x)
-    fuzz = 4 * eps(Float64)
+    # R's stats::quantile guards against `n * p` landing just below an integer
+    # through floating-point error: the index uses a multiplicative fuzz
+    # `floor(nppm * (1 + fuzz))`, with fuzz = 4 eps except for type 7, which
+    # uses no fuzz at all.
+    fuzz = qtype == 7 ? 0.0 : 4 * eps(Float64)
     if qtype <= 3
         nppm = qtype == 3 ? n * p - 0.5 : n * p
-        j = floor(Int, nppm + fuzz)
+        j = floor(Int, nppm * (1 + fuzz))
         h = if qtype == 1
             nppm > j ? 1.0 : 0.0
         elseif qtype == 2
@@ -48,8 +52,12 @@ function _quantile_hf(x::AbstractVector, p::Real, qtype::Int)
                qtype == 7 ? (1.0, 1.0) :
                qtype == 8 ? (1 / 3, 1 / 3) : (3 / 8, 3 / 8)
         nppm = a + p * (n + 1 - a - b)
-        j = floor(Int, nppm + fuzz)
-        h = clamp(nppm - j, 0.0, 1.0)
+        j = floor(Int, nppm * (1 + fuzz))
+        h = nppm - j
+        # R snaps interpolation weights within fuzz of 0 to exactly 0, and
+        # falls back to the order statistic `j` whenever h is not in (0, 1).
+        abs(h) < fuzz && (h = 0.0)
+        h = clamp(h, 0.0, 1.0)
     end
     lo = clamp(j, 1, n)
     hi = clamp(j + 1, 1, n)

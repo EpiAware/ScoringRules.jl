@@ -328,6 +328,26 @@ rows_univ <- do.call(rbind, lapply(ens_ids, function(i) {
 }))
 write_ref("sample_univ_scores", rows_univ)
 
+## ---- member-weighted univariate sample scores -----------------------------
+# crps_sample() and dss_sample() take member weights directly.
+set.seed(789)
+w_list <- lapply(ens_ids, function(i) rexp(20))
+for (i in ens_ids) write_ens(sprintf("ens_univ_w_%d", i), t(matrix(w_list[[i]])))
+
+rows_wm <- do.call(rbind, lapply(ens_ids, function(i) {
+  dat <- ens_list[[i]]
+  w <- w_list[[i]]
+  do.call(rbind, lapply(ys_univ, function(yval) {
+    data.frame(
+      ens_id = i,
+      y      = yval,
+      crps_w = crps_sample(yval, dat = dat, w = w),
+      dss_w  = dss_sample(yval, dat = dat, w = w)
+    )
+  }))
+}))
+write_ref("sample_univ_weighted_members", rows_wm)
+
 ## ---- sample multivariate (es / vs / mmds vs R es_sample / vs_sample / mmds_sample) ----
 # Two 3-dimensional ensembles of size 15 each.
 set.seed(456)
@@ -374,6 +394,41 @@ rows_wtu <- do.call(rbind, lapply(1:2, function(eid) {
   }))
 }))
 write_ref("sample_weighted_univ", rows_wtu)
+
+## ---- censored/conditional likelihood score (clogs vs R clogs_sample) ----
+# Ensembles of size 5, 30 and 500; windows one- and two-sided, y inside and
+# outside (including exactly on a bound), default and explicit bandwidth,
+# censored and conditional variants.
+set.seed(789)
+ns_clogs <- c(5, 30, 500)
+clogs_ens <- lapply(ns_clogs, function(n) rnorm(n, mean = 0.2, sd = 1.1))
+names(clogs_ens) <- as.character(ns_clogs)
+for (n in ns_clogs) {
+  write_ens(sprintf("ens_clogs_%d", n), t(matrix(clogs_ens[[as.character(n)]])))
+}
+
+ys_clogs <- c(-2, -0.5, 0, 0.5, 1, 3)
+ab_pairs_clogs <- list(c(-Inf, Inf), c(-1, 1), c(0, 2), c(-0.5, Inf), c(-Inf, 0.5))
+bws_clogs <- c(NA, 0.4)
+rows_clogs <- do.call(rbind, lapply(ns_clogs, function(n) {
+  dat <- clogs_ens[[as.character(n)]]
+  do.call(rbind, lapply(ys_clogs, function(yval) {
+    do.call(rbind, lapply(seq_along(ab_pairs_clogs), function(ki) {
+      ab <- ab_pairs_clogs[[ki]]
+      do.call(rbind, lapply(bws_clogs, function(bwval) {
+        bw_arg <- if (is.na(bwval)) NULL else bwval
+        data.frame(
+          n = n, y = yval, ab_id = ki, a = ab[1], b = ab[2], bw = bwval,
+          clogs_cens = clogs_sample(yval, dat = dat, a = ab[1], b = ab[2],
+                                    bw = bw_arg, cens = TRUE),
+          clogs_cond = clogs_sample(yval, dat = dat, a = ab[1], b = ab[2],
+                                    bw = bw_arg, cens = FALSE)
+        )
+      }))
+    }))
+  }))
+}))
+write_ref("sample_clogs", rows_clogs)
 
 ## ---- weighted multivariate (twes/owes/twvs/owvs/twmmds/owmmds) ----
 # Use multivariate ensembles; scalar [a,b] intervals broadcast to all dims.
@@ -583,6 +638,32 @@ rows_qs_samp <- do.call(rbind, lapply(1:2, function(eid) {
 }))
 write_ref("quantile_sample_scores", rows_qs_samp)
 
+# Near-integer n*p boundary cases for the sample quantile helper. Coverage 0.9
+# gives alpha1 = 0.5 * (1 - 0.9) = 0.04999..., so n * alpha1 lands just below
+# an integer in floating point (24.99... at n = 500) and the complementary
+# upper level lands just above one; R's quantile() index fuzz decides which
+# order statistic is used. The ensembles are simply 1:n, reproduced exactly in
+# the Julia tests, so no ensemble CSV is needed.
+alpha_lo <- 0.5 * (1 - 0.9)
+alpha_hi <- 1 - alpha_lo
+fuzz_cases <- list(list(n = 500L, ys = c(10, 250.5, 490)),
+                   list(n = 20L,  ys = c(0, 10.5, 20)))
+rows_qfuzz <- do.call(rbind, lapply(fuzz_cases, function(cas) {
+  dat <- as.numeric(1:cas$n)
+  do.call(rbind, lapply(1:9, function(t) {
+    do.call(rbind, lapply(cas$ys, function(yval) {
+      data.frame(
+        n = cas$n, type = t, y = yval,
+        qs_lo = qs_sample(yval, dat = dat, alpha = alpha_lo, type = t),
+        qs_hi = qs_sample(yval, dat = dat, alpha = alpha_hi, type = t),
+        ints_90 = ints_sample(yval, dat = dat, target_coverage = 0.9,
+                              type = t)
+      )
+    }))
+  }))
+}))
+write_ref("quantile_fuzz_scores", rows_qfuzz)
+
 ## ---- RPS (rps_probs vs Julia rps) ----
 # x (R) = probability vector over K categories; y = observed category (1-indexed).
 rps_cases <- list(
@@ -601,6 +682,16 @@ rows_rps <- do.call(rbind, lapply(seq_along(rps_cases), function(ci) {
   }))
 }))
 write_ref("rps_scores", rows_rps)
+
+## ---- error-spread score (ess_moments) ----
+# Moment-based input mode; includes skew = 0, negative skew and near-zero
+# variance (the score stays finite there, tending to the fourth power of the
+# forecast error).
+g <- grid(mean = c(-1, 0, 2.5), var = c(1e-8, 0.25, 1, 4),
+          skew = c(-1.5, -0.5, 0, 0.5, 2),
+          y = c(-2, 0, 0.7, 3))
+g$ess <- ess_moments(g$y, mean = g$mean, var = g$var, skew = g$skew)
+write_ref("ess", g)
 
 ## ---- extra distributions: LogLogistic, LogLaplace, TwoPieceNormal, TwoPieceExponential ----
 

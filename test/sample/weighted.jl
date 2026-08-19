@@ -166,6 +166,35 @@
     end
 end
 
+@testitem "ow* scores return NaN when no member has positive weight" begin
+    using ScoringRules
+
+    dat = collect(range(-2.0, 2.0; length = 20))
+    X = reshape(collect(range(-2.0, 2.0; length = 60)), 3, 20)
+    y_mv = [0.0, 0.0, 0.0]
+
+    # The interval (a, b) lies entirely outside the ensemble range, so every
+    # member weight is zero and no conditional forecast exists.
+    a, b = 100.0, 200.0
+
+    @test isnan(owcrps(dat, 0.5; a = a, b = b))
+    @test isnan(owes(X, y_mv; a = a, b = b))
+    @test isnan(owvs(X, y_mv; a = a, b = b))
+    @test isnan(owmmds(X, y_mv; a = a, b = b))
+
+    # Custom weight functions that assign zero weight everywhere behave the
+    # same way.
+    @test isnan(owcrps(dat, 0.5; weight_func = z -> 0.0))
+    @test isnan(owes(X, y_mv; weight_func = z -> 0.0))
+    @test isnan(owvs(X, y_mv; weight_func = z -> 0.0))
+    @test isnan(owmmds(X, y_mv; weight_func = z -> 0.0))
+
+    # Invalid (negative) member weights still error, even when they sum to
+    # zero: `dat` is symmetric about 0, so `z -> z` gives Σw = 0.
+    @test_throws ArgumentError owcrps(dat, 0.5; weight_func = z -> -1.0)
+    @test_throws ArgumentError owcrps(dat, 0.5; weight_func = z -> z)
+end
+
 @testitem "member-weighted tw/ow scores match R scoringRules" setup=[References] begin
     using ScoringRules
     atol = 1e-9
@@ -256,6 +285,20 @@ end
         @test_throws ArgumentError owes(X, y; w = fill(-1.0, m))
         @test_throws DimensionMismatch owcrps(dat, 0.0; w = ones(length(dat) + 1))
         @test_throws ArgumentError twcrps(dat, 0.0; w = fill(-1.0, length(dat)))
+    end
+
+    @testset "all-zero member weights give NaN for outcome-weighted scores" begin
+        # No member has positive weight, so the outcome-weighted scores are
+        # undefined: R's ow*_sample return NaN, and so must we, consistently
+        # across the univariate and multivariate scores.
+        X = mv_ens[1]
+        y = ys_mv[1]
+        m = size(X, 2)
+        dat = univ_ens[1]
+        @test isnan(owcrps(dat, 0.0; w = zeros(length(dat))))
+        @test isnan(owes(X, y; w = zeros(m)))
+        @test isnan(owvs(X, y; w = zeros(m)))
+        @test isnan(owmmds(X, y; w = zeros(m)))
     end
 end
 

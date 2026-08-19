@@ -1,9 +1,10 @@
-# Univariate ensemble (sample-based) scoring rules: CRPS, LogS, DSS.
+# Univariate ensemble (sample-based) scoring rules: CRPS, LogS, DSS, and the
+# censored/conditional likelihood scores.
 # Ported from R scoringRules v1.1.3 (scores_sample_univ.R; mixn.cpp;
 # Jordan, Krüger, Lerch, Allen) under GPL-2.0-or-later.
 #
-# Three scoring rules are exposed via the existing generics `crps`, `logs` and
-# `dss` (all exported from the parent module). No new exports are needed here.
+# CRPS, LogS and DSS are exposed via the existing generics `crps`, `logs` and
+# `dss` (all exported from the parent module); `clogs` is exported here.
 #
 # References
 # ----------
@@ -13,6 +14,11 @@
 # Laio & Tamea (2007): Verification tools for probabilistic forecasts of
 #   continuous hydrological variables. Hydrology and Earth System Sciences 11,
 #   1267–1277.
+# Diks, Panchenko & van Dijk (2011): Likelihood-based scoring rules for
+#   comparing density forecasts in tails. Journal of Econometrics 163,
+#   215–230. doi:10.1016/j.jeconom.2011.04.001
+
+export clogs
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -22,6 +28,18 @@
 # defined in crps/mixture.jl, which loads before this file. The kernel-density
 # CRPS below reuses `_crps_mixnorm`: a Gaussian KDE is an equally-weighted normal
 # mixture with common bandwidth as the standard deviation.
+
+# Validate a member-weight vector against its ensemble. R errors on missing,
+# infinite and negative weights too; the positive-sum requirement is stricter
+# than R, which returns NaN for an all-zero weight vector.
+function _check_member_weights(dat::AbstractVector, w::AbstractVector)
+    axes(dat) == axes(w) || throw(DimensionMismatch(
+        "dat and w must have the same axes"))
+    all(x -> isfinite(x) && x >= 0, w) ||
+        throw(ArgumentError("weights w must be finite and non-negative"))
+    sum(w) > 0 || throw(ArgumentError("weights w must have a positive sum"))
+    return nothing
+end
 
 # Silverman's rule-of-thumb bandwidth, matching R's `bw.nrd`.
 # bw.nrd(x) = 1.06 * min(sd(x), IQR(x)/1.34) * n^(-1/5)
@@ -58,9 +76,7 @@ end
 # Weighted path.
 # Weights are normalised so that Σw = 1 (or equivalently divided by P = Σw).
 function _crps_edf_weighted(y::Real, dat::AbstractVector, w::AbstractVector)
-    length(dat) == length(w) || throw(DimensionMismatch(
-        "dat and w must have the same length"))
-    any(<(0), w) && throw(ArgumentError("weights w must be non-negative"))
+    _check_member_weights(dat, w)
 
     ord = sortperm(dat)
     x = dat[ord]
@@ -102,7 +118,7 @@ observation `y`.
 Two approximation methods are available via `method`:
 
   - `:edf` (default) — empirical distribution function approximation using the
-    quantile decomposition of Laio & Tamea (2007).  Optional non-negative weights
+    quantile decomposition of Laio & Tamea (2007).  Optional finite, non-negative weights
     `w` (length `m`) are normalised to sum to one internally.
 
   - `:kde` — Gaussian kernel density estimate with bandwidth `bw`.  If `bw` is
@@ -119,7 +135,7 @@ Lower is better.
 # Keyword Arguments
 
   - `method`: `:edf` (default) or `:kde`.
-  - `w`: optional non-negative weight vector (length `m`); only used for `:edf`.
+  - `w`: optional finite, non-negative weight vector (length `m`) with a positive sum; only used for `:edf`.
   - `bw`: optional bandwidth; only used for `:kde`.
 
 # Provenance
@@ -155,15 +171,15 @@ end
 """
     logs(dat::AbstractVector{<:Real}, y::Real; bw=nothing)
 
-Logarithmic score of an ensemble forecast `dat` at observation `y` using
-Gaussian kernel density estimation.
+Logarithmic score of an ensemble forecast `dat` (a vector of `m` simulation
+draws) at observation `y` using Gaussian kernel density estimation.
 
 If `bw` is `nothing`, Silverman's rule-of-thumb bandwidth is used (matching
 R's `bw.nrd`).  Lower is better.
 
 # Arguments
 
-  - `dat`: ensemble of simulation draws.
+  - `dat`: ensemble of `m` simulation draws.
   - `y`: scalar observation.
 
 # Keyword Arguments
@@ -186,8 +202,6 @@ logs(dat, 0.5)
 function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     n = length(dat)
-    # KDE density at y: (1/n) Σ_i φ_{bw}(y − datᵢ)
-    # log score = −log density
     den = 0.0
     @inbounds for i in eachindex(dat)
         den += _norm_pdf((y - dat[i]) / bw_val) / bw_val
@@ -197,9 +211,80 @@ function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing)
 end
 
 """
-    dss(dat::AbstractVector{<:Real}, y::Real)
+    clogs(dat::AbstractVector{<:Real}, y::Real; a=-Inf, b=Inf, bw=nothing, cens=true)
 
-Dawid–Sebastiani score of an ensemble forecast `dat` at observation `y`:
+Censored likelihood score (`cens = true`, the default) or conditional
+likelihood score (`cens = false`) of an ensemble forecast `dat` at observation
+`y`, emphasising the window `(a, b)` (Diks, Panchenko & van Dijk 2011).
+
+Both scores are based on the Gaussian kernel density estimate ``\\hat{f}`` of
+the ensemble, with its probability mass in the window
+``P = \\hat{F}(b) - \\hat{F}(a)`` and the indicator
+``w(y) = \\mathbf{1}\\{a < y < b\\}`` (strict inequalities):
+
+  - censored: ``-\\log \\hat{f}(y)`` when `y` is inside the window and
+    ``-\\log(1 - P)`` otherwise, so outcomes outside the window enter only
+    through their total probability.
+  - conditional: ``-\\log\\bigl(\\hat{f}(y) / P\\bigr)`` when `y` is inside
+    the window and `0` otherwise.
+
+With the default unbounded window both variants reduce to `logs(dat, y; bw)`.
+If `bw` is `nothing`, Silverman's rule-of-thumb bandwidth is used (matching
+R's `bw.nrd`).  Lower is better.
+
+# Arguments
+
+  - `dat`: ensemble of simulation draws.
+  - `y`: scalar observation.
+
+# Keyword Arguments
+
+  - `a`: lower end of the window (default `-Inf`).
+  - `b`: upper end of the window (default `Inf`).
+  - `bw`: optional bandwidth; defaults to Silverman's rule-of-thumb.
+  - `cens`: `true` for the censored score, `false` for the conditional score.
+
+# Provenance
+
+Ported from `clogs_sample` in R scoringRules (scores_sample_univ_weighted.R;
+mixn.cpp; Jordan, Krüger, Lerch, Allen).
+
+# Example
+
+```@example
+using ScoringRules
+dat = randn(100)
+clogs(dat, 0.5; a = 0.0, b = 1.0)
+```
+"""
+function clogs(dat::AbstractVector{<:Real}, y::Real;
+        a::Real = -Inf, b::Real = Inf, bw = nothing, cens::Bool = true)
+    a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
+    bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
+    n = length(dat)
+    # KDE mass in the window, P = F̂(b) − F̂(a), and KDE density at y; the KDE
+    # is an equally weighted normal mixture with the bandwidth as common sd.
+    mass = 0.0
+    den = 0.0
+    @inbounds for x in dat
+        mass += _norm_cdf((b - x) / bw_val) - _norm_cdf((a - x) / bw_val)
+        den += _norm_pdf((y - x) / bw_val) / bw_val
+    end
+    mass /= n
+    den /= n
+    inside = a < y < b
+    if cens
+        return inside ? -log(den) : -log1p(-mass)
+    else
+        return inside ? log(mass) - log(den) : 0.0
+    end
+end
+
+"""
+    dss(dat::AbstractVector{<:Real}, y::Real; w=nothing)
+
+Dawid–Sebastiani score of an ensemble forecast `dat` (a vector of `m`
+simulation draws) at observation `y`:
 
 ```math
 \\mathrm{DSS} = \\frac{(y - \\bar{x})^2}{s^2} + \\log s^2
@@ -207,17 +292,24 @@ Dawid–Sebastiani score of an ensemble forecast `dat` at observation `y`:
 
 where ``\\bar{x}`` is the sample mean and ``s^2 = \\tfrac{1}{n}\\sum_i(x_i - \\bar{x})^2``
 is the **population** variance (R uses `mean(dat^2) - mean(dat)^2`, i.e. the
-biased estimator). Lower is better.
+biased estimator). Optional finite, non-negative member weights `w` (length `m`) are
+normalised to sum to one internally and replace the mean and variance with
+their weighted versions. Lower is better.
 
 # Arguments
 
-  - `dat`: ensemble of simulation draws.
+  - `dat`: ensemble of `m` simulation draws.
   - `y`: scalar observation.
+
+# Keyword Arguments
+
+  - `w`: optional finite, non-negative member weight vector (length `m`) with a positive sum.
 
 # Provenance
 
 Ported from `dss_sample` / `dss_edf` in R scoringRules (scores_sample_univ.R;
-Jordan, Krüger, Lerch, Allen).
+Jordan, Krüger, Lerch, Allen), including the member-weight handling of
+`dss_edf`.
 
 # Example
 
@@ -227,9 +319,21 @@ dat = randn(100)
 dss(dat, 0.5)
 ```
 """
-function dss(dat::AbstractVector{<:Real}, y::Real)
-    m = mean(dat)
-    # Population variance: mean(dat.^2) - mean(dat).^2  (matches R dss_edf)
-    v = mean(x^2 for x in dat) - m^2
+function dss(dat::AbstractVector{<:Real}, y::Real; w = nothing)
+    if w === nothing
+        m = mean(dat)
+        # Population variance: mean(dat.^2) - mean(dat).^2  (matches R dss_edf)
+        v = mean(x^2 for x in dat) - m^2
+    else
+        _check_member_weights(dat, w)
+        W = swx = swx2 = 0.0
+        @inbounds for i in eachindex(dat)
+            W += w[i]
+            swx += w[i] * dat[i]
+            swx2 += w[i] * dat[i]^2
+        end
+        m = swx / W
+        v = swx2 / W - m^2
+    end
     return (y - m)^2 / v + log(v)
 end

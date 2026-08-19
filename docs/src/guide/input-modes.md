@@ -67,11 +67,15 @@ dss(draws, 0.5)    # uses sample mean and population variance
 
 ### Weighted ensemble members
 
-Importance weights can be passed to `crps` with the EDF method:
+Importance weights can be passed to `crps` (EDF method) and `dss`:
 
 ```@example modes
 w = abs.(randn(1000)) .+ 0.01   # arbitrary positive weights (normalised internally)
 crps(draws, 0.5; w = w)
+```
+
+```@example modes
+dss(draws, 0.5; w = w)    # weighted mean and variance
 ```
 
 ## Moment-based forecasts
@@ -83,6 +87,14 @@ specified.
 
 ```@example modes
 dss_moments(0.5, 1.0, 4.0)   # observation y=0.5, mean=1.0, variance=4.0
+```
+
+The error-spread score of Christensen, Moroz and Palmer (2015) also takes
+moment forecasts, extending them with the skewness. It assesses whether the
+spread and skewness of an ensemble forecast are consistent with its error:
+
+```@example modes
+ess_moments(0.5, 1.0, 4.0, 0.3)   # as above, with skewness 0.3
 ```
 
 This is useful when forecasts arrive as published summary statistics rather
