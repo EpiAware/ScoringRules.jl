@@ -5,23 +5,13 @@ ScoringRules.jl is a port of the R package
 most cases the two packages produce identical numerical results, but there are
 known divergences that users coming from R should be aware of.
 
-## DSS for Log-Logistic
+## CRPS gradients and Hessians
 
-R's `dss_llogis` returns `NaN` in all tested configurations. The root cause is
-that R's implementation drops a location-dependent factor when computing the
-variance of the log-logistic distribution, making the formula incorrect and
-producing numerically degenerate results.
-
-ScoringRules.jl uses the correct variance:
-
-```math
-\mathrm{Var}[X] = \alpha^2 \left(\frac{2/\beta}{\sin(2\pi/\beta)} - \left(\frac{\pi/\beta}{\sin(\pi/\beta)}\right)^2\right)
-```
-
-via Distributions.jl's `var(LogLogistic(α, β))`, so `dss(LogLogistic(α, β), y)`
-returns a finite result wherever the variance exists (requires ``\beta > 2``).
-Numerical comparison with R is not possible because R's implementation is
-broken for this family.
+R exports closed-form CRPS derivatives with respect to location and scale
+(`gradcrps_*`, `hesscrps_*`) for the normal, logistic and Student's ``t``
+families and their truncated and censored variants. ScoringRules.jl provides
+no closed-form derivatives; gradients come from automatic differentiation of
+`crps`.
 
 ## GEV CRPS: Gumbel case (shape ≈ 0)
 
