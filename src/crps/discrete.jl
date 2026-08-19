@@ -15,9 +15,17 @@
 # The two calls share the same argument x = 2λ, so we factor out exp(-2λ).
 """
 CRPS of a `Poisson(λ)` forecast, in closed form.
+
+The Poisson CDF is `F(y) = P(Y ≤ ⌊y⌋) = Q(⌊y⌋+1, λ) = ccdf(Gamma(⌊y⌋+1, 1), λ)`,
+and `0` for `y < 0` (empty support — matching R's `crps_pois`). Routed through
+`ccdf_ad_safe` so `λ` stays differentiable: the stock `cdf(::Poisson)` reaches
+`gamma_inc`, which has no method for a Dual shape argument (#11). `ccdf_ad_safe`
+returns `Q` directly rather than `1 - P`, keeping the far upper tail accurate.
 """
 function _crps_pois(y::Real, lambda::Real)
-    c1 = (y - lambda) * (2 * cdf(Poisson(lambda), y) - 1)
+    k = floor(y + 1)
+    poiscdf = k <= 0 ? oftype(float(lambda), 0) : ccdf_ad_safe(Gamma(k, 1.0), lambda)
+    c1 = (y - lambda) * (2 * poiscdf - 1)
     x = 2 * lambda
     c2 = 2 * pdf(Poisson(lambda), floor(Int, y)) -
          exp(-x) * (besseli(0, x) + besseli(1, x))

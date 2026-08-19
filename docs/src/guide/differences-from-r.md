@@ -69,6 +69,14 @@ which also uses the biased (population) estimator. Julia's `var` function uses
 the ``n-1`` denominator, so passing `var(dat)` directly would not match R.
 The implementation avoids `Statistics.var` deliberately.
 
+## Ensemble member weights
+
+The sample `crps` (`method = :edf`) and `dss` accept member weights `w`,
+matching R's `crps_sample` and `dss_sample`. Member weights must be finite,
+non-negative and sum to a positive value, otherwise an error is thrown. R also
+errors on missing, infinite and negative weights but returns `NaN` for an
+all-zero weight vector.
+
 ## Parameter conventions
 
 The following parameter conventions differ from R's function arguments:
