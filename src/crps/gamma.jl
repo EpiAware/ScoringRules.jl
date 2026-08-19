@@ -20,7 +20,7 @@ function _crps_gamma(y::Real, shape::Real, scale::Real)
     p1 = cdf_ad_safe(Gamma(shape, scale), y)
     p2 = cdf_ad_safe(Gamma(shape + 1, scale), y)
     return y * (2 * p1 - 1) -
-           scale * (shape * (2 * p2 - 1) + exp(-logbeta(oftype(float(shape), 0.5), shape)))
+        scale * (shape * (2 * p2 - 1) + exp(-logbeta(oftype(float(shape), 0.5), shape)))
 end
 
 crps(d::Gamma, y::Real) = _crps_gamma(y, shape(d), scale(d))

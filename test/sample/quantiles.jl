@@ -1,7 +1,7 @@
-@testitem "quantile and interval scores match R scoringRules" setup=[References] begin
+@testitem "quantile and interval scores match R scoringRules" setup = [References] begin
     using ScoringRules
-    atol = 1e-9
-    rtol = 1e-7
+    atol = 1.0e-9
+    rtol = 1.0e-7
 
     q_levels = [0.1, 0.25, 0.5, 0.75, 0.9]
 
@@ -17,7 +17,7 @@
             for (j, alpha) in enumerate(q_levels)
                 ref = c["qs_a$j"][i]
                 got = quantile_score([alpha], [qf[j]], y)
-                @test only(got)≈ref atol=atol rtol=rtol
+                @test only(got) ≈ ref atol = atol rtol = rtol
             end
         end
     end
@@ -28,7 +28,7 @@
             lower = c["q1"][i]   # 10th percentile
             upper = c["q5"][i]   # 90th percentile
             ref = c["ints_80"][i]
-            @test interval_score(lower, upper, y, 0.8)≈ref atol=atol rtol=rtol
+            @test interval_score(lower, upper, y, 0.8) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -38,7 +38,7 @@
             lower = c["q2"][i]   # 25th percentile
             upper = c["q4"][i]   # 75th percentile
             ref = c["ints_50"][i]
-            @test interval_score(lower, upper, y, 0.5)≈ref atol=atol rtol=rtol
+            @test interval_score(lower, upper, y, 0.5) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -59,9 +59,9 @@
             dat = univ_ens[Int(cs["ens_id"][i])]
             y = cs["y"][i]
             got_qs = quantile_score(dat, y; alpha = cs["alpha"][i])
-            @test got_qs≈cs["qs"][i] atol=atol rtol=rtol
+            @test got_qs ≈ cs["qs"][i] atol = atol rtol = rtol
             got_is = interval_score(dat, y; level = 0.8)
-            @test got_is≈cs["ints_80"][i] atol=atol rtol=rtol
+            @test got_is ≈ cs["ints_80"][i] atol = atol rtol = rtol
         end
     end
 
@@ -80,9 +80,9 @@
             dat = collect(1.0:cf["n"][i])
             t = Int(cf["type"][i])
             y = cf["y"][i]
-            @test quantile_score(dat, y; alpha = alpha_lo, type = t)≈cf["qs_lo"][i] atol=atol rtol=rtol
-            @test quantile_score(dat, y; alpha = alpha_hi, type = t)≈cf["qs_hi"][i] atol=atol rtol=rtol
-            @test interval_score(dat, y; level = 0.9, type = t)≈cf["ints_90"][i] atol=atol rtol=rtol
+            @test quantile_score(dat, y; alpha = alpha_lo, type = t) ≈ cf["qs_lo"][i] atol = atol rtol = rtol
+            @test quantile_score(dat, y; alpha = alpha_hi, type = t) ≈ cf["qs_hi"][i] atol = atol rtol = rtol
+            @test interval_score(dat, y; level = 0.9, type = t) ≈ cf["ints_90"][i] atol = atol rtol = rtol
         end
     end
 end
@@ -96,22 +96,26 @@ end
     # Oracle values from R scoringRules 1.1.3:
     #   qs_sample(y, dat, alpha = 0.75, type = t)
     #   ints_sample(y, matrix(dat, nrow = 1), target_coverage = 0.8, type = t)
-    qs_ref = Dict(1 => 0.925, 4 => 0.8, 6 => 0.9875, 7 => 0.8625,
-        8 => 0.945833333333333)
-    is_ref = Dict(1 => 8.0, 4 => 8.0, 6 => 8.8, 7 => 7.2,
-        8 => 8.26666666666667)
+    qs_ref = Dict(
+        1 => 0.925, 4 => 0.8, 6 => 0.9875, 7 => 0.8625,
+        8 => 0.945833333333333
+    )
+    is_ref = Dict(
+        1 => 8.0, 4 => 8.0, 6 => 8.8, 7 => 7.2,
+        8 => 8.26666666666667
+    )
 
     for (t, ref) in qs_ref
-        @test quantile_score(dat, y; alpha = 0.75, type = t)≈ref rtol=1e-12
+        @test quantile_score(dat, y; alpha = 0.75, type = t) ≈ ref rtol = 1.0e-12
     end
     for (t, ref) in is_ref
-        @test interval_score(dat, y; level = 0.8, type = t)≈ref rtol=1e-12
+        @test interval_score(dat, y; level = 0.8, type = t) ≈ ref rtol = 1.0e-12
     end
 
     # Distinct types must give distinct results (guards against the `type`
     # keyword silently collapsing to type 7).
     @test quantile_score(dat, y; alpha = 0.75, type = 1) !=
-          quantile_score(dat, y; alpha = 0.75, type = 6)
+        quantile_score(dat, y; alpha = 0.75, type = 6)
 end
 
 @testitem "quantile / interval / rps input validation" begin

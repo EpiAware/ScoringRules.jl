@@ -22,18 +22,18 @@ pages = [
         "Overview" => "getting-started/index.md",
         "Tutorials" => [
             "Evaluating forecasts end-to-end" => "getting-started/tutorials/evaluating-forecasts.md",
-            "Automatic differentiation backends" => "getting-started/tutorials/ad-backends.md"
-        ]
+            "Automatic differentiation backends" => "getting-started/tutorials/ad-backends.md",
+        ],
     ],
     "Guide" => [
         "Forecast input modes" => "guide/input-modes.md",
         "Scoring rules reference" => "guide/scoring-rules-reference.md",
         "Supported distributions" => "guide/distributions.md",
         "Differences from R" => "guide/differences-from-r.md",
-        "Validation against R" => "guide/validation-against-r.md"
+        "Validation against R" => "guide/validation-against-r.md",
     ],
     "API reference" => [
         "Public API" => "lib/public.md",
-        "Internal API" => "lib/internals.md"
-    ]
+        "Internal API" => "lib/internals.md",
+    ],
 ]

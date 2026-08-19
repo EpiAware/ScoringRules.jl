@@ -1,9 +1,9 @@
-@testitem "extra distribution scores match R scoringRules" setup=[References] begin
+@testitem "extra distribution scores match R scoringRules" setup = [References] begin
     using ScoringRules
     using Distributions
 
-    atol = 1e-9
-    rtol = 1e-7
+    atol = 1.0e-9
+    rtol = 1.0e-7
 
     # ---------- LogLogistic ----------
     # R parameterisation: crps_llogis(y, locationlog, scalelog)
@@ -19,7 +19,7 @@
             y = c["y"][i]
             ref = c["crps"][i]
             d = LogLogistic(exp(locationlog), 1 / scalelog)
-            @test crps(d, y)≈ref atol=atol rtol=rtol
+            @test crps(d, y) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -31,7 +31,7 @@
             y = c["y"][i]
             ref = c["logs"][i]
             d = LogLogistic(exp(locationlog), 1 / scalelog)
-            @test logs(d, y)≈ref atol=atol rtol=rtol
+            @test logs(d, y) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -48,7 +48,7 @@
             y = c["y"][i]
             ref = c["crps"][i]
             d = LogLaplace(μ, σ)
-            @test crps(d, y)≈ref atol=atol rtol=rtol
+            @test crps(d, y) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -60,7 +60,7 @@
             y = c["y"][i]
             ref = c["logs"][i]
             d = LogLaplace(μ, σ)
-            @test logs(d, y)≈ref atol=atol rtol=rtol
+            @test logs(d, y) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -73,7 +73,7 @@
             y = c["y"][i]
             ref = c["dss"][i]
             d = LogLaplace(μ, σ)
-            @test dss(d, y)≈ref atol=atol rtol=rtol
+            @test dss(d, y) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -90,7 +90,7 @@
             y = c["y"][i]
             ref = c["crps"][i]
             d = TwoPieceNormal(loc, scale1, scale2)
-            @test crps(d, y)≈ref atol=atol rtol=rtol
+            @test crps(d, y) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -103,7 +103,7 @@
             y = c["y"][i]
             ref = c["logs"][i]
             d = TwoPieceNormal(loc, scale1, scale2)
-            @test logs(d, y)≈ref atol=atol rtol=rtol
+            @test logs(d, y) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -120,7 +120,7 @@
             y = c["y"][i]
             ref = c["crps"][i]
             d = TwoPieceExponential(loc, scale1, scale2)
-            @test crps(d, y)≈ref atol=atol rtol=rtol
+            @test crps(d, y) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -133,7 +133,7 @@
             y = c["y"][i]
             ref = c["logs"][i]
             d = TwoPieceExponential(loc, scale1, scale2)
-            @test logs(d, y)≈ref atol=atol rtol=rtol
+            @test logs(d, y) ≈ ref atol = atol rtol = rtol
         end
     end
 end
