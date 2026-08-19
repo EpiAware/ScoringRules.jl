@@ -19,7 +19,9 @@ const _LOGIS_TAYLOR_ATOL = 1e-8
 # the Taylor expansion used in the R source.
 @inline function _logis_Fz_plus_logFmz(z::Real)
     p = logistic(z)
-    return p > _LOGIS_TAYLOR_ATOL ? p + log1p(-p) : -p^2 / 2 - p^3 / 3
+    # log F(-z) = -log1pexp(z): stays finite (≈ -z) where log1p(-p) would
+    # overflow to -Inf once p rounds to exactly 1 (z ≳ 37).
+    return p > _LOGIS_TAYLOR_ATOL ? p - log1pexp(z) : -p^2 / 2 - p^3 / 3
 end
 
 # Normalising constant appearing in the truncated/gtc formulas:
@@ -27,7 +29,7 @@ end
 # Equivalent to the R expressions `ifelse(p>1e-8, p+lp_m, Taylor) - p*(z*p + 2*lp_m)`.
 @inline function _logis_out(z::Real)
     p = logistic(z)
-    lpm = log1p(-p)             # log F(-z)
+    lpm = -log1pexp(z)          # log F(-z), finite for all z
     fz = _logis_Fz_plus_logFmz(z)   # F(z) + log F(-z), Taylor-safe
     return fz - p * (z * p + 2 * lpm)
 end
@@ -119,7 +121,7 @@ function _crps_tlogis_unit(y::Real, l::Real, u::Real)
     b = out_u - out_l
     b == 0 && return NaN
 
-    lp_mz = log1p(-logistic(z))   # log F(-z)
+    lp_mz = -log1pexp(z)          # log F(-z), finite for all z
     out_z = z * (-p_l - p_u) - 2 * lp_mz
 
     out = (out_z - b / a) / a
@@ -185,7 +187,7 @@ function _crps_gtclogis_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real
     if isfinite(l) || lmass != 0
         (lmass < 0 || lmass > 1) && return NaN
         p_l = logistic(l)
-        lp_ml = log1p(-p_l)       # log F(-l)
+        lp_ml = -log1pexp(l)      # log F(-l), finite for all l
         out_l1 = lmass == 0 ? 0.0 : l * lmass^2
         out_l2 = isfinite(l) ? 2 * (l * p_l + lp_ml) * lmass : 0.0
         out_l3 = isfinite(l) ? _logis_out(l) : 0.0
@@ -194,7 +196,7 @@ function _crps_gtclogis_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real
     if isfinite(u) || umass != 0
         (umass < 0 || umass > 1) && return NaN
         p_u = logistic(u)
-        lp_mu = log1p(-p_u)       # log F(-u)
+        lp_mu = -log1pexp(u)      # log F(-u), finite for all u
         out_u1 = umass == 0 ? 0.0 : u * umass^2
         out_u2 = isfinite(u) ? 2 * (u * p_u + lp_mu) * umass : 0.0
         out_u3 = isfinite(u) ? _logis_out(u) : 1.0
@@ -210,7 +212,7 @@ function _crps_gtclogis_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real
     b = out_u3 - out_l3
     b == 0 && return NaN
 
-    lp_mz = log1p(-logistic(z))   # log F(-z)
+    lp_mz = -log1pexp(z)          # log F(-z), finite for all z
 
     out = out_u1 - out_l1 -
           (z * ((1 - 2 * lmass) * p_u + (1 - 2 * umass) * p_l) +

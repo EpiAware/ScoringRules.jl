@@ -101,6 +101,20 @@ g$crps <- crps_clogis(g$y, location = g$location, scale = g$scale,
                       lower = g$lower, upper = g$upper)
 write_ref("clogis", g)
 
+## ---- generalised truncated/censored logistic -------------------------------
+g <- grid(location = c(0, 1.5), scale = c(0.5, 2),
+          lower = c(-Inf, -1, 0), upper = c(Inf, 2),
+          lmass = c(0, 0.1), umass = c(0, 0.2),
+          y = c(-2, 0, 1, 4))
+g <- g[g$lower < g$upper, ]
+# point masses only make sense at finite bounds
+g <- g[!(is.infinite(g$lower) & g$lmass != 0), ]
+g <- g[!(is.infinite(g$upper) & g$umass != 0), ]
+g$crps <- crps_gtclogis(g$y, location = g$location, scale = g$scale,
+                        lower = g$lower, upper = g$upper,
+                        lmass = g$lmass, umass = g$umass)
+write_ref("gtclogis", g)
+
 ## ---- Student-t ------------------------------------------------------------
 g <- grid(df = c(2, 3, 10, 30), location = c(-1, 0, 2), scale = c(0.5, 1, 3),
           y = c(-5, -1, 0, 1, 5))
@@ -129,6 +143,20 @@ g$crps <- crps_ct(g$y, df = g$df, location = g$location, scale = g$scale,
                   lower = g$lower, upper = g$upper)
 write_ref("ct", g)
 
+## ---- generalised truncated/censored Student-t ------------------------------
+g <- grid(df = c(3, 10), location = c(0, 1), scale = c(1, 2),
+          lower = c(-Inf, -1, 0), upper = c(Inf, 2),
+          lmass = c(0, 0.1), umass = c(0, 0.2),
+          y = c(-2, 0, 1, 4))
+g <- g[g$lower < g$upper, ]
+# point masses only make sense at finite bounds
+g <- g[!(is.infinite(g$lower) & g$lmass != 0), ]
+g <- g[!(is.infinite(g$upper) & g$umass != 0), ]
+g$crps <- crps_gtct(g$y, df = g$df, location = g$location, scale = g$scale,
+                    lower = g$lower, upper = g$upper,
+                    lmass = g$lmass, umass = g$umass)
+write_ref("gtct", g)
+
 ## ---- Laplace --------------------------------------------------------------
 g <- grid(location = c(-2, 0, 3), scale = c(0.5, 1, 3),
           y = c(-5, -1, 0, 1, 5, 10))
@@ -144,6 +172,13 @@ g$crps <- crps_exp(g$y, rate = g$rate)
 g$logs <- logs_exp(g$y, rate = g$rate)
 g$dss  <- dss_exp(g$y, rate = g$rate)
 write_ref("exponential", g)
+
+## ---- exponential with a point mass at its location -------------------------
+g <- grid(location = c(0, 0.5, 2), scale = c(0.5, 1, 2),
+          mass = c(0, 0.1, 0.4),
+          y = c(-1, 0, 0.5, 1, 3, 6))
+g$crps <- crps_expM(g$y, location = g$location, scale = g$scale, mass = g$mass)
+write_ref("exp_mass", g)
 
 ## ---- Gamma ----------------------------------------------------------------
 g <- grid(shape = c(0.5, 1, 2, 5), scale = c(0.5, 1, 3),
@@ -169,6 +204,15 @@ g$crps <- crps_unif(g$y, min = g$min, max = g$max)
 g$logs <- logs_unif(g$y, min = g$min, max = g$max)
 g$dss  <- dss_unif(g$y, min = g$min, max = g$max)
 write_ref("unif", g)
+
+## ---- uniform with boundary masses ------------------------------------------
+g <- grid(min = c(-2, 0, 1), max = c(0, 1, 5),
+          lmass = c(0, 0.15), umass = c(0, 0.3),
+          y = c(-3, -1, 0, 0.5, 2, 6))
+g <- g[g$min < g$max, ]
+g$crps <- crps_unif(g$y, min = g$min, max = g$max,
+                    lmass = g$lmass, umass = g$umass)
+write_ref("unif_mass", g)
 
 ## ---- Log-normal -----------------------------------------------------------
 g <- grid(meanlog = c(-1, 0, 1), sdlog = c(0.25, 0.5, 1),
@@ -199,6 +243,15 @@ g$crps <- crps_gpd(g$y, shape = g$shape, location = g$location, scale = g$scale)
 g$logs <- logs_gpd(g$y, shape = g$shape, location = g$location, scale = g$scale)
 g$dss  <- dss_gpd(g$y, shape = g$shape, location = g$location, scale = g$scale)
 write_ref("gpd", g)
+
+## ---- GPD with a point mass at its location ---------------------------------
+g <- grid(shape = c(-0.5, 0.0, 0.2, 0.9),
+          location = c(0, 1), scale = c(0.5, 2),
+          mass = c(0.1, 0.3),
+          y = c(-0.5, 0, 0.5, 1, 2, 5))
+g$crps <- crps_gpd(g$y, shape = g$shape, location = g$location,
+                   scale = g$scale, mass = g$mass)
+write_ref("gpd_mass", g)
 
 ## ---- Mixture of normals ---------------------------------------------------
 # Fixed collection of 2-component and 3-component mixtures, stored in long form.
