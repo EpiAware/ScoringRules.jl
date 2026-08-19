@@ -16,13 +16,39 @@ Lerch and Allen). See the README for attribution and provenance.
   (the log-logistic uses `Distributions.LogLogistic`).
 - Sample/ensemble forecasts: `crps` (empirical and kernel-density), `logs`,
   `dss` on vectors; the energy score `es`, variogram score `vs` and
-  maximum-mean-discrepancy score `mmds` on multivariate ensembles.
+  maximum-mean-discrepancy score `mmds` on multivariate ensembles. The sample
+  `crps` (`method = :edf`) and `dss` take optional member weights `w`, matching
+  R's `crps_sample` and `dss_sample`. All three multivariate scores also take
+  optional member weights `w`, matching R. The pairwise `d × d` weight matrix of
+  `vs` is named `w_vs` (as in R); it was briefly exposed as `w`, so any early
+  code passing a matrix via `w` must switch to `w_vs`. Unlike R's `vs_sample`,
+  which ignores `w_vs` when member weights are given, `vs` honours both together.
 - Threshold- and outcome-weighted scores (`twcrps`, `owcrps`, `twes`, `owes`,
-  `twvs`, `owvs`, `twmmds`, `owmmds`).
+  `twvs`, `owvs`, `twmmds`, `owmmds`), all with optional member weights `w`:
+  the tw\* scores weight the chained ensemble, and in the ow\* scores the
+  outcome weights multiply the member weights, as in R.
+- Censored and conditional likelihood scores (`clogs`) of Diks et al. (2011).
 - Quantile and interval scores (`quantile_score`, `interval_score`), the ranked
-  probability score `rps`, and the moment-based `dss_moments`.
+  probability score `rps`, and the moment-based `dss_moments` and `ess_moments`
+  (error-spread score of Christensen, Moroz and Palmer 2015).
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
   suite.
+- `dss` returns `NaN` whenever the forecast variance is not finite and
+  positive (for example t with `df ≤ 2`, GEV/GPD with `shape ≥ 1/2`,
+  log-Laplace with `σ ≥ 1/2`, log-logistic with `β ≤ 2`), matching R.
+- `owcrps` returns `NaN` when no ensemble member has positive weight, matching
+  R and the multivariate outcome-weighted scores.
+- The sample quantile helper behind `quantile_score(dat, y; ...)` and
+  `interval_score(dat, y; ...)` mirrors the index fuzz of R's
+  `stats::quantile`, so quantile levels whose `n * p` lands just below an
+  integer in floating point (e.g. `0.5 * (1 - 0.9)` at `n = 500`) pick the
+  same order statistic as R.
+- Closed-form CRPS is automatic-differentiation-safe for the Student-t, beta,
+  log-logistic, gamma, GEV and Poisson families, whose CDFs route through
+  `EpiAwareADTools` AD-safe primitives so gradients propagate dual numbers
+  instead of hitting the non-differentiable `beta_inc`/`gamma_inc`. The
+  per-backend AD test matrix (ForwardDiff, ReverseDiff, Enzyme, Mooncake)
+  exercises real score gradients over these families.
 
 This file tracks notes for major releases and significant milestones; GitHub
 Releases (auto-generated from merged PRs) cover every release in between.

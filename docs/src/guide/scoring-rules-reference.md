@@ -1,8 +1,8 @@
 # [Scoring rules reference](@id scoring-rules-reference)
 
 This page covers the multivariate ensemble scores, the weighted (threshold- and
-outcome-weighted) extensions, the quantile and interval scores, and the ranked
-probability score. All functions follow the **lower-is-better** convention.
+outcome-weighted) extensions, the censored and conditional likelihood scores,
+the quantile and interval scores, and the ranked probability score. All functions follow the **lower-is-better** convention.
 
 For the three main univariate scores (`crps`, `logs`, `dss`) see
 [Getting started](@ref getting-started) and
@@ -53,8 +53,9 @@ structure between the forecast ensemble and the observation:
   \bigl(|y_k - y_l|^p - \overline{|X_{k,\cdot} - X_{l,\cdot}|^p}\bigr)^2
 ```
 
-The default order is ``p = 0.5``; a ``d \times d`` non-negative symmetric
-weight matrix ``w_{kl}`` can be supplied.
+The default order is ``p = 0.5``. A ``d \times d`` non-negative symmetric
+pairwise weight matrix ``w_{kl}`` can be supplied as `w_vs`, and per-member
+weights as `w` (as for `es`).
 
 ```@example ref
 vs(X, y)            # default order p = 0.5
@@ -62,6 +63,11 @@ vs(X, y)            # default order p = 0.5
 
 ```@example ref
 vs(X, y; p = 1.0)   # order p = 1
+```
+
+```@example ref
+w_vs = [1 / (1 + abs(k - l)) for k in 1:d, l in 1:d]
+vs(X, y; w = w, w_vs = w_vs)
 ```
 
 ### MMD score
@@ -74,6 +80,10 @@ The maximum-mean-discrepancy score uses a Gaussian kernel ``k(x, z) = \exp(-\tfr
 
 ```@example ref
 mmds(X, y)
+```
+
+```@example ref
+mmds(X, y; w = w)   # per-member weights
 ```
 
 ## Weighted scores
@@ -109,6 +119,30 @@ owcrps(dat, y1d; a = 1.0)
 twcrps(dat, y1d; chain_func = z -> max(z, 0.0))
 ```
 
+### Censored and conditional likelihood scores
+
+`clogs` computes the censored (`cens = true`, the default) and conditional
+(`cens = false`) likelihood scores of Diks, Panchenko & van Dijk (2011),
+based on a Gaussian kernel density estimate ``\hat{f}`` of the ensemble and
+the window ``(a, b)``, with ``P = \hat{F}(b) - \hat{F}(a)`` the estimated
+probability of the window.
+
+The **censored** score treats all outcomes outside the window as a single
+event: it is ``-\log \hat{f}(y)`` inside the window and ``-\log(1 - P)``
+outside. The **conditional** score is ``-\log(\hat{f}(y)/P)`` inside the
+window and ``0`` outside.
+
+```@example ref
+clogs(dat, y1d; a = 1.0)                 # censored likelihood score
+```
+
+```@example ref
+clogs(dat, y1d; a = 1.0, cens = false)   # conditional likelihood score
+```
+
+With the default unbounded window, `clogs` reduces to the KDE-based `logs`;
+the bandwidth can be set via `bw` (Silverman's rule-of-thumb by default).
+
 ### Threshold- and outcome-weighted energy score
 
 ```@example ref
@@ -142,7 +176,10 @@ owmmds(X, y; a = 0.0)
 
 For multivariate weighted scores, `a` and `b` can be scalars (broadcast to
 all dimensions) or length-`d` vectors. A custom `chain_func` or `weight_func`
-can be supplied when the default interval-based functions do not suit.
+can be supplied when the default interval-based functions do not suit. All
+weighted scores also take per-member weights `w`: the `tw*` scores weight the
+chained ensemble, and the `ow*` scores multiply the outcome weights by the
+member weights, as in R.
 
 ## Quantile and interval scores
 
@@ -211,6 +248,7 @@ rps(p, 1)
 
 - Jordan, A., Krüger, F., & Lerch, S. (2019). Evaluating Probabilistic Forecasts with scoringRules. *Journal of Statistical Software*, 90(12), 1–37. [doi:10.18637/jss.v090.i12](https://doi.org/10.18637/jss.v090.i12)
 - Allen, S. (2024). Weighted scoringRules: Emphasizing Particular Outcomes When Evaluating Probabilistic Forecasts. *Journal of Statistical Software*, 110(8), 1–26. [doi:10.18637/jss.v110.i08](https://doi.org/10.18637/jss.v110.i08)
+- Diks, C., Panchenko, V., & van Dijk, D. (2011). Likelihood-based scoring rules for comparing density forecasts in tails. *Journal of Econometrics*, 163, 215–230. [doi:10.1016/j.jeconom.2011.04.001](https://doi.org/10.1016/j.jeconom.2011.04.001)
 - Gneiting, T. & Raftery, A. E. (2007). Strictly Proper Scoring Rules, Prediction, and Estimation. *JASA*, 102, 359–378.
 - Scheuerer, M. & Hamill, T. M. (2015). Variogram-based proper scoring rules for probabilistic forecasts of multivariate quantities. *Monthly Weather Review*, 143, 1321–1334.
 - Epstein, E. S. (1969). A scoring system for probability forecasts of ranked categories. *Journal of Applied Meteorology and Climatology*, 8, 985–987.
