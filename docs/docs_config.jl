@@ -50,7 +50,7 @@ const FORCE_STUB_TUTORIALS = String[]
 # kit scaffolds packages outside the org too, and they should carry no EpiAware
 # branding. Set `true` in an EpiAware org package; the content it turns on is
 # kit-managed and re-synced, so only this line is package-owned.
-const ORG_BRANDING = false
+const ORG_BRANDING = true
 
 # Regexes for URLs to skip during the (full-build) linkcheck, e.g. a page
 # published by a separate workflow that is not yet live.
