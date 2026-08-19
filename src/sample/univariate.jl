@@ -33,8 +33,11 @@ export clogs
 # infinite and negative weights too; the positive-sum requirement is stricter
 # than R, which returns NaN for an all-zero weight vector.
 function _check_member_weights(dat::AbstractVector, w::AbstractVector)
-    axes(dat) == axes(w) || throw(DimensionMismatch(
-        "dat and w must have the same axes"))
+    axes(dat) == axes(w) || throw(
+        DimensionMismatch(
+            "dat and w must have the same axes"
+        )
+    )
     all(x -> isfinite(x) && x >= 0, w) ||
         throw(ArgumentError("weights w must be finite and non-negative"))
     sum(w) > 0 || throw(ArgumentError("weights w must have a positive sum"))
@@ -151,8 +154,10 @@ dat = randn(100)
 crps(dat, 0.5)
 ```
 """
-function crps(dat::AbstractVector{<:Real}, y::Real;
-        method::Symbol = :edf, w = nothing, bw = nothing)
+function crps(
+        dat::AbstractVector{<:Real}, y::Real;
+        method::Symbol = :edf, w = nothing, bw = nothing
+    )
     if method === :edf
         if w === nothing
             return _crps_edf_unweighted(y, dat)
@@ -161,7 +166,7 @@ function crps(dat::AbstractVector{<:Real}, y::Real;
         end
     elseif method === :kde
         w === nothing ||
-            @warn "the `w` argument is ignored for method = :kde" maxlog=1
+            @warn "the `w` argument is ignored for method = :kde" maxlog = 1
         return _crps_kde(y, dat, bw)
     else
         throw(ArgumentError("method must be :edf or :kde, got :$method"))
@@ -257,8 +262,10 @@ dat = randn(100)
 clogs(dat, 0.5; a = 0.0, b = 1.0)
 ```
 """
-function clogs(dat::AbstractVector{<:Real}, y::Real;
-        a::Real = -Inf, b::Real = Inf, bw = nothing, cens::Bool = true)
+function clogs(
+        dat::AbstractVector{<:Real}, y::Real;
+        a::Real = -Inf, b::Real = Inf, bw = nothing, cens::Bool = true
+    )
     a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     n = length(dat)
