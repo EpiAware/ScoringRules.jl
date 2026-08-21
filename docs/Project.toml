@@ -36,7 +36,7 @@ ScoringRules = {path = ".."}
 ADFixtures = {path = "../test/ADFixtures"}
 
 [compat]
-EpiAwarePackageTools = "=0.3.0"
+EpiAwarePackageTools = "=0.3.0, 0.4"
 AlgebraOfGraphics = "0.13"
 CairoMakie = "0.15"
 Chairmarks = "1"
