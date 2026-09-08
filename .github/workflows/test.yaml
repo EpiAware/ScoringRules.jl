@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   test:
-    uses: EpiAware/.github/.github/workflows/tests.yml@8c1e09003b9cf0d2eb3cbec7aa726855bb365ac5
+    uses: EpiAware/.github/.github/workflows/tests.yml@2c7ce73459772f11dad46ac7f456e35f0d296faf
     with:
       # The managed standard needs Julia 1.11: `[sources]` (how test/Project.toml
       # pins the kit to main) is a Pkg 1.11 feature, and on 1.10 it is silently
