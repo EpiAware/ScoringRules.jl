@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 231" width="200" height="231">
+  <!-- ScoringRules.jl logo: the CRPS picture (forecast CDF vs the observation's
+       step function, area between them shaded) inside the Julia-package hexagon,
+       styled to match the EpiAware / epiforecasts ecosystem. -->
+  <defs>
+    <linearGradient id="crps" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#4063d8" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#389826" stop-opacity="0.55"/>
+    </linearGradient>
+  </defs>
+
+  <!-- hexagon frame -->
+  <path d="M100 3 L8 60.75 L8 170.25 L100 228 L192 170.25 L192 60.75 Z"
+        fill="#1a1a2e" stroke="#e8e8f0" stroke-width="5" stroke-linejoin="round"/>
+
+  <!-- CRPS area between the CDF and the step -->
+  <path d="M55 165 C 90 165, 92 72, 145 72 L 100 72 L 100 165 Z"
+        fill="url(#crps)"/>
+
+  <!-- forecast CDF F(x) -->
+  <path d="M55 165 C 90 165, 92 72, 145 72"
+        fill="none" stroke="#4063d8" stroke-width="8"
+        stroke-linecap="round"/>
+
+  <!-- observation step function 1{x >= y} -->
+  <path d="M55 165 L 100 165 L 100 72 L 145 72"
+        fill="none" stroke="#cb3c33" stroke-width="6.5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- the observation y -->
+  <circle cx="100" cy="165" r="8" fill="#cb3c33" stroke="#1a1a2e" stroke-width="2.5"/>
+</svg>
