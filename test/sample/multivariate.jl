@@ -1,7 +1,7 @@
-@testitem "sample multivariate scores match R scoringRules" setup=[References] begin
+@testitem "sample multivariate scores match R scoringRules" setup = [References] begin
     using ScoringRules
-    atol = 1e-9
-    rtol = 1e-7
+    atol = 1.0e-9
+    rtol = 1.0e-7
 
     # Load a d×m ensemble from a CSV where each row is a dimension and each
     # column is a member (R stores the matrix row-major, d rows × m cols).
@@ -23,7 +23,7 @@
     ys_mv = [
         [0.0, 0.0, 0.0],
         [1.0, -1.0, 0.5],
-        [-2.0, 2.0, -1.0]
+        [-2.0, 2.0, -1.0],
     ]
 
     c, n = References.load("sample_mv_scores")
@@ -37,7 +37,7 @@
             ref = c["es"][i]
             # es does not depend on p_vs; only check once per (ens, y) combo.
             c["p_vs"][i] == 0.5 || continue
-            @test es(X, y)≈ref atol=atol rtol=rtol
+            @test es(X, y) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -49,7 +49,7 @@
             y = ys_mv[yid]
             p = c["p_vs"][i]
             ref = c["vs"][i]
-            @test vs(X, y; p = p)≈ref atol=atol rtol=rtol
+            @test vs(X, y; p = p) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -62,15 +62,15 @@
             ref = c["mmds"][i]
             # mmds does not depend on p_vs; check once per (ens, y) combo.
             c["p_vs"][i] == 0.5 || continue
-            @test mmds(X, y)≈ref atol=atol rtol=rtol
+            @test mmds(X, y) ≈ ref atol = atol rtol = rtol
         end
     end
 end
 
-@testitem "member-weighted multivariate scores match R scoringRules" setup=[References] begin
+@testitem "member-weighted multivariate scores match R scoringRules" setup = [References] begin
     using ScoringRules
-    atol = 1e-9
-    rtol = 1e-7
+    atol = 1.0e-9
+    rtol = 1.0e-7
 
     function load_mv_ens(id::Int)
         c, nrows = References.load("ens_mv_$id")
@@ -88,7 +88,7 @@ end
     ys_mv = [
         [0.0, 0.0, 0.0],
         [1.0, -1.0, 0.5],
-        [-2.0, 2.0, -1.0]
+        [-2.0, 2.0, -1.0],
     ]
 
     # Deterministic member-weight vectors, mirroring generate_references.R.
@@ -110,9 +110,9 @@ end
             y = ys_mv[Int(c["y_id"][i])]
             wv = member_w(size(X, 2), Int(c["w_id"][i]))
             p = c["p_vs"][i]
-            @test es(X, y; w = wv)≈c["es"][i] atol=atol rtol=rtol
-            @test vs(X, y; p = p, w = wv)≈c["vs"][i] atol=atol rtol=rtol
-            @test mmds(X, y; w = wv)≈c["mmds"][i] atol=atol rtol=rtol
+            @test es(X, y; w = wv) ≈ c["es"][i] atol = atol rtol = rtol
+            @test vs(X, y; p = p, w = wv) ≈ c["vs"][i] atol = atol rtol = rtol
+            @test mmds(X, y; w = wv) ≈ c["mmds"][i] atol = atol rtol = rtol
         end
     end
 
@@ -122,8 +122,8 @@ end
             y = ys_mv[Int(c["y_id"][i])]
             wv = member_w(size(X, 2), Int(c["w_id"][i]))
             p = c["p_vs"][i]
-            @test vs(X, y; p = p, w_vs = wvs)≈c["vs_wvs"][i] atol=atol rtol=rtol
-            @test vs(X, y; p = p, w = wv, w_vs = wvs)≈c["vs_w_wvs"][i] atol=atol rtol=rtol
+            @test vs(X, y; p = p, w_vs = wvs) ≈ c["vs_wvs"][i] atol = atol rtol = rtol
+            @test vs(X, y; p = p, w = wv, w_vs = wvs) ≈ c["vs_w_wvs"][i] atol = atol rtol = rtol
         end
     end
 

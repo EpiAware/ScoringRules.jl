@@ -12,7 +12,7 @@
 # Light tutorials emit `@example` blocks that Documenter runs in-process; keep
 # cheap tutorials here.
 const LIGHT_TUTORIALS = String[
-    "evaluating-forecasts.jl"
+    "evaluating-forecasts.jl",
 ]
 
 # Heavy tutorials (live MCMC fits, multi-backend AD, plotting) are each
@@ -21,7 +21,7 @@ const LIGHT_TUTORIALS = String[
 # `ad = true`: the page itself is kit-managed (re-applied on every sync); only
 # this registration is package-owned.
 const HEAVY_TUTORIALS = String[
-    "ad-backends.jl"
+    "ad-backends.jl",
 ]
 
 # Where the tutorial `.jl` sources and rendered `.md` pages live, relative to
@@ -33,7 +33,7 @@ const TUTORIALS_SUBDIR = joinpath("getting-started", "tutorials")
 # `"# [Title](@id my-anchor)"`) so cross-references from other pages still
 # resolve in a fast build.
 const TUTORIAL_STUBS = Pair{String, String}[
-    "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)"
+    "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)",
 ]
 
 # Heavy tutorials that always render from their `TUTORIAL_STUBS` heading and
@@ -57,7 +57,7 @@ const ORG_BRANDING = true
 const LINKCHECK_IGNORE = Regex[
     # The docs site's own URLs 404 until the first successful deploy exists.
     r"^https://epiaware\.org/ScoringRules\.jl",
-    r"^https://github\.com/EpiAware/\.github/blob/main/CODE_OF_CONDUCT\.md"
+    r"^https://github\.com/EpiAware/\.github/blob/main/CODE_OF_CONDUCT\.md",
 ]
 
 # README -> index.md link rewrites: `from => to` pairs applied line by line,

@@ -27,11 +27,15 @@ end
 
 function crps(
         d::BoundaryMass{
-            <:Real, <:Distributions.LocationScale{<:Real, Continuous, <:TDist}},
-        y::Real)
+            <:Real, <:Distributions.LocationScale{<:Real, Continuous, <:TDist},
+        },
+        y::Real
+    )
     inner = d.dist
-    return _crps_gtct(y, dof(inner.ρ), inner.μ, inner.σ,
-        d.lower, d.upper, d.lmass, d.umass)
+    return _crps_gtct(
+        y, dof(inner.ρ), inner.μ, inner.σ,
+        d.lower, d.upper, d.lmass, d.umass
+    )
 end
 
 # --- uniform with boundary masses -------------------------------------------
@@ -65,7 +69,7 @@ end
 function crps(d::BoundaryMass{<:Real, <:GeneralizedPareto}, y::Real)
     μ, σ, ξ = params(d.dist)
     if d.umass == 0 && d.upper >= maximum(d.dist) &&
-       (d.lower == μ || (d.lmass == 0 && d.lower <= μ))
+            (d.lower == μ || (d.lmass == 0 && d.lower <= μ))
         return _crps_gpd(y, ξ, μ, σ, d.lmass)
     end
     return _crps_boundarymass_quad(d, y)

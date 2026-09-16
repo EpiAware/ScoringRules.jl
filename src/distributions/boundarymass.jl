@@ -38,19 +38,25 @@ crps(d, 0.5)
 ```
 """
 struct BoundaryMass{T <: Real, D <: ContinuousUnivariateDistribution} <:
-       ContinuousUnivariateDistribution
+    ContinuousUnivariateDistribution
     dist::D   # base (untruncated) continuous distribution
     lower::T  # lower truncation bound (may be -Inf when lmass == 0)
     upper::T  # upper truncation bound (may be Inf when umass == 0)
     lmass::T  # point mass at `lower` (∈ [0, 1])
     umass::T  # point mass at `upper` (∈ [0, 1], lmass + umass ≤ 1)
-    function BoundaryMass{T, D}(dist::D, lower::T, upper::T, lmass::T,
-            umass::T) where {T <: Real, D <: ContinuousUnivariateDistribution}
+    function BoundaryMass{T, D}(
+            dist::D, lower::T, upper::T, lmass::T,
+            umass::T
+        ) where {T <: Real, D <: ContinuousUnivariateDistribution}
         lower < upper ||
             throw(ArgumentError("lower must be strictly below upper"))
         (lmass >= 0 && umass >= 0 && lmass + umass <= 1) ||
-            throw(DomainError((lmass, umass),
-                "point masses must be nonnegative with lmass + umass ≤ 1"))
+            throw(
+            DomainError(
+                (lmass, umass),
+                "point masses must be nonnegative with lmass + umass ≤ 1"
+            )
+        )
         lmass == 0 || isfinite(lower) ||
             throw(ArgumentError("nonzero lmass requires a finite lower bound"))
         umass == 0 || isfinite(upper) ||
@@ -59,13 +65,19 @@ struct BoundaryMass{T <: Real, D <: ContinuousUnivariateDistribution} <:
     end
 end
 
-function BoundaryMass(dist::ContinuousUnivariateDistribution;
+function BoundaryMass(
+        dist::ContinuousUnivariateDistribution;
         lower::Real = minimum(dist), upper::Real = maximum(dist),
-        lmass::Real = 0, umass::Real = 0)
-    T = promote_type(typeof(lower), typeof(upper), typeof(lmass),
-        typeof(umass), Float64)
-    return BoundaryMass{T, typeof(dist)}(dist, T(lower), T(upper), T(lmass),
-        T(umass))
+        lmass::Real = 0, umass::Real = 0
+    )
+    T = promote_type(
+        typeof(lower), typeof(upper), typeof(lmass),
+        typeof(umass), Float64
+    )
+    return BoundaryMass{T, typeof(dist)}(
+        dist, T(lower), T(upper), T(lmass),
+        T(umass)
+    )
 end
 
 Distributions.params(d::BoundaryMass) = (d.dist, d.lower, d.upper, d.lmass, d.umass)
@@ -85,9 +97,11 @@ _interior_mass(d::BoundaryMass) = 1 - (d.lmass + d.umass)
 # The renormalised continuous part on (lower, upper). Only meaningful when
 # `_interior_mass(d) > 0`; callers guard on that.
 function _interior(d::BoundaryMass)
-    return truncated(d.dist;
+    return truncated(
+        d.dist;
         lower = isfinite(d.lower) ? d.lower : nothing,
-        upper = isfinite(d.upper) ? d.upper : nothing)
+        upper = isfinite(d.upper) ? d.upper : nothing
+    )
 end
 
 function Distributions.pdf(d::BoundaryMass, x::Real)

@@ -33,9 +33,11 @@ function _crps_2pnorm(y::Real, scale1::Real, scale2::Real, location::Real)
         return abs(yc)
     end
     lhs = _crps_gtcnorm(
-        y_neg, zero(yc), scale1, oftype(yc, -Inf), zero(yc), zero(yc), scale2 / s)
+        y_neg, zero(yc), scale1, oftype(yc, -Inf), zero(yc), zero(yc), scale2 / s
+    )
     rhs = _crps_gtcnorm(
-        y_pos, zero(yc), scale2, zero(yc), oftype(yc, Inf), scale1 / s, zero(yc))
+        y_pos, zero(yc), scale2, zero(yc), oftype(yc, Inf), scale1 / s, zero(yc)
+    )
     return lhs + rhs
 end
 

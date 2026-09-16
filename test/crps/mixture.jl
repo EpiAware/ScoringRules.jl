@@ -1,9 +1,9 @@
-@testitem "mixture of normals scores match R scoringRules" tags=[:crps] setup=[References] begin
+@testitem "mixture of normals scores match R scoringRules" tags = [:crps] setup = [References] begin
     using ScoringRules
     using Distributions
 
-    atol=1e-9
-    rtol=1e-6
+    atol = 1.0e-9
+    rtol = 1.0e-6
 
     @testset "MixtureModel Normal" begin
         c, n = References.load("mixnorm")
@@ -20,9 +20,9 @@
                 weights = [c["w1"][i], c["w2"][i], c["w3"][i]]
             end
             d = MixtureModel(Normal.(means, sds), weights)
-            @test crps(d, y)≈c["crps"][i] atol=atol rtol=rtol
-            @test logs(d, y)≈c["logs"][i] atol=atol rtol=rtol
-            @test dss(d, y)≈c["dss"][i] atol=atol rtol=rtol
+            @test crps(d, y) ≈ c["crps"][i] atol = atol rtol = rtol
+            @test logs(d, y) ≈ c["logs"][i] atol = atol rtol = rtol
+            @test dss(d, y) ≈ c["dss"][i] atol = atol rtol = rtol
         end
     end
 end
