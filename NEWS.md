@@ -14,6 +14,11 @@ Lerch and Allen). See the README for attribution and provenance.
   negative binomial, binomial and hypergeometric discrete families.
 - `LogLaplace`, `TwoPieceNormal` and `TwoPieceExponential` distribution types
   (the log-logistic uses `Distributions.LogLogistic`).
+- `BoundaryMass(dist; lower, upper, lmass, umass)` distribution wrapper for
+  forecasts with free point masses at the truncation bounds, with closed-form
+  `crps` for normal, logistic and (location–scale) Student-t bases and for the
+  point-mass exponential, uniform and generalised Pareto forms; `logs` and
+  `dss` also work on the wrapper (R exposes no logs/dss counterparts).
 - Sample/ensemble forecasts: `crps` (empirical and kernel-density), `logs`,
   `dss` on vectors; the energy score `es`, variogram score `vs` and
   maximum-mean-discrepancy score `mmds` on multivariate ensembles. The sample
