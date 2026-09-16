@@ -47,10 +47,10 @@ function _quantile_hf(x::AbstractVector, p::Real, qtype::Int)
         end
     else
         a, b = qtype == 4 ? (0.0, 1.0) :
-               qtype == 5 ? (0.5, 0.5) :
-               qtype == 6 ? (0.0, 0.0) :
-               qtype == 7 ? (1.0, 1.0) :
-               qtype == 8 ? (1 / 3, 1 / 3) : (3 / 8, 3 / 8)
+            qtype == 5 ? (0.5, 0.5) :
+            qtype == 6 ? (0.0, 0.0) :
+            qtype == 7 ? (1.0, 1.0) :
+            qtype == 8 ? (1 / 3, 1 / 3) : (3 / 8, 3 / 8)
         nppm = a + p * (n + 1 - a - b)
         j = floor(Int, nppm * (1 + fuzz))
         h = nppm - j
@@ -102,13 +102,17 @@ Expanded this gives:
 
 The convention follows *nominal coverage* (not alpha = 1 - coverage).
 """
-@inline function _ints_quantile(y::Real, x_lower::Real, x_upper::Real,
-        target_coverage::Real)
+@inline function _ints_quantile(
+        y::Real, x_lower::Real, x_upper::Real,
+        target_coverage::Real
+    )
     alpha1 = 0.5 * (1 - target_coverage)
     alpha2 = 0.5 * (1 + target_coverage)
     scale = 2 / (1 - target_coverage)
-    return scale * (_qs_quantile(y, x_lower, alpha1) +
-                    _qs_quantile(y, x_upper, alpha2))
+    return scale * (
+        _qs_quantile(y, x_lower, alpha1) +
+            _qs_quantile(y, x_upper, alpha2)
+    )
 end
 
 # ---------------------------------------------------------------------------
@@ -147,15 +151,22 @@ q = [-1.28, 0.0, 1.28]
 quantile_score(levels, q, 1.0)
 ```
 """
-function quantile_score(q_levels::AbstractVector, q_forecasts::AbstractVector,
-        y::Real)
+function quantile_score(
+        q_levels::AbstractVector, q_forecasts::AbstractVector,
+        y::Real
+    )
     length(q_levels) == length(q_forecasts) ||
-        throw(DimensionMismatch(
-            "q_levels and q_forecasts must have the same length"))
+        throw(
+        DimensionMismatch(
+            "q_levels and q_forecasts must have the same length"
+        )
+    )
     all(a -> 0 < a < 1, q_levels) ||
         throw(ArgumentError("all quantile levels must lie strictly in (0, 1)"))
-    return [_qs_quantile(y, q_forecasts[i], q_levels[i])
-            for i in eachindex(q_levels)]
+    return [
+        _qs_quantile(y, q_forecasts[i], q_levels[i])
+            for i in eachindex(q_levels)
+    ]
 end
 
 # ---------------------------------------------------------------------------
@@ -191,8 +202,10 @@ dat = randn(100)
 quantile_score(dat, 0.5; alpha = 0.9)
 ```
 """
-function quantile_score(dat::AbstractVector, y::Real;
-        alpha::Real, type::Int = 7)
+function quantile_score(
+        dat::AbstractVector, y::Real;
+        alpha::Real, type::Int = 7
+    )
     0 < alpha < 1 || throw(ArgumentError("alpha must lie strictly in (0, 1), got $alpha"))
     q_hat = _quantile_hf(dat, alpha, type)
     return _qs_quantile(y, q_hat, alpha)
@@ -265,8 +278,10 @@ dat = randn(100)
 interval_score(dat, 0.5; level = 0.9)
 ```
 """
-function interval_score(dat::AbstractVector, y::Real;
-        level::Real, type::Int = 7)
+function interval_score(
+        dat::AbstractVector, y::Real;
+        level::Real, type::Int = 7
+    )
     0 < level < 1 || throw(ArgumentError("level must lie strictly in (0, 1), got $level"))
     alpha1 = 0.5 * (1 - level)
     alpha2 = 1 - alpha1

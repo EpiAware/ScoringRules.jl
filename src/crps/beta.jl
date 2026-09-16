@@ -31,7 +31,7 @@ function _crps_beta(y::Real, shape1::Real, shape2::Real, lower::Real, upper::Rea
         lb = logbeta(shape1, shape2)
         c4_log = log(2) - log(shape1) + logbeta(2 * shape1, 2 * shape2) - 2 * lb
         c4 = isfinite(c4_log) ? exp(c4_log) :
-             sqrt(shape2 / (oftype(float(shape1), π) * shape1 * (shape1 + shape2)))
+            sqrt(shape2 / (oftype(float(shape1), π) * shape1 * (shape1 + shape2)))
         return c1 + c2 * (c3 - c4)
     else
         !isfinite(lower) && return oftype(float(y), NaN)

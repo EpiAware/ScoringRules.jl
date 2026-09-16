@@ -1,9 +1,9 @@
-@testitem "sample univariate scores match R scoringRules" setup=[References] begin
+@testitem "sample univariate scores match R scoringRules" setup = [References] begin
     using ScoringRules
     using ScoringRules: _bw_nrd
 
-    atol = 1e-9
-    rtol = 1e-7
+    atol = 1.0e-9
+    rtol = 1.0e-7
 
     # Load a fixed ensemble or weight vector (stored as a 1-row CSV of m columns).
     function load_ens_file(name::AbstractString)
@@ -24,7 +24,7 @@
             dat = ensembles[eid]
             y = c["y"][i]
             ref = c["crps"][i]
-            @test crps(dat, y; method = :edf)≈ref atol=atol rtol=rtol
+            @test crps(dat, y; method = :edf) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -35,7 +35,7 @@
             y = c["y"][i]
             ref = c["crps_kde"][i]
             # KDE bandwidth matching R's bw.nrd may introduce rounding differences.
-            @test crps(dat, y; method = :kde)≈ref atol=atol rtol=1e-6
+            @test crps(dat, y; method = :kde) ≈ ref atol = atol rtol = 1.0e-6
         end
     end
 
@@ -45,7 +45,7 @@
             dat = ensembles[eid]
             y = c["y"][i]
             ref = c["logs"][i]
-            @test logs(dat, y)≈ref atol=atol rtol=1e-6
+            @test logs(dat, y) ≈ ref atol = atol rtol = 1.0e-6
         end
     end
 
@@ -55,7 +55,7 @@
             dat = ensembles[eid]
             y = c["y"][i]
             ref = c["dss"][i]
-            @test dss(dat, y)≈ref atol=atol rtol=rtol
+            @test dss(dat, y) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -70,8 +70,8 @@
             dat = ensembles[eid]
             w = weights[eid]
             y = cw["y"][i]
-            @test crps(dat, y; w = w)≈cw["crps_w"][i] atol=atol rtol=rtol
-            @test dss(dat, y; w = w)≈cw["dss_w"][i] atol=atol rtol=rtol
+            @test crps(dat, y; w = w) ≈ cw["crps_w"][i] atol = atol rtol = rtol
+            @test dss(dat, y; w = w) ≈ cw["dss_w"][i] atol = atol rtol = rtol
         end
     end
 
@@ -96,7 +96,7 @@
     end
 end
 
-@testitem "sample censored/conditional likelihood score matches R scoringRules" setup=[References] begin
+@testitem "sample censored/conditional likelihood score matches R scoringRules" setup = [References] begin
     using ScoringRules
 
     # Load the fixed ensembles (each stored as a 1-row CSV of m columns).
@@ -115,8 +115,8 @@ end
         b = c["b"][i]
         # NaN in the bw column marks R's default (bw.nrd) bandwidth.
         bw = isnan(c["bw"][i]) ? nothing : c["bw"][i]
-        @test clogs(dat, y; a, b, bw, cens = true)≈c["clogs_cens"][i] atol=1e-9 rtol=1e-6
-        @test clogs(dat, y; a, b, bw, cens = false)≈c["clogs_cond"][i] atol=1e-9 rtol=1e-6
+        @test clogs(dat, y; a, b, bw, cens = true) ≈ c["clogs_cens"][i] atol = 1.0e-9 rtol = 1.0e-6
+        @test clogs(dat, y; a, b, bw, cens = false) ≈ c["clogs_cond"][i] atol = 1.0e-9 rtol = 1.0e-6
     end
 end
 
@@ -126,8 +126,8 @@ end
     dat = [-1.2, -0.3, 0.1, 0.8, 1.5]
 
     # Unbounded window: both variants reduce to the plain KDE log score.
-    @test clogs(dat, 0.4)≈logs(dat, 0.4) atol=1e-12
-    @test clogs(dat, 0.4; cens = false)≈logs(dat, 0.4) atol=1e-12
+    @test clogs(dat, 0.4) ≈ logs(dat, 0.4) atol = 1.0e-12
+    @test clogs(dat, 0.4; cens = false) ≈ logs(dat, 0.4) atol = 1.0e-12
 
     # Observation outside the window: conditional score is exactly zero,
     # censored score is the log probability of falling outside.

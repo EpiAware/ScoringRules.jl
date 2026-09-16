@@ -1,9 +1,9 @@
-@testitem "logistic family scores match R scoringRules" tags=[:crps] setup=[References] begin
+@testitem "logistic family scores match R scoringRules" tags = [:crps] setup = [References] begin
     using ScoringRules
     using Distributions
 
-    atol=1e-9
-    rtol=1e-8
+    atol = 1.0e-9
+    rtol = 1.0e-8
 
     _bound(x) = isfinite(x) ? x : nothing
     function trunc_logis(loc, scale, l, u)
@@ -20,9 +20,9 @@
         for i in 1:n
             d = Logistic(c["location"][i], c["scale"][i])
             y = c["y"][i]
-            @test crps(d, y)≈c["crps"][i] atol=atol rtol=rtol
-            @test logs(d, y)≈c["logs"][i] atol=atol rtol=rtol
-            @test dss(d, y)≈c["dss"][i] atol=atol rtol=rtol
+            @test crps(d, y) ≈ c["crps"][i] atol = atol rtol = rtol
+            @test logs(d, y) ≈ c["logs"][i] atol = atol rtol = rtol
+            @test dss(d, y) ≈ c["dss"][i] atol = atol rtol = rtol
         end
     end
 
@@ -34,9 +34,9 @@
             ref_crps = c["crps"][i]
             ref_logs = c["logs"][i]
             isnan(ref_crps) && continue
-            @test crps(d, y)≈ref_crps atol=atol rtol=rtol
+            @test crps(d, y) ≈ ref_crps atol = atol rtol = rtol
             (isnan(ref_logs) || isinf(ref_logs)) && continue
-            @test logs(d, y)≈ref_logs atol=atol rtol=rtol
+            @test logs(d, y) ≈ ref_logs atol = atol rtol = rtol
         end
     end
 
@@ -47,7 +47,7 @@
             y = c["y"][i]
             ref_crps = c["crps"][i]
             isnan(ref_crps) && continue
-            @test crps(d, y)≈ref_crps atol=atol rtol=rtol
+            @test crps(d, y) ≈ ref_crps atol = atol rtol = rtol
         end
     end
 end

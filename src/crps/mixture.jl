@@ -14,10 +14,12 @@ CRPS of a finite Gaussian mixture forecast at observation `y`.
 `weights` is a vector of non-negative mixture weights (need not sum to 1 —
 they are normalised internally, matching the R implementation).
 """
-function _crps_mixnorm(y::Real,
+function _crps_mixnorm(
+        y::Real,
         means::AbstractVector{<:Real},
         sds::AbstractVector{<:Real},
-        weights::AbstractVector{<:Real})
+        weights::AbstractVector{<:Real}
+    )
     N = length(means)
     W = zero(float(y))
     crps1 = zero(float(y))
@@ -35,8 +37,10 @@ function _crps_mixnorm(y::Real,
         # Off-diagonal contributions j < i
         si2 = si^2
         for j in 1:(i - 1)
-            crps3 += weights[j] * _auxcrps(means[i] - means[j],
-                sqrt(si2 + sds[j]^2))
+            crps3 += weights[j] * _auxcrps(
+                means[i] - means[j],
+                sqrt(si2 + sds[j]^2)
+            )
         end
         crps2 += wi * crps3
     end

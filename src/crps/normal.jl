@@ -154,13 +154,16 @@ function _crps_gtcnorm_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real)
     (a2 < 0 || a2 > 1) && return NaN
     b = out_u3 - out_l3
     out = out_u1 - out_l1 +
-          (z * (2 * a2 * _norm_cdf(z) - (1 - 2 * lmass) * p_u - (1 - 2 * umass) * p_l) +
-           (2 * _norm_pdf(z) - out_u2 - out_l2 - a2 * b / a1 * _INV_SQRTPI) * a2) / a1
+        (
+        z * (2 * a2 * _norm_cdf(z) - (1 - 2 * lmass) * p_u - (1 - 2 * umass) * p_l) +
+            (2 * _norm_pdf(z) - out_u2 - out_l2 - a2 * b / a1 * _INV_SQRTPI) * a2
+    ) / a1
     return out + abs(y - z)
 end
 
 function _crps_gtcnorm(
-        y::Real, μ::Real, σ::Real, l::Real, u::Real, lmass::Real, umass::Real)
+        y::Real, μ::Real, σ::Real, l::Real, u::Real, lmass::Real, umass::Real
+    )
     σ < 0 && return oftype(float(y), NaN)
     y -= μ
     isfinite(l) && (l -= μ)
@@ -168,10 +171,12 @@ function _crps_gtcnorm(
     if σ == 0
         if l < 0 && u > 0
             return (min(y, 0) - l) * lmass^2 - min(y, 0) * (1 - lmass)^2 +
-                   (u - max(y, 0)) * umass^2 + max(y, 0) * (1 - umass)^2
+                (u - max(y, 0)) * umass^2 + max(y, 0) * (1 - umass)^2
         end
         return σ * _crps_gtcnorm_unit(y, l, u, lmass, umass)
     end
-    return σ * _crps_gtcnorm_unit(y / σ, isfinite(l) ? l / σ : l,
-        isfinite(u) ? u / σ : u, lmass, umass)
+    return σ * _crps_gtcnorm_unit(
+        y / σ, isfinite(l) ? l / σ : l,
+        isfinite(u) ? u / σ : u, lmass, umass
+    )
 end
