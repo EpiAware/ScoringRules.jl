@@ -30,15 +30,15 @@ crps(Normal(0, 1), 0.5)
 module ScoringRules
 
 using Distributions: Distributions, Beta, Binomial, Censored, Continuous,
-                     ContinuousUnivariateDistribution, DiscreteUnivariateDistribution,
-                     Exponential, Gamma, GeneralizedExtremeValue, GeneralizedPareto,
-                     Hypergeometric, Laplace, LogLogistic, LogNormal,
-                     Logistic, MixtureModel, NegativeBinomial, Normal, Poisson, TDist,
-                     Truncated, Uniform, Univariate, UnivariateDistribution,
-                     ccdf, cdf, components, dof, location, logpdf, params, pdf, probs,
-                     scale, shape
+    ContinuousUnivariateDistribution, DiscreteUnivariateDistribution,
+    Exponential, Gamma, GeneralizedExtremeValue, GeneralizedPareto,
+    Hypergeometric, Laplace, LogLogistic, LogNormal,
+    Logistic, MixtureModel, NegativeBinomial, Normal, Poisson, TDist,
+    Truncated, Uniform, Univariate, UnivariateDistribution,
+    ccdf, cdf, components, dof, location, logpdf, params, pdf, probs,
+    scale, shape
 using SpecialFunctions: erfc, gamma, digamma, logbeta,
-                        besseli, expinti
+    besseli, expinti
 using EpiAwareADTools: cdf_ad_safe, ccdf_ad_safe
 using LogExpFunctions: logistic
 using HypergeometricFunctions: _₂F₁

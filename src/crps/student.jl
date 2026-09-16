@@ -41,7 +41,7 @@ end
 # The constant `bfrac(df)` = 2√df/(df−1) · B(½, df−½) / B(½, df/2)²,
 # shared by all four CRPS formulae once standardised.
 @inline _t_bfrac(df::Real) = 2 * sqrt(df) / (df - 1) *
-                             exp(logbeta(0.5, df - 0.5) - 2 * logbeta(0.5, 0.5 * df))
+    exp(logbeta(0.5, df - 0.5) - 2 * logbeta(0.5, 0.5 * df))
 
 # --- standard t: _crps_t(y, df, location, scale) ------------------------------
 
@@ -127,8 +127,10 @@ end
 # type below.
 function crps(d::Truncated{<:Distributions.LocationScale{<:Real, Continuous, <:TDist}}, y::Real)
     inner = d.untruncated
-    return _crps_tt(y, dof(inner.ρ), inner.μ, inner.σ,
-        _lo(d.lower), _hi(d.upper))
+    return _crps_tt(
+        y, dof(inner.ρ), inner.μ, inner.σ,
+        _lo(d.lower), _hi(d.upper)
+    )
 end
 
 # --- censored t: _crps_ct(y, df, location, scale, lower, upper) --------------
@@ -182,17 +184,25 @@ end
 # Location–scale censored t: `censored(loc + scale*TDist(df), lower, upper)`
 # gives `Censored{LocationScale{…,TDist{…}},…}` — again no public named type.
 function crps(
-        d::Distributions.Censored{<:Distributions.LocationScale{
-            <:Real, Continuous, <:TDist}}, y::Real)
+        d::Distributions.Censored{
+            <:Distributions.LocationScale{
+                <:Real, Continuous, <:TDist,
+            },
+        }, y::Real
+    )
     inner = d.uncensored
-    return _crps_ct(y, dof(inner.ρ), inner.μ, inner.σ,
-        _lo(d.lower), _hi(d.upper))
+    return _crps_ct(
+        y, dof(inner.ρ), inner.μ, inner.σ,
+        _lo(d.lower), _hi(d.upper)
+    )
 end
 
 # --- generalised truncated/censored t: _crps_gtct(..., lmass, umass) ---------
 
-function _crps_gtct_unit(y::Real, df::Real, l::Real, u::Real,
-        lmass::Real, umass::Real)
+function _crps_gtct_unit(
+        y::Real, df::Real, l::Real, u::Real,
+        lmass::Real, umass::Real
+    )
     # Sign-swap for numerical stability when lower > 3.
     if l > 3
         y, l, u = -y, -u, -l
@@ -234,16 +244,24 @@ function _crps_gtct_unit(y::Real, df::Real, l::Real, u::Real,
     b == 0 && return oftype(float(y), NaN)
     G_z = _t_G(z, df)
     out = out_u1 - out_l1 +
-          (z * (2 * a2 * _t_cdf(df, z) -
+        (
+        z * (
+            2 * a2 * _t_cdf(df, z) -
                 (1 - 2 * lmass) * p_u -
-                (1 - 2 * umass) * p_l) -
-           (2 * G_z - out_u2 - out_l2 +
-            a2 * b / a1 * _t_bfrac(df)) * a2) / a1
+                (1 - 2 * umass) * p_l
+        ) -
+            (
+            2 * G_z - out_u2 - out_l2 +
+                a2 * b / a1 * _t_bfrac(df)
+        ) * a2
+    ) / a1
     return out + abs(y - z)
 end
 
-function _crps_gtct(y::Real, df::Real, location::Real, scale::Real,
-        l::Real, u::Real, lmass::Real, umass::Real)
+function _crps_gtct(
+        y::Real, df::Real, location::Real, scale::Real,
+        l::Real, u::Real, lmass::Real, umass::Real
+    )
     scale < 0 && return oftype(float(y), NaN)
     df <= 1 && return oftype(float(y), NaN)
     ys = y - location
@@ -252,7 +270,7 @@ function _crps_gtct(y::Real, df::Real, location::Real, scale::Real,
     if scale == 0
         if ls < 0 && us > 0
             return (min(ys, 0) - ls) * lmass^2 - min(ys, 0) * (1 - lmass)^2 +
-                   (us - max(ys, 0)) * umass^2 + max(ys, 0) * (1 - umass)^2
+                (us - max(ys, 0)) * umass^2 + max(ys, 0) * (1 - umass)^2
         end
         return oftype(float(y), NaN)
     end

@@ -15,8 +15,10 @@
 
     "Load reference table `name` as a `Dict{String, Vector{Float64}}` plus row count."
     function load(name::AbstractString)
-        raw, header = readdlm(joinpath(DATA_DIR, name * ".csv"), ',',
-            Any; header = true)
+        raw, header = readdlm(
+            joinpath(DATA_DIR, name * ".csv"), ',',
+            Any; header = true
+        )
         names = strip.(replace.(vec(header), '"' => ""))
         cols = Dict{String, Vector{Float64}}()
         for (j, nm) in enumerate(names)

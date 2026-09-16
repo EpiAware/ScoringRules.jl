@@ -1,18 +1,18 @@
-@testitem "discrete family scores match R scoringRules" tags=[:crps] setup=[References] begin
+@testitem "discrete family scores match R scoringRules" tags = [:crps] setup = [References] begin
     using ScoringRules
     using Distributions
 
-    atol=1e-9
-    rtol=1e-8
+    atol = 1.0e-9
+    rtol = 1.0e-8
 
     @testset "Poisson" begin
         c, n = References.load("pois")
         for i in 1:n
             d = Poisson(c["lambda"][i])
             y = c["y"][i]
-            @test crps(d, y)≈c["crps"][i] atol=atol rtol=rtol
-            @test logs(d, y)≈c["logs"][i] atol=atol rtol=rtol
-            @test dss(d, y)≈c["dss"][i] atol=atol rtol=rtol
+            @test crps(d, y) ≈ c["crps"][i] atol = atol rtol = rtol
+            @test logs(d, y) ≈ c["logs"][i] atol = atol rtol = rtol
+            @test dss(d, y) ≈ c["dss"][i] atol = atol rtol = rtol
         end
     end
 
@@ -22,9 +22,9 @@
             # Distributions.NegativeBinomial(r, p): r = size (successes), p = prob
             d = NegativeBinomial(c["size"][i], c["prob"][i])
             y = c["y"][i]
-            @test crps(d, y)≈c["crps"][i] atol=atol rtol=rtol
-            @test logs(d, y)≈c["logs"][i] atol=atol rtol=rtol
-            @test dss(d, y)≈c["dss"][i] atol=atol rtol=rtol
+            @test crps(d, y) ≈ c["crps"][i] atol = atol rtol = rtol
+            @test logs(d, y) ≈ c["logs"][i] atol = atol rtol = rtol
+            @test dss(d, y) ≈ c["dss"][i] atol = atol rtol = rtol
         end
     end
 
@@ -33,8 +33,8 @@
         for i in 1:n
             d = Binomial(Int(c["size"][i]), c["prob"][i])
             y = c["y"][i]
-            @test crps(d, y)≈c["crps"][i] atol=atol rtol=rtol
-            @test logs(d, y)≈c["logs"][i] atol=atol rtol=rtol
+            @test crps(d, y) ≈ c["crps"][i] atol = atol rtol = rtol
+            @test logs(d, y) ≈ c["logs"][i] atol = atol rtol = rtol
         end
     end
 
@@ -48,8 +48,8 @@
             k = Int(c["k"][i])
             d = Hypergeometric(m, nblack, k)
             y = c["y"][i]
-            @test crps(d, y)≈c["crps"][i] atol=atol rtol=rtol
-            @test logs(d, y)≈c["logs"][i] atol=atol rtol=rtol
+            @test crps(d, y) ≈ c["crps"][i] atol = atol rtol = rtol
+            @test logs(d, y) ≈ c["logs"][i] atol = atol rtol = rtol
         end
     end
 end

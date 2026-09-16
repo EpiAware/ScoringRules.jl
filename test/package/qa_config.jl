@@ -13,6 +13,12 @@ const QA_CONFIG = (
     # Path to the isolated JET environment (see test/jet/Project.toml).
     jet_env = joinpath(@__DIR__, "..", "jet"),
 
+    # Path to the isolated formatter environment (see
+    # test/formatter/Project.toml). Setting this runs the check against a Runic
+    # pinned to the exact version, rather than whatever version the shared test
+    # environment resolves on the CI Julia in use.
+    formatter_env = joinpath(@__DIR__, "..", "formatter"),
+
     # Per-check Aqua relaxations, e.g. (; ambiguities = false). Empty = all on.
     aqua = (;),
 
@@ -43,5 +49,5 @@ const QA_CONFIG = (
     #      prefixes = ("MyPkg", "SomeTrigger"),
     #      expect_phantoms = false,    # true if a third party adds phantoms
     #      broken = false)             # true to quarantine a known ambiguity
-    extensions = ()
+    extensions = (),
 )

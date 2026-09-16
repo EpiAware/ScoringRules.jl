@@ -87,7 +87,7 @@ function Distributions.cdf(d::TwoPieceNormal, x::Real)
         return 2 * d.scale1 / S * _norm_cdf(z / d.scale1)
     else
         return d.scale1 / S +
-               2 * d.scale2 / S * (_norm_cdf(z / d.scale2) - oftype(float(x), 0.5))
+            2 * d.scale2 / S * (_norm_cdf(z / d.scale2) - oftype(float(x), 0.5))
     end
 end
 

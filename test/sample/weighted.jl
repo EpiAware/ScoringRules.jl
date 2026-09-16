@@ -1,7 +1,7 @@
-@testitem "weighted ensemble scores match R scoringRules" setup=[References] begin
+@testitem "weighted ensemble scores match R scoringRules" setup = [References] begin
     using ScoringRules
-    atol = 1e-9
-    rtol = 1e-7
+    atol = 1.0e-9
+    rtol = 1.0e-7
 
     # ---------- helpers: load ensembles ----------
 
@@ -28,7 +28,7 @@
     ys_mv = [
         [0.0, 0.0, 0.0],
         [1.0, -1.0, 0.5],
-        [-2.0, 2.0, -1.0]
+        [-2.0, 2.0, -1.0],
     ]
 
     # ---------- univariate weighted scores ----------
@@ -43,7 +43,7 @@
             a = c["a"][i]
             b = c["b"][i]
             ref = c["twcrps"][i]
-            @test twcrps(dat, y; a = a, b = b)≈ref atol=atol rtol=rtol
+            @test twcrps(dat, y; a = a, b = b) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -61,7 +61,7 @@
             if isnan(ref)
                 @test isnan(got)
             else
-                @test got≈ref atol=atol rtol=rtol
+                @test got ≈ ref atol = atol rtol = rtol
             end
         end
     end
@@ -79,7 +79,7 @@
             a = cw["a"][i]
             b = cw["b"][i]
             ref = cw["twes"][i]
-            @test twes(X, y; a = a, b = b)≈ref atol=atol rtol=rtol
+            @test twes(X, y; a = a, b = b) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -96,7 +96,7 @@
             if isnan(ref)
                 @test isnan(got)
             else
-                @test got≈ref atol=atol rtol=rtol
+                @test got ≈ ref atol = atol rtol = rtol
             end
         end
     end
@@ -111,7 +111,7 @@
             b = cw["b"][i]
             p = cw["p_vs"][i]
             ref = cw["twvs"][i]
-            @test twvs(X, y; p = p, a = a, b = b)≈ref atol=atol rtol=rtol
+            @test twvs(X, y; p = p, a = a, b = b) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -129,7 +129,7 @@
             if isnan(ref)
                 @test isnan(got)
             else
-                @test got≈ref atol=atol rtol=rtol
+                @test got ≈ ref atol = atol rtol = rtol
             end
         end
     end
@@ -143,7 +143,7 @@
             a = cw["a"][i]
             b = cw["b"][i]
             ref = cw["twmmds"][i]
-            @test twmmds(X, y; a = a, b = b)≈ref atol=atol rtol=rtol
+            @test twmmds(X, y; a = a, b = b) ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -160,7 +160,7 @@
             if isnan(ref)
                 @test isnan(got)
             else
-                @test got≈ref atol=atol rtol=rtol
+                @test got ≈ ref atol = atol rtol = rtol
             end
         end
     end
@@ -195,10 +195,10 @@ end
     @test_throws ArgumentError owcrps(dat, 0.5; weight_func = z -> z)
 end
 
-@testitem "member-weighted tw/ow scores match R scoringRules" setup=[References] begin
+@testitem "member-weighted tw/ow scores match R scoringRules" setup = [References] begin
     using ScoringRules
-    atol = 1e-9
-    rtol = 1e-7
+    atol = 1.0e-9
+    rtol = 1.0e-7
 
     function load_univ_ens(id::Int)
         c, _ = References.load("ens_univ_$id")
@@ -223,7 +223,7 @@ end
     ys_mv = [
         [0.0, 0.0, 0.0],
         [1.0, -1.0, 0.5],
-        [-2.0, 2.0, -1.0]
+        [-2.0, 2.0, -1.0],
     ]
 
     # Deterministic member-weight vectors, mirroring generate_references.R.
@@ -239,7 +239,7 @@ end
         if isnan(ref)
             @test isnan(got)
         else
-            @test got≈ref atol=atol rtol=rtol
+            @test got ≈ ref atol = atol rtol = rtol
         end
     end
 
@@ -252,7 +252,7 @@ end
             a = c["a"][i]
             b = c["b"][i]
             wv = member_w(length(dat), Int(c["w_id"][i]))
-            @test twcrps(dat, y; a = a, b = b, w = wv)≈c["twcrps"][i] atol=atol rtol=rtol
+            @test twcrps(dat, y; a = a, b = b, w = wv) ≈ c["twcrps"][i] atol = atol rtol = rtol
             test_ref(owcrps(dat, y; a = a, b = b, w = wv), c["owcrps"][i])
         end
     end
@@ -267,9 +267,9 @@ end
             b = cw["b"][i]
             p = cw["p_vs"][i]
             wv = member_w(size(X, 2), Int(cw["w_id"][i]))
-            @test twes(X, y; a = a, b = b, w = wv)≈cw["twes"][i] atol=atol rtol=rtol
-            @test twvs(X, y; p = p, a = a, b = b, w = wv)≈cw["twvs"][i] atol=atol rtol=rtol
-            @test twmmds(X, y; a = a, b = b, w = wv)≈cw["twmmds"][i] atol=atol rtol=rtol
+            @test twes(X, y; a = a, b = b, w = wv) ≈ cw["twes"][i] atol = atol rtol = rtol
+            @test twvs(X, y; p = p, a = a, b = b, w = wv) ≈ cw["twvs"][i] atol = atol rtol = rtol
+            @test twmmds(X, y; a = a, b = b, w = wv) ≈ cw["twmmds"][i] atol = atol rtol = rtol
             test_ref(owes(X, y; a = a, b = b, w = wv), cw["owes"][i])
             test_ref(owvs(X, y; p = p, a = a, b = b, w = wv), cw["owvs"][i])
             test_ref(owmmds(X, y; a = a, b = b, w = wv), cw["owmmds"][i])

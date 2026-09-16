@@ -78,9 +78,11 @@ dat = randn(100)
 twcrps(dat, 0.5; a = 0.0, b = 1.0)
 ```
 """
-function twcrps(dat::AbstractVector, y::Real;
+function twcrps(
+        dat::AbstractVector, y::Real;
         a::Real = -Inf, b::Real = Inf,
-        chain_func = nothing, w = nothing)
+        chain_func = nothing, w = nothing
+    )
     if chain_func === nothing
         a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
         v = z -> clamp(z, a, b)
@@ -144,9 +146,11 @@ dat = randn(100)
 owcrps(dat, 0.5; a = 0.0, b = 1.0)
 ```
 """
-function owcrps(dat::AbstractVector, y::Real;
+function owcrps(
+        dat::AbstractVector, y::Real;
         a::Real = -Inf, b::Real = Inf,
-        weight_func = nothing, w = nothing)
+        weight_func = nothing, w = nothing
+    )
     if weight_func === nothing
         a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
         w_func = z -> Float64(a < z < b)
@@ -161,8 +165,11 @@ function owcrps(dat::AbstractVector, y::Real;
     if w === nothing
         w_mem = ones(length(dat))
     else
-        length(w) == length(dat) || throw(DimensionMismatch(
-            "length of w ($(length(w))) must equal the number of ensemble members ($(length(dat)))"))
+        length(w) == length(dat) || throw(
+            DimensionMismatch(
+                "length of w ($(length(w))) must equal the number of ensemble members ($(length(dat)))"
+            )
+        )
         any(<(0), w) && throw(ArgumentError("member weights w must be non-negative"))
         w_mem = w
     end
@@ -193,8 +200,11 @@ function _broadcast_bound(v, d::Int, name::String)
     if v isa Real
         return fill(Float64(v), d)
     else
-        length(v) == d || throw(DimensionMismatch(
-            "bound $name has length $(length(v)) but y has length $d"))
+        length(v) == d || throw(
+            DimensionMismatch(
+                "bound $name has length $(length(v)) but y has length $d"
+            )
+        )
         return Float64.(v)
     end
 end
@@ -243,8 +253,10 @@ y = [0.0, 0.0]
 twes(X, y; a = -1.0, b = 1.0)
 ```
 """
-function twes(X::AbstractMatrix, y::AbstractVector;
-        a = -Inf, b = Inf, chain_func = nothing, w = nothing)
+function twes(
+        X::AbstractMatrix, y::AbstractVector;
+        a = -Inf, b = Inf, chain_func = nothing, w = nothing
+    )
     _check_multiv(X, y)
     d = length(y)
     if chain_func === nothing
@@ -296,8 +308,10 @@ y = [0.0, 0.0]
 owes(X, y; a = -1.0, b = 1.0)
 ```
 """
-function owes(X::AbstractMatrix, y::AbstractVector;
-        a = -Inf, b = Inf, weight_func = nothing, w = nothing)
+function owes(
+        X::AbstractMatrix, y::AbstractVector;
+        a = -Inf, b = Inf, weight_func = nothing, w = nothing
+    )
     _check_multiv(X, y)
     d = length(y)
     if weight_func === nothing
@@ -344,8 +358,10 @@ y = [0.0, 0.0]
 twvs(X, y; a = -1.0, b = 1.0)
 ```
 """
-function twvs(X::AbstractMatrix, y::AbstractVector;
-        p::Real = 0.5, a = -Inf, b = Inf, chain_func = nothing, w = nothing)
+function twvs(
+        X::AbstractMatrix, y::AbstractVector;
+        p::Real = 0.5, a = -Inf, b = Inf, chain_func = nothing, w = nothing
+    )
     _check_multiv(X, y)
     d = length(y)
     if chain_func === nothing
@@ -392,8 +408,10 @@ y = [0.0, 0.0]
 owvs(X, y; a = -1.0, b = 1.0)
 ```
 """
-function owvs(X::AbstractMatrix, y::AbstractVector;
-        p::Real = 0.5, a = -Inf, b = Inf, weight_func = nothing, w = nothing)
+function owvs(
+        X::AbstractMatrix, y::AbstractVector;
+        p::Real = 0.5, a = -Inf, b = Inf, weight_func = nothing, w = nothing
+    )
     _check_multiv(X, y)
     d = length(y)
     if weight_func === nothing
@@ -440,8 +458,10 @@ y = [0.0, 0.0]
 twmmds(X, y; a = -1.0, b = 1.0)
 ```
 """
-function twmmds(X::AbstractMatrix, y::AbstractVector;
-        a = -Inf, b = Inf, chain_func = nothing, w = nothing)
+function twmmds(
+        X::AbstractMatrix, y::AbstractVector;
+        a = -Inf, b = Inf, chain_func = nothing, w = nothing
+    )
     _check_multiv(X, y)
     d = length(y)
     if chain_func === nothing
@@ -488,8 +508,10 @@ y = [0.0, 0.0]
 owmmds(X, y; a = -1.0, b = 1.0)
 ```
 """
-function owmmds(X::AbstractMatrix, y::AbstractVector;
-        a = -Inf, b = Inf, weight_func = nothing, w = nothing)
+function owmmds(
+        X::AbstractMatrix, y::AbstractVector;
+        a = -Inf, b = Inf, weight_func = nothing, w = nothing
+    )
     _check_multiv(X, y)
     d = length(y)
     if weight_func === nothing

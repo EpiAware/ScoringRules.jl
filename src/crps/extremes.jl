@@ -11,7 +11,7 @@
 
 # Below this |shape| the general closed forms are numerically unstable, so the
 # analytic limit (Gumbel for GEV, exponential for GPD) is used instead.
-const _SHAPE_ATOL = 1e-12
+const _SHAPE_ATOL = 1.0e-12
 
 # ---------------------------------------------------------------------------
 # GEV
@@ -35,7 +35,7 @@ function _crps_gev(y::Real, shape::Real, location::Real = 0.0, scale::Real = 1.0
         # out = -y_std - γ_E - log 2 - 2·Ei(-exp(-y_std))
         # where γ_E = -digamma(1)
         -y_std - digamma(one(float(y_std))) - log(oftype(float(y_std), 2)) -
-        2 * expinti(-exp(-y_std))
+            2 * expinti(-exp(-y_std))
     else
         # General case
         x_inner = 1 + shape * y_std
@@ -68,9 +68,11 @@ in closed form (Friederichs & Thorarinsdottir 2012). Shape must be < 1.
 `mass` is an optional point mass at the location (lower boundary); it is
 retained for internal use but not exposed through the Distributions dispatch.
 """
-function _crps_gpd(y::Real, shape::Real,
+function _crps_gpd(
+        y::Real, shape::Real,
         location::Real = 0.0, scale::Real = 1.0,
-        mass::Real = 0.0)
+        mass::Real = 0.0
+    )
     scale < 0 && return oftype(float(y), NaN)
     shape >= 1 && return oftype(float(y), NaN)
     (mass < 0 || mass > 1) && return oftype(float(y), NaN)
