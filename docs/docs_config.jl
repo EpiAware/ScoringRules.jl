@@ -17,12 +17,9 @@ const LIGHT_TUTORIALS = String[
 
 # Heavy tutorials (live MCMC fits, multi-backend AD, plotting) are each
 # executed once in a fresh subprocess so native/memory state cannot accumulate.
-# The `ad-backends.jl` entry is seeded when the package is scaffolded with
-# `ad = true`: the page itself is kit-managed (re-applied on every sync); only
-# this registration is package-owned.
-const HEAVY_TUTORIALS = String[
-    "ad-backends.jl",
-]
+# The AD-backends tutorial retired in favour of the `ad-comparison` benchmark
+# page below, so this starts empty; add package-owned heavy tutorials here.
+const HEAVY_TUTORIALS = String[]
 
 # Where the tutorial `.jl` sources and rendered `.md` pages live, relative to
 # `docs/src`.
@@ -32,8 +29,19 @@ const TUTORIALS_SUBDIR = joinpath("getting-started", "tutorials")
 # heading should preserve the tutorial's `@id` (e.g.
 # `"# [Title](@id my-anchor)"`) so cross-references from other pages still
 # resolve in a fast build.
-const TUTORIAL_STUBS = Pair{String, String}[
-    "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)",
+const TUTORIAL_STUBS = Pair{String, String}[]
+
+# Heavy pages under `docs/src/benchmarks/`, same convention as
+# `HEAVY_TUTORIALS`/`TUTORIAL_STUBS` above but their own nav group. The
+# `ad-comparison.jl` entry is seeded when the package is scaffolded with
+# `ad = true`: the page itself is kit-managed; only this registration is
+# package-owned.
+const HEAVY_BENCHMARKS = String[
+    "ad-comparison.jl",
+]
+
+const BENCHMARK_STUBS = Pair{String, String}[
+    "ad-comparison.md" => "# [AD backend comparison](@id ad-comparison)\n\n## [Choosing a backend](@id ad-backends)",
 ]
 
 # Heavy tutorials that always render from their `TUTORIAL_STUBS` heading and
