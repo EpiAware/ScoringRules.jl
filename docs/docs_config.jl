@@ -42,7 +42,17 @@ const TUTORIAL_STUBS = Pair{String, String}[
 # terminate in reasonable time), so it need not block its siblings from
 # running for real. Leave empty; every heavy tutorial with no such problem
 # should execute.
-const FORCE_STUB_TUTORIALS = String[]
+const FORCE_STUB_TUTORIALS = String[
+    # Enzyme's forward-mode `override_bc_mapreduce` emits code that allocates
+    # the mixture's component vector without rooting it, so the next GC mark
+    # segfaults the build (Enzyme 0.13.204, `Mixture-of-normals crps`). Each
+    # backend survives on its own; the page benchmarks all six in one process,
+    # and the heap the earlier backends leave behind is what exposes the bug.
+    # The `ad` workflow still runs every backend, one per job, so this costs
+    # the rendered benchmark table and no test coverage. Drop once Enzyme
+    # roots that allocation.
+    "ad-backends.jl",
+]
 
 # Whether this package advertises itself as part of the EpiAware ecosystem: a
 # "Part of the EpiAware ecosystem" section in the managed README block, and the
