@@ -50,7 +50,16 @@ const BENCHMARK_STUBS = Pair{String, String}[
 # terminate in reasonable time), so it need not block its siblings from
 # running for real. Leave empty; every heavy tutorial with no such problem
 # should execute.
-const FORCE_STUB_TUTORIALS = String[]
+const FORCE_STUB_TUTORIALS = String[
+    # Enzyme forward mode leaves the mixture's component `Memory` with an
+    # undefined header across a safepoint, so the next collection segfaults the
+    # docs build. Each backend survives alone; this page measures all of them in
+    # one process, which exposes it. Upstream: EnzymeAD/Enzyme.jl#3698, fixed by
+    # EnzymeAD/Enzyme.jl#3723 and unreleased as of Enzyme 0.13.216. Drop this
+    # entry once a release includes that fix. The `ad` workflow still runs every
+    # backend one per job, so this costs the rendered table and no test coverage.
+    "ad-comparison.jl",
+]
 
 # Whether this package advertises itself as part of the EpiAware ecosystem: a
 # "Part of the EpiAware ecosystem" section in the managed README block, and the
