@@ -17,12 +17,9 @@ const LIGHT_TUTORIALS = String[
 
 # Heavy tutorials (live MCMC fits, multi-backend AD, plotting) are each
 # executed once in a fresh subprocess so native/memory state cannot accumulate.
-# The `ad-backends.jl` entry is seeded when the package is scaffolded with
-# `ad = true`: the page itself is kit-managed (re-applied on every sync); only
-# this registration is package-owned.
-const HEAVY_TUTORIALS = String[
-    "ad-backends.jl",
-]
+# The AD-backends tutorial retired in favour of the `ad-comparison` benchmark
+# page below, so this starts empty; add package-owned heavy tutorials here.
+const HEAVY_TUTORIALS = String[]
 
 # Where the tutorial `.jl` sources and rendered `.md` pages live, relative to
 # `docs/src`.
@@ -32,8 +29,19 @@ const TUTORIALS_SUBDIR = joinpath("getting-started", "tutorials")
 # heading should preserve the tutorial's `@id` (e.g.
 # `"# [Title](@id my-anchor)"`) so cross-references from other pages still
 # resolve in a fast build.
-const TUTORIAL_STUBS = Pair{String, String}[
-    "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)",
+const TUTORIAL_STUBS = Pair{String, String}[]
+
+# Heavy pages under `docs/src/benchmarks/`, same convention as
+# `HEAVY_TUTORIALS`/`TUTORIAL_STUBS` above but their own nav group. The
+# `ad-comparison.jl` entry is seeded when the package is scaffolded with
+# `ad = true`: the page itself is kit-managed; only this registration is
+# package-owned.
+const HEAVY_BENCHMARKS = String[
+    "ad-comparison.jl",
+]
+
+const BENCHMARK_STUBS = Pair{String, String}[
+    "ad-comparison.md" => "# [AD backend comparison](@id ad-comparison)\n\n## [Choosing a backend](@id ad-backends)",
 ]
 
 # Heavy tutorials that always render from their `TUTORIAL_STUBS` heading and
@@ -43,15 +51,14 @@ const TUTORIAL_STUBS = Pair{String, String}[
 # running for real. Leave empty; every heavy tutorial with no such problem
 # should execute.
 const FORCE_STUB_TUTORIALS = String[
-    # Enzyme's forward-mode `override_bc_mapreduce` emits code that allocates
-    # the mixture's component vector without rooting it, so the next GC mark
-    # segfaults the build (Enzyme 0.13.204, `Mixture-of-normals crps`). Each
-    # backend survives on its own; the page benchmarks all six in one process,
-    # and the heap the earlier backends leave behind is what exposes the bug.
-    # The `ad` workflow still runs every backend, one per job, so this costs
-    # the rendered benchmark table and no test coverage. Drop once Enzyme
-    # roots that allocation.
-    "ad-backends.jl",
+    # Enzyme forward mode leaves the mixture's component `Memory` with an
+    # undefined header across a safepoint, so the next collection segfaults the
+    # docs build. Each backend survives alone; this page measures all of them in
+    # one process, which exposes it. Upstream: EnzymeAD/Enzyme.jl#3698, fixed by
+    # EnzymeAD/Enzyme.jl#3723 and unreleased as of Enzyme 0.13.216. Drop this
+    # entry once a release includes that fix. The `ad` workflow still runs every
+    # backend one per job, so this costs the rendered table and no test coverage.
+    "ad-comparison.jl",
 ]
 
 # Whether this package advertises itself as part of the EpiAware ecosystem: a
