@@ -42,10 +42,11 @@ computation unconditionally rather than attempting and catching, so `res1` is
 construction; each stays in the registry as a standing, honest record of its
 gap until the fix lands (as all six now have).
 
-All scenarios run across the ForwardDiff / ReverseDiff / Enzyme (forward and
-reverse) / Mooncake (forward and reverse) backend matrix declared in
-`backends()`. The reference is computed with ForwardDiff and matched by the
-other backends to `rtol = 5e-2, atol = 1e-6` (the harness defaults).
+All scenarios run across the ForwardDiff / ReverseDiff (tape and compiled) /
+Enzyme (forward and reverse) / Mooncake (forward and reverse) backend matrix
+declared in `backends()`. The reference is computed with ForwardDiff and
+matched by the other backends to `rtol = 5e-2, atol = 1e-6` (the harness
+defaults).
 """
 module ADFixtures
 
@@ -81,6 +82,10 @@ function backends()
         (
             name = "ReverseDiff (tape)",
             backend = AutoReverseDiff(compile = false),
+        ),
+        (
+            name = "ReverseDiff (compiled)",
+            backend = AutoReverseDiff(compile = true),
         ),
         (
             name = "Enzyme forward",
