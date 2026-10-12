@@ -1,7 +1,8 @@
-# MANAGED by EpiAwarePackageTools.scaffold, with one deliberate divergence: the
-# job gate below. The managed version allowlists a single handle, which skips
-# every PR in this repo. Do not revert it from a template-sync PR without the
-# upstream gate having been widened first.
+# MANAGED by EpiAwarePackageTools.scaffold, with two deliberate divergences: the
+# job gate below, and the token gate in the steps. The managed gate allowlists a
+# single handle, which skips every PR in this repo. Do not revert either from a
+# template-sync PR without the upstream gate having been widened first, or
+# EpiAwarePackageTools#528 having made these workflows opt-in.
 name: Claude Code Review
 
 on:
@@ -39,13 +40,30 @@ jobs:
       id-token: write
 
     steps:
+      # The review needs `CLAUDE_CODE_OAUTH_TOKEN`, which this repo does not
+      # set. Without this gate the job fails on every PR and leaves a red
+      # `claude-review` check that no amount of fixing clears. Read the secret
+      # in a `run` step, since the `secrets` context is not available to a
+      # step-level `if`, and skip the review when it is absent so the job
+      # still concludes green. Drop the gate once EpiAwarePackageTools#528
+      # makes these workflows opt-in, or once a token is provisioned.
+      - name: Check for a review token
+        id: token
+        run: echo "present=${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Report a skipped review
+        if: steps.token.outputs.present != 'true'
+        run: echo "::notice title=Claude review::No CLAUDE_CODE_OAUTH_TOKEN is set; the review did not run."
+
       - name: Checkout repository
+        if: steps.token.outputs.present == 'true'
         uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
       - name: Run Claude Code Review
         id: claude-review
+        if: steps.token.outputs.present == 'true'
         uses: anthropics/claude-code-action@beta
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
