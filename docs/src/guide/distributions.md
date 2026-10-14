@@ -66,10 +66,40 @@ and support `pdf`, `logpdf`, `cdf`, `quantile`, `mean`, `var`, and `rand`.
 | `LogLaplace(μ, σ)` | μ: log-scale location, σ: log-scale scale (σ ∈ (0,1)) | closed form, requires σ < 1 |
 | `TwoPieceNormal(loc, σ₁, σ₂)` | location, left-arm scale, right-arm scale | via generalised truncated/censored Normal |
 | `TwoPieceExponential(loc, σ₁, σ₂)` | location, left-arm scale, right-arm scale | via exponential CRPS |
+| `BoundaryMass(dist; lower, upper, lmass, umass)` | base distribution, bounds, boundary point masses | see below |
 
 `LogLogistic` is provided by Distributions.jl (as `LogLogistic(α, β)`, the
 Fisk distribution); `crps` for it uses the closed form from R's
 `scores_llogis.R`.
+
+### Point masses at the truncation bounds
+
+`BoundaryMass(dist; lower, upper, lmass, umass)` truncates a continuous
+distribution `dist` to `[lower, upper]` and places free point masses `lmass`
+and `umass` at the bounds, with the interior renormalised to carry the
+remaining probability. This is the "generalised truncated/censored"
+construction of R `scoringRules` (`crps_gtcnorm` and friends): zero masses
+recover `truncated(dist; ...)` and tail-probability masses recover
+`censored(dist; ...)`, with anything in between available too. The bounds
+default to the support of `dist`, so e.g.
+`BoundaryMass(Exponential(θ); lmass = 0.1)` places its mass at zero (R's
+`crps_expM`).
+
+Closed-form CRPS is used for these bases:
+
+| Base | R counterpart | Conditions |
+|:---|:---|:---|
+| `Normal` | `crps_gtcnorm` | — |
+| `Logistic` | `crps_gtclogis` | — |
+| `TDist` / `μ + σ * TDist(ν)` | `crps_gtct` | ν > 1 |
+| `Uniform` | `crps_unif` with `lmass`/`umass` | masses at the interval endpoints |
+| `Exponential` | `crps_expM` | mass at the lower end, no upper bound |
+| `GeneralizedPareto` | `crps_gpd` with `mass` | mass at the location, no upper bound, ξ < 1 |
+
+Any other base (or an unrouted bound/mass combination) falls back to the
+generic quadrature over the wrapper's CDF. `logs` and `dss` work through the
+generic density and moment methods; R has no logs/dss counterparts for these
+forms.
 
 ## Quadrature fallback
 

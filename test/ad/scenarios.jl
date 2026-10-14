@@ -17,6 +17,10 @@ end
     test_working_backend("ReverseDiff (tape)")
 end
 
+@testitem "ReverseDiff (compiled) gradients (marginal)" tags = [:ad, :reversediff_compiled] setup = [ADHelpers] begin
+    test_working_backend("ReverseDiff (compiled)")
+end
+
 @testitem "Enzyme forward gradients (marginal)" tags = [:ad, :enzyme, :enzyme_forward] setup = [ADHelpers] begin
     test_working_backend("Enzyme forward")
 end
