@@ -17,3 +17,13 @@ ScoringRules = "1fcf7366-10ae-49d1-a4dc-286b3bf402d3"
 
 [sources]
 ScoringRules = {path = "../.."}
+
+[compat]
+ADTypes = "1.24.0"
+DifferentiationInterface = "0.7.21"
+DifferentiationInterfaceTest = "0.11.0"
+Distributions = "0.25.131"
+Enzyme = "0.13.215"
+ForwardDiff = "1.4.6"
+Mooncake = "0.5.63"
+ReverseDiff = "1.18.4"
