@@ -768,7 +768,10 @@ write_ref("ess", g)
 
 # LogLogistic: R uses (locationlog, scalelog); Julia uses LogLogistic(α, β)
 #   with α = exp(locationlog), β = 1/scalelog.
-# dss_llogis is NOT compared (known NaN issue in R).
+# dss_llogis is NOT compared: R's expression drops a pair of parentheses
+# (`ell^2 * 2 * b/sin(2 * b) - b^2/sb^2`, where `ell^2` should multiply both
+# terms), so it is wrong for every nonzero locationlog, not only where the
+# resulting negative variance turns into NaN. See the Differences from R page.
 g <- grid(locationlog = c(-1, 0, 1),
           scalelog    = c(0.3, 0.5, 0.7),
           y           = c(0.1, 0.5, 1, 2, 5))
