@@ -1,4 +1,4 @@
-## Unreleased
+## 1.0.0
 
 First working version: a port of the R
 [`scoringRules`](https://github.com/FK83/scoringRules) package (Jordan, Krüger,
