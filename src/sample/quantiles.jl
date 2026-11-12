@@ -133,10 +133,8 @@ corresponding quantile forecasts, evaluated at observation `y`.
 
 # Keywords
 - `reduce` — function applied to the per-level scores. Under the default
-             `mean` the result is the mean pinball loss, a scalar, which is
-             the shape every other score in this package returns. Pass
-             `identity` for the per-level vector, or another reduction such
-             as `sum`.
+             `mean` the result is the mean pinball loss. Pass `identity` for
+             the per-level vector, or another reduction such as `sum`.
 
 # Returns
 `reduce` applied to the per-level scores: a scalar under the default `mean`,
