@@ -141,3 +141,51 @@ end
         @test_throws ArgumentError mmds(X, y; w = fill(-1.0, m))
     end
 end
+
+@testitem "the weighted variogram score matches its kernel form" tags = [:sample] begin
+    using ScoringRules
+    using Random: MersenneTwister
+
+    # `vs` with member weights used to evaluate the kernel score
+    #   Σ_i w_i κ(X_i, y) − ½ Σ_{i,j} w_i w_j κ(X_i, X_j),
+    # which is m² kernel evaluations for the same number the single pass over
+    # the ensemble gives. This pins the two together.
+    function kernel_form(y, X, w_vs, w, p)
+        d = length(y)
+        m = size(X, 2)
+        κ = (x1, x2) -> sum(
+            2.0 * w_vs[k, l] *
+                (abs(x1[k] - x1[l])^p - abs(x2[k] - x2[l])^p)^2
+                for k in 1:d, l in 1:d if l >= k
+        )
+        s1 = sum(w[i] * κ(view(X, :, i), y) for i in 1:m)
+        s2 = sum(w[i] * w[j] * κ(view(X, :, i), view(X, :, j)) for i in 1:m, j in 1:m)
+        return s1 - s2 / 2
+    end
+
+    rng = MersenneTwister(20260218)
+    for (d, m, p) in ((3, 20, 0.5), (5, 40, 1.0), (4, 13, 2.0), (6, 7, 0.25))
+        X = randn(rng, d, m)
+        y = randn(rng, d)
+        wraw = rand(rng, m) .+ 0.1
+        w = wraw ./ sum(wraw)
+        A = [1 / (1 + abs(k - l)) for k in 1:d, l in 1:d]
+        for wv in (ones(d, d), A)
+            @test vs(X, y; p = p, w = wraw, w_vs = wv) ≈
+                kernel_form(y, X, wv, w, p) rtol = 1.0e-12
+        end
+        # And the unweighted path is the uniform-weight case of the same form.
+        @test vs(X, y; p = p) ≈
+            kernel_form(y, X, ones(d, d), fill(1 / m, m), p) rtol = 1.0e-12
+    end
+end
+
+@testitem "multivariate scores reject an empty ensemble" tags = [:sample] begin
+    using ScoringRules
+
+    X = Matrix{Float64}(undef, 3, 0)
+    y = [0.1, -0.2, 0.5]
+    @test_throws ArgumentError es(X, y)
+    @test_throws ArgumentError vs(X, y)
+    @test_throws ArgumentError mmds(X, y)
+end

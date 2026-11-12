@@ -435,8 +435,7 @@ function owvs(
     w_y = wf(y)
     wv = _ow_weights(X, wf, w)
     wv === nothing && return NaN
-    wvs = w_vs === nothing ? ones(d, d) : w_vs
-    return _vsC_w(y, X, wvs, wv, p) * w_y
+    return _vs_core(y, X, w_vs, wv, p) * w_y
 end
 
 # ---------------------------------------------------------------------------

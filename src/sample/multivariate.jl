@@ -16,13 +16,38 @@ export es, vs, mmds
 """
     _check_multiv(X, y)
 
-Verify that `X` is a `d × m` matrix and `y` is a length-`d` vector.
+Verify that `X` is a `d × m` matrix with at least one member and `y` is a
+length-`d` vector.
 """
 function _check_multiv(X::AbstractMatrix, y::AbstractVector)
     d = length(y)
-    return size(X, 1) == d || throw(
+    size(X, 1) == d || throw(
         DimensionMismatch("rows of X ($(size(X, 1))) must equal length of y ($d)")
     )
+    size(X, 2) >= 1 ||
+        throw(ArgumentError("the ensemble X must have at least one member"))
+    return nothing
+end
+
+# Euclidean distance between two columns of the ensemble, and between a column
+# and the observation, accumulated in place. Writing these out keeps the
+# `m(m−1)/2` inner products of `es` and `mmds` free of the temporary that
+# `norm(view(X, :, i) .- view(X, :, j))` allocates on every pair: at d = 50,
+# m = 3000 that temporary accounted for 2 GiB of allocation per call.
+@inline function _col_sqdist(X::AbstractMatrix, i::Integer, j::Integer)
+    s = zero(eltype(X)) * zero(eltype(X))
+    @inbounds @simd for k in axes(X, 1)
+        s += abs2(X[k, i] - X[k, j])
+    end
+    return s
+end
+
+@inline function _col_sqdist(X::AbstractMatrix, i::Integer, y::AbstractVector)
+    s = zero(eltype(X)) * zero(eltype(X))
+    @inbounds @simd for k in axes(X, 1)
+        s += abs2(X[k, i] - y[k])
+    end
+    return s
 end
 
 """
@@ -83,8 +108,8 @@ end
 # "XY" part: Σ_i w_i ‖X_i − y‖
 function _esC_xy(y::AbstractVector, X::AbstractMatrix, w::AbstractVector)
     out = 0.0
-    @inbounds for (wi, xi) in zip(w, eachcol(X))
-        out += wi * norm(xi .- y)
+    @inbounds for i in axes(X, 2)
+        out += w[i] * sqrt(_col_sqdist(X, i, y))
     end
     return out
 end
@@ -94,9 +119,12 @@ function _esC_xx(X::AbstractMatrix, w::AbstractVector)
     out = 0.0
     m = size(X, 2)
     @inbounds for i in 1:m
-        @inbounds for j in (i + 1):m
-            out += 2.0 * w[i] * w[j] * norm(view(X, :, i) .- view(X, :, j))
+        wi = w[i]
+        acc = 0.0
+        for j in (i + 1):m
+            acc += w[j] * sqrt(_col_sqdist(X, i, j))
         end
+        out += 2.0 * wi * acc
     end
     return out
 end
@@ -138,65 +166,45 @@ end
 # Variogram score of order p
 # ---------------------------------------------------------------------------
 
-# No-weight path: Σ_{k≤l} 2 (|y_k − y_l|^p − mean_i |X_{k,i} − X_{l,i}|^p)^2
-function _vsC(y::AbstractVector, X::AbstractMatrix, p::Real)
-    out = 0.0
-    d = length(y)
-    @inbounds for k in 1:d
-        @inbounds for l in k:d
-            vdat = mean(abs(X[k, i] - X[l, i])^p for i in 1:size(X, 2))
-            vy = abs(y[k] - y[l])^p
-            out += 2.0 * (vy - vdat)^2
-        end
-    end
-    return out
-end
-
-# w_vs-weighted path: Σ_{k≤l} 2 w_vs[k,l] (|y_k − y_l|^p − mean_i |X_{k,i} − X_{l,i}|^p)^2
-function _vsC_w_vs(y::AbstractVector, X::AbstractMatrix, w_vs::AbstractMatrix, p::Real)
-    out = 0.0
-    d = length(y)
-    @inbounds for k in 1:d
-        @inbounds for l in k:d
-            vdat = mean(abs(X[k, i] - X[l, i])^p for i in 1:size(X, 2))
-            vy = abs(y[k] - y[l])^p
-            out += 2.0 * w_vs[k, l] * (vy - vdat)^2
-        end
-    end
-    return out
-end
-
-# Variogram kernel: Σ_{k≤l} 2 w_vs[k,l] (|x1_k − x1_l|^p − |x2_k − x2_l|^p)^2
-function _vskernel(x1::AbstractVector, x2::AbstractVector, w_vs::AbstractMatrix, p::Real)
-    out = 0.0
-    d = length(x1)
-    @inbounds for k in 1:d
-        @inbounds for l in k:d
-            vx1 = abs(x1[k] - x1[l])^p
-            vx2 = abs(x2[k] - x2[l])^p
-            out += 2.0 * w_vs[k, l] * (vx1 - vx2)^2
-        end
-    end
-    return out
-end
-
-# Member-weight path (w per column, default w_vs = ones)
-function _vsC_w(
-        y::AbstractVector, X::AbstractMatrix, w_vs::AbstractMatrix,
-        w::AbstractVector, p::Real
+# Variogram score, one pass over the ensemble.
+#
+#   VS_p = Σ_{k≤l} 2 w_kl (|y_k − y_l|^p − Σ_i w_i |X_{k,i} − X_{l,i}|^p)²
+#
+# `w_vs` and `w` may each be `nothing`, meaning all-ones pairs and uniform
+# members. The member-weighted case used to be written as the kernel score
+#
+#   Σ_i w_i κ(X_i, y) − ½ Σ_{i,j} w_i w_j κ(X_i, X_j),
+#
+# which is the same number: expanding the double sum gives
+# `2(E_w[V²] − E_w[V]²)` for each pair (k, l), and that cancels the variance
+# term out of the first sum. It costs m² kernel evaluations instead of m, so at
+# d = 10, m = 2000 the kernel form took 16 s against 3 ms here.
+function _vs_core(
+        y::AbstractVector, X::AbstractMatrix, w_vs, w, p::Real
     )
+    out = 0.0
+    d = length(y)
     m = size(X, 2)
-    s1 = 0.0
-    @inbounds for i in 1:m
-        s1 += w[i] * _vskernel(view(X, :, i), y, w_vs, p)
-    end
-    s2 = 0.0
-    @inbounds for i in 1:m
-        @inbounds for j in 1:m
-            s2 += w[i] * w[j] * _vskernel(view(X, :, i), view(X, :, j), w_vs, p)
+    @inbounds for k in 1:d
+        for l in k:d
+            wkl = w_vs === nothing ? 1.0 : w_vs[k, l]
+            wkl == 0 && continue
+            vdat = 0.0
+            if w === nothing
+                for i in 1:m
+                    vdat += abs(X[k, i] - X[l, i])^p
+                end
+                vdat /= m
+            else
+                for i in 1:m
+                    vdat += w[i] * abs(X[k, i] - X[l, i])^p
+                end
+            end
+            vy = abs(y[k] - y[l])^p
+            out += 2.0 * wkl * (vy - vdat)^2
         end
     end
-    return s1 - s2 / 2.0
+    return out
 end
 
 """
@@ -236,14 +244,9 @@ function vs(
         p::Real = 0.5, w = nothing, w_vs = nothing
     )
     _check_multiv(X, y)
-    d = length(y)
-    w_vs === nothing || _check_w_vs(w_vs, d)
-    if w === nothing
-        return w_vs === nothing ? _vsC(y, X, p) : _vsC_w_vs(y, X, w_vs, p)
-    end
-    wv = _w_helper(X, w)
-    wvs = w_vs === nothing ? ones(d, d) : w_vs
-    return _vsC_w(y, X, wvs, wv, p)
+    w_vs === nothing || _check_w_vs(w_vs, length(y))
+    wv = w === nothing ? nothing : _w_helper(X, w)
+    return _vs_core(y, X, w_vs, wv, p)
 end
 
 # ---------------------------------------------------------------------------
@@ -253,9 +256,8 @@ end
 # "XY" part: Σ_i w_i exp(−½ ‖X_i − y‖²)
 function _mmdsC_xy(y::AbstractVector, X::AbstractMatrix, w::AbstractVector)
     out = 0.0
-    @inbounds for (wi, xi) in zip(w, eachcol(X))
-        d2 = sum(abs2, xi .- y)
-        out += wi * exp(-0.5 * d2)
+    @inbounds for i in axes(X, 2)
+        out += w[i] * exp(-0.5 * _col_sqdist(X, i, y))
     end
     return out
 end
@@ -266,10 +268,11 @@ function _mmdsC_xx(X::AbstractMatrix, w::AbstractVector)
     m = size(X, 2)
     @inbounds for i in 1:m
         out += w[i]^2
-        @inbounds for j in (i + 1):m
-            d2 = sum(abs2, view(X, :, i) .- view(X, :, j))
-            out += 2.0 * w[i] * w[j] * exp(-0.5 * d2)
+        acc = 0.0
+        for j in (i + 1):m
+            acc += w[j] * exp(-0.5 * _col_sqdist(X, i, j))
         end
+        out += 2.0 * w[i] * acc
     end
     return out
 end
