@@ -97,18 +97,33 @@ Closed-form CRPS is used for these bases:
 | `GeneralizedPareto` | `crps_gpd` with `mass` | mass at the location, no upper bound, ξ < 1 |
 
 Any other base (or an unrouted bound/mass combination) falls back to the
-generic quadrature over the wrapper's CDF. `logs` and `dss` work through the
-generic density and moment methods; R has no logs/dss counterparts for these
-forms.
+generic quadrature over the wrapper's CDF. `logs` reads the density directly.
+`dss` combines the boundary masses with the moments of the truncated interior,
+taking those by quadrature for the bases where `Distributions.jl` has no
+analytic truncated variance. R has no logs/dss counterparts for these forms.
+
+One convention to watch: `pdf` at a bound that has a point mass returns that
+mass, as `Distributions.Censored` does, so `logs` at a bound is `-log(mass)`.
+R's `f*` functions return the renormalised interior density there instead (see
+[Differences from R](@ref differences-from-r)).
 
 ## Quadrature fallback
 
 For any continuous distribution not in the table above, `crps` falls back to
 adaptive Gauss–Kronrod quadrature (via
 [QuadGK.jl](https://github.com/JuliaMath/QuadGK.jl)). The fallback is
-correct but slower and less numerically precise for some distributions. If you
-encounter a distribution family that should have a closed form but does not,
-please open an issue.
+correct but slower and less numerically precise for some distributions.
+
+A discrete distribution not in the table falls back instead to exact
+integration of its step CDF, which is what the CRPS integral reduces to when
+the CDF is piecewise constant. It needs only `cdf`, so it works for families
+with no `quantile` method (`Skellam`) and for ones whose support cannot be
+enumerated (an upper-unbounded truncated `Poisson`), and it keeps the two
+half-infinite pieces of the integral, so the score keeps growing as the
+observation moves away from the support rather than flattening out.
+
+If you encounter a distribution family that should have a closed form but does
+not, please open an issue.
 
 ## Example: using package-provided types
 

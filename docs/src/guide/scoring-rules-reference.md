@@ -187,6 +187,37 @@ weighted scores also take per-member weights `w`: the `tw*` scores weight the
 chained ensemble, and the `ow*` scores multiply the outcome weights by the
 member weights, as in R.
 
+### Smooth weights
+
+The interval indicator is an abrupt weight. Allen (2024) also uses smooth ones:
+a normal or logistic CDF to emphasise larger outcomes, a survival function for
+smaller ones, a density for a region around a point. Each needs its matching
+chaining function, the antiderivative of the weight, which is what keeps the
+threshold-weighted score proper. [`weight_function`](@ref) and
+[`chaining_function`](@ref) build the pair, as R's `get_weight_func` does:
+
+```@example ref
+w = weight_function(:norm_cdf; mu = 1.0, sigma = 0.5)
+owcrps(dat, y1d; weight_func = w)
+```
+
+```@example ref
+v = chaining_function(:norm_cdf; mu = 1.0, sigma = 0.5)
+twcrps(dat, y1d; chain_func = v)
+```
+
+The six shapes are `:norm_cdf`, `:norm_surv`, `:norm_pdf`, `:logis_cdf`,
+`:logis_surv` and `:logis_pdf`. Pass length-`d` `mu` and `sigma` for a
+multivariate forecast, where the weight becomes the product over dimensions and
+the chaining function applies element-wise:
+
+```@example ref
+wm = weight_function(:norm_surv; mu = zeros(d), sigma = ones(d))
+owes(X, y; weight_func = wm)
+```
+
+As in R, the logistic shapes are univariate only.
+
 ## Quantile and interval scores
 
 ### Quantile score (pinball loss)

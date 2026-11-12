@@ -54,7 +54,18 @@ end
 The differences are at the level of floating-point round-off, so the two
 implementations agree for practical purposes. The full test suite checks
 `logs`/`dss`, the ensemble scores and the weighted/multivariate scores the same
-way, at `atol = 1e-9, rtol = 1e-7`.
+way. Most of those comparisons run at `atol = 1e-9` with `rtol` between `1e-6`
+and `1e-9`, the looser end being the ensemble scores and the GEV near its
+Gumbel limit, where R itself integrates numerically.
+
+Two things about the table above are worth knowing. It skips any row whose R
+value is not finite, so a family that R scores as `NaN` or `Inf` contributes
+nothing to the maximum; the `NaN`/`Inf` conventions are checked in the test
+suite instead. And the reference grids were widened in 1.0.0 to reach the
+parameters where the closed forms misbehave (a Poisson mean past 350, a
+negative binomial size past 40, a shape within `1e-3` of the Gumbel limit, a
+truncation bound 1000 standard units into the tail), so the rows counted here
+include those.
 
 ## Gradients via automatic differentiation
 
@@ -132,8 +143,10 @@ method for a dual element type, which stops `d/dy` wherever the CRPS falls back
 to numerical integration. Closing these is tracked as future work. R provides
 analytic gradients for the Normal, Logistic and Student-t families only.
 
-## Intentional divergences
+## Divergences
 
-Three families deliberately differ from R (a corrected log-logistic DSS, the GEV
-Gumbel limit, and the ensemble population variance). These are documented on the
-[Differences from R](@ref differences-from-r) page.
+Four scores return a different number from R because the R value is wrong
+against an independent reference, and two differ by design. The
+[Differences from R](@ref differences-from-r) page lists all six with the
+numbers. The ensemble DSS is **not** one of them: like R it uses the population
+variance, so the two agree.

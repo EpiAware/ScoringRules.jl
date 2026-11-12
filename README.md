@@ -34,14 +34,17 @@ What that means in practice:
   separate function per family: write `crps(Normal(0, 1), 0.4)`, not `crps_norm`.
 - Gradients come from automatic differentiation with any supported backend, so
   there is no equivalent of R's hand-written `gradcrps_*` / `hesscrps_*`.
-- Results match R throughout (the test suite checks against reference values
-  generated from R; see
+- Results match R to floating-point round-off for almost every score (the test
+  suite checks against reference values generated from R; see
   [Validation against R](https://epiaware.org/ScoringRules.jl/dev/guide/validation-against-r)
-  for a live value- and gradient-level comparison). The one genuine numerical
-  difference is the log-logistic Dawid–Sebastiani score, where R has a bug that
-  returns `NaN` and we return the correct value; a couple of other choices differ
-  in method but not in results (e.g. an analytic GEV Gumbel limit in place of R's
-  numerical integration). Both are documented under
+  for a live value- and gradient-level comparison). A handful of scores differ,
+  in each case because an independent reference (brute-force summation,
+  300-bit quadrature, or an analytic limit) says the R value is wrong: the
+  log-logistic Dawid–Sebastiani score, the generalised Pareto CRPS near shape
+  zero, the negative binomial CRPS at a large or non-integer size, and the
+  log score of a truncated density with a far lower bound. Two further
+  divergences are design choices rather than corrections. Every one of them is
+  listed, with the numbers, under
   [Differences from R](https://epiaware.org/ScoringRules.jl/dev/guide/differences-from-r).
 - `LogLaplace`, `TwoPieceNormal` and `TwoPieceExponential` are provided here, as
   Distributions.jl does not have them.
