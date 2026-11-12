@@ -203,11 +203,11 @@ which equals ``(1-\alpha)(q-y)`` when ``y < q`` and ``\alpha(y-q)`` when
 ```@example ref
 levels = [0.1, 0.5, 0.9]
 qs     = [-1.28, 0.0, 1.28]  # standard-normal quantiles
-quantile_score(levels, qs, 1.0)
+quantile_score(levels, qs, 1.0)   # mean pinball loss across the levels
 ```
 
 ```@example ref
-mean(quantile_score(levels, qs, 1.0))   # mean quantile score
+quantile_score(levels, qs, 1.0; reduce = identity)   # one score per level
 ```
 
 ### Interval score
