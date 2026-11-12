@@ -74,14 +74,19 @@ Lerch and Allen). See the README for attribution and provenance.
   the extreme-value shape threshold sits at `√eps` and the GPD survival goes
   through `log1p`; and `dss` falls back to numerical moments for the truncated
   and censored bases where `Distributions.jl` has no analytic variance, which
-  used to throw a `MethodError`.
+  used to throw a `MethodError`. The continuous quadrature fallback now splits
+  the integral at the forecast's own quantiles, so a narrow band of mass or a
+  jump in the CDF cannot be missed; a boundary-mass exponential of scale 0.057
+  at location 1.985 was 1.8e-5 relative low whatever tolerance was asked for.
 - Input validation to match R's: `interval_score` rejects a reversed interval,
   `rps` rejects a vector that is negative or does not sum to one, and the
   ensemble scores reject an empty ensemble. Passing `bw` to `crps(dat, y;
   method = :edf)` warns rather than being dropped in silence.
-- `es`, `mmds` and `vs` no longer allocate a temporary per member pair; `vs`
-  with member weights computes the same number in one pass over the ensemble
-  instead of `m²` kernel evaluations (16 s to 3 ms at `d = 10`, `m = 2000`).
+- `es`, `mmds` and `vs` no longer allocate a temporary per member pair, which
+  at `d = 50`, `m = 3000` takes `es` from 2061 MiB and 594 ms per call to
+  0.02 MiB and 127 ms. `vs` with member weights now computes the same number in
+  one pass over the ensemble instead of `m²` kernel evaluations, 14.7 s to
+  3.3 ms at `d = 10`, `m = 2000`; `owvs` goes through the same path.
 - `dss` returns `NaN` whenever the forecast variance is not finite and
   positive (for example t with `df ≤ 2`, GEV/GPD with `shape ≥ 1/2`,
   log-Laplace with `σ ≥ 1/2`, log-logistic with `β ≤ 2`), matching R.

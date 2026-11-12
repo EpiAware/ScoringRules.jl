@@ -171,6 +171,41 @@ end
     end
 end
 
+@testitem "the quadrature fallback resolves a narrow or discontinuous CDF" tags = [:crps] begin
+    using ScoringRules
+    using Distributions
+
+    # `quadgk` over a half-infinite interval chooses its first nodes from the
+    # interval alone. A boundary-mass exponential whose continuous part has
+    # scale 0.057 at location 1.985 was missed entirely and the fallback
+    # returned 0.15899015 against the exact 0.15898723, reporting convergence
+    # whatever `rtol` was asked for.
+    loc = 1.98509270790964
+    sc = 0.0571883754423546
+    mass = 0.248775732819922
+    y = 1.84224226559283
+    # Exact: the point mass sits above `y`, so the score is
+    # (loc − y) + (1 − mass)²·scale/2.
+    exact = (loc - y) + (1 - mass)^2 * sc / 2
+    @test crps(BoundaryMass(loc + Exponential(sc); lmass = mass), y) ≈ exact rtol = 1.0e-12
+
+    # The fallback must still reproduce every closed form it is not used for.
+    fallback(d, z) = invoke(crps, Tuple{ContinuousUnivariateDistribution, Real}, d, z)
+    for (d, z) in (
+            (Normal(0.0, 1.0), 1.2),
+            (Normal(0.0, 1.0), 40.0),
+            (Normal(5.0, 1.0e-4), 5.3),
+            (Gamma(2.0, 1.5), 3.0),
+            (Gamma(2.0, 1.0e-3), 0.01),
+            (Beta(2.0, 3.0), 0.4),
+            (Exponential(1.0e-3), 0.02),
+            (Logistic(0.0, 1.0), 0.7),
+            (Uniform(0.0, 2.0), 0.7),
+        )
+        @test fallback(d, z) ≈ crps(d, z) atol = 1.0e-12 rtol = 1.0e-9
+    end
+end
+
 @testitem "dss moments stay accurate and defined on wrapped forecasts" tags = [:crps] begin
     using ScoringRules
     using Distributions

@@ -111,8 +111,9 @@ R's `f*` functions return the renormalised interior density there instead (see
 
 For any continuous distribution not in the table above, `crps` falls back to
 adaptive Gauss–Kronrod quadrature (via
-[QuadGK.jl](https://github.com/JuliaMath/QuadGK.jl)). The fallback is
-correct but slower and less numerically precise for some distributions.
+[QuadGK.jl](https://github.com/JuliaMath/QuadGK.jl)), split at the forecast's
+own quantiles so that a narrow band of mass or a jump in the CDF cannot fall
+between the first nodes. The fallback is correct but slower than a closed form.
 
 A discrete distribution not in the table falls back instead to exact
 integration of its step CDF, which is what the CRPS integral reduces to when

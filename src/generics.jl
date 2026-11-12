@@ -312,11 +312,50 @@ using Distributions, ScoringRules
 crps(Normal(0, 1), 0.5)
 ```
 """
+# Probabilities whose quantiles become quadrature segment boundaries. A bare
+# `quadgk(f, lo, hi)` places its first nodes from the interval alone, so a
+# forecast whose mass sits in a narrow band far from the midpoint of a
+# half-infinite interval can be missed entirely, and the error estimate then
+# reports convergence: a boundary-mass exponential of scale 0.057 at location
+# 1.985 came out 1.8e-5 relative low, whatever `rtol` was asked for. Splitting
+# at the forecast's own quantiles puts a node in every region that holds mass.
+const _CRPS_QUAD_PROBS = (
+    1.0e-8, 1.0e-4, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 1 - 1.0e-4, 1 - 1.0e-8,
+)
+
+# Interior segment boundaries strictly between `a` and `b`, as `Float64`.
+# Anything that does not convert is skipped, which is what keeps the fallback
+# usable under automatic differentiation: a dual-valued quantile is dropped and
+# the call degenerates to the plain two-point one.
+function _crps_quad_breaks(d::ContinuousUnivariateDistribution, a::Real, b::Real)
+    pts = Float64[]
+    lo, hi = a < b ? (a, b) : (b, a)
+    for p in _CRPS_QUAD_PROBS
+        q = try
+            Float64(quantile(d, p))
+        catch
+            continue
+        end
+        isfinite(q) && lo < q < hi && push!(pts, q)
+    end
+    for edge in (minimum(d), maximum(d))
+        e = try
+            Float64(edge)
+        catch
+            continue
+        end
+        isfinite(e) && lo < e < hi && push!(pts, e)
+    end
+    sort!(pts)
+    unique!(pts)
+    return a < b ? pts : reverse!(pts)
+end
+
 function crps(d::ContinuousUnivariateDistribution, y::Real)
     lo = minimum(d)
     hi = maximum(d)
-    left, _ = quadgk(x -> cdf(d, x)^2, lo, y)
-    right, _ = quadgk(x -> ccdf(d, x)^2, y, hi)
+    left, _ = quadgk(x -> cdf(d, x)^2, lo, _crps_quad_breaks(d, lo, y)..., y)
+    right, _ = quadgk(x -> ccdf(d, x)^2, y, _crps_quad_breaks(d, y, hi)..., hi)
     return left + right
 end
 
