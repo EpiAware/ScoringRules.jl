@@ -27,7 +27,13 @@ the probability mass itself.
 [`crps`](@ref) has closed forms for normal, logistic and (location–scale)
 Student-t bases, and for the boundary-mass exponential, uniform and
 generalised Pareto forms; other bases fall back to quadrature. [`logs`](@ref)
-and [`dss`](@ref) work through the generic density and moment methods.
+reads the density directly. [`dss`](@ref) takes the boundary masses plus the
+moments of the truncated interior, by quadrature for the bases where
+`Distributions.jl` has no analytic truncated variance.
+
+`pdf` at a bound that has a point mass returns that mass, following
+`Distributions.Censored`. R's `f*` functions instead return the interior
+density there, so `logs` at a bound differs between the two.
 
 # Example
 
@@ -156,6 +162,30 @@ function Distributions.var(d::BoundaryMass)
         v += a * (var(int) + (mean(int) - m)^2)
     end
     return v
+end
+
+# `dss` route. `Distributions.var(::BoundaryMass)` needs `var` of the
+# truncated interior, which has no method for most bases; going through
+# `_forecast_moments` picks up the numerical fallback there.
+function _forecast_moments(d::BoundaryMass)
+    a = _interior_mass(d)
+    T = float(typeof(a))
+    m = zero(T)
+    m2 = zero(T)
+    if a > 0
+        mi, vi = _forecast_moments(_interior(d))
+        m += a * mi
+        m2 += a * (vi + mi^2)
+    end
+    if d.lmass > 0
+        m += d.lmass * d.lower
+        m2 += d.lmass * d.lower^2
+    end
+    if d.umass > 0
+        m += d.umass * d.upper
+        m2 += d.umass * d.upper^2
+    end
+    return (m, m2 - m^2)
 end
 
 function Distributions.rand(rng::AbstractRNG, d::BoundaryMass)
