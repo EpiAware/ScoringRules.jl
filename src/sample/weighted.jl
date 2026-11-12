@@ -83,6 +83,7 @@ function twcrps(
         a::Real = -Inf, b::Real = Inf,
         chain_func = nothing, w = nothing
     )
+    _check_nonempty(dat)
     if chain_func === nothing
         a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
         v = z -> clamp(z, a, b)
@@ -151,6 +152,7 @@ function owcrps(
         a::Real = -Inf, b::Real = Inf,
         weight_func = nothing, w = nothing
     )
+    _check_nonempty(dat)
     if weight_func === nothing
         a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
         w_func = z -> Float64(a < z < b)

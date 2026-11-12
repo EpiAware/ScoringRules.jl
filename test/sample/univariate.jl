@@ -153,6 +153,10 @@ end
     @test_throws ArgumentError logs(empty, 0.5)
     @test_throws ArgumentError dss(empty, 0.5)
     @test_throws ArgumentError clogs(empty, 0.5)
+    @test_throws ArgumentError twcrps(empty, 0.5; a = 0.0)
+    @test_throws ArgumentError owcrps(empty, 0.5; a = 0.0)
+    @test_throws ArgumentError quantile_score(empty, 0.5; alpha = 0.9)
+    @test_throws ArgumentError interval_score(empty, 0.5; level = 0.9)
 end
 
 @testitem "crps warns when bw is passed to the EDF method" tags = [:sample] begin
