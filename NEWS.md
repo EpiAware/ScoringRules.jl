@@ -39,6 +39,7 @@ Lerch and Allen). See the README for attribution and provenance.
 - Quantile and interval scores (`quantile_score`, `interval_score`), the ranked
   probability score `rps`, and the moment-based `dss_moments` and `ess_moments`
   (error-spread score of Christensen, Moroz and Palmer 2015).
+- `quantile_score` over a vector of quantile levels returns the mean pinball loss, the same scalar shape every other score in the package returns. Pass `reduce = identity` for one score per level, or another reduction such as `sum`.
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
   suite.
 - `dss` returns `NaN` whenever the forecast variance is not finite and

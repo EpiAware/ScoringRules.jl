@@ -109,11 +109,14 @@ corresponding quantile values:
 levels = [0.1, 0.25, 0.5, 0.75, 0.9]
 qs     = [-1.28, -0.67, 0.0, 0.67, 1.28]   # standard-normal quantiles
 
-scores = quantile_score(levels, qs, 0.5)
+quantile_score(levels, qs, 0.5)   # mean pinball loss across the levels
 ```
 
+The result is the mean across levels, which is the shape every other score
+returns. For the score at each level separately, pass `reduce = identity`:
+
 ```@example modes
-mean(scores)   # mean quantile score
+quantile_score(levels, qs, 0.5; reduce = identity)
 ```
 
 For a single quantile level from an ensemble:

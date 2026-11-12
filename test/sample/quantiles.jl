@@ -17,7 +17,7 @@
             for (j, alpha) in enumerate(q_levels)
                 ref = c["qs_a$j"][i]
                 got = quantile_score([alpha], [qf[j]], y)
-                @test only(got) ≈ ref atol = atol rtol = rtol
+                @test got ≈ ref atol = atol rtol = rtol
             end
         end
     end
@@ -128,4 +128,28 @@ end
     @test_throws ArgumentError interval_score(-1.0, 1.0, 0.0, 0.0)
     @test_throws ArgumentError rps([0.2, 0.3, 0.5], 5)
     @test_throws ArgumentError rps([0.2, 0.3, 0.5], 0)
+end
+
+@testitem "quantile_score reduces the per-level scores" begin
+    using ScoringRules
+
+    levels = [0.1, 0.5, 0.9]
+    q = [-1.28, 0.0, 1.28]
+    y = 1.0
+
+    per_level = quantile_score(levels, q, y; reduce = identity)
+    @test per_level isa Vector{Float64}
+    @test length(per_level) == length(levels)
+
+    # The headline call returns a scalar, as every other score here does.
+    got = quantile_score(levels, q, y)
+    @test got isa Real
+    @test got ≈ sum(per_level) / length(per_level)
+
+    @test quantile_score(levels, q, y; reduce = sum) ≈ sum(per_level)
+
+    # A single level reduces to that level's pinball loss either way.
+    for (i, alpha) in enumerate(levels)
+        @test quantile_score([alpha], [q[i]], y) ≈ per_level[i]
+    end
 end
