@@ -1,8 +1,4 @@
-# MANAGED by EpiAwarePackageTools.scaffold, with two deliberate divergences: the
-# job gate below, and the token gate in the steps. The managed gate allowlists a
-# single handle, which skips every PR in this repo. Do not revert either from a
-# template-sync PR without the upstream gate having been widened first, or
-# EpiAwarePackageTools#528 having made these workflows opt-in.
+# MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 name: Claude Code Review
 
 on:
@@ -17,20 +13,8 @@ on:
 
 jobs:
   claude-review:
-    # Repo insiders only, judged by where the branch lives: pushing a branch to
-    # this repo requires write access, so a same-repo PR is by definition from
-    # someone trusted, and every fork PR is excluded (those get no secrets and
-    # could not authenticate anyway). Bot authors push in-repo branches too, so
-    # they need excluding separately. The previous single-handle gate skipped
-    # every PR here, since they are all authored by `sbfnk-bot`.
-    #
-    # Do not use author_association here — the webhook payload does not report
-    # the same value the REST API does, and the job silently skips.
-    #
-    # Keep this on one line: in a folded block, a more-indented continuation
-    # keeps its newline rather than folding to a space, which also makes the
-    # expression evaluate false.
-    if: github.event.pull_request.head.repo.full_name == github.repository && !endsWith(github.event.pull_request.user.login, '[bot]')
+    # Only run for PRs from the configured reviewer handle
+    if: github.event.pull_request.user.login == 'sbfnk'
 
     runs-on: ubuntu-latest
     permissions:
@@ -40,30 +24,13 @@ jobs:
       id-token: write
 
     steps:
-      # The review needs `CLAUDE_CODE_OAUTH_TOKEN`, which this repo does not
-      # set. Without this gate the job fails on every PR and leaves a red
-      # `claude-review` check that no amount of fixing clears. Read the secret
-      # in a `run` step, since the `secrets` context is not available to a
-      # step-level `if`, and skip the review when it is absent so the job
-      # still concludes green. Drop the gate once EpiAwarePackageTools#528
-      # makes these workflows opt-in, or once a token is provisioned.
-      - name: Check for a review token
-        id: token
-        run: echo "present=${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
-
-      - name: Report a skipped review
-        if: steps.token.outputs.present != 'true'
-        run: echo "::notice title=Claude review::No CLAUDE_CODE_OAUTH_TOKEN is set; the review did not run."
-
       - name: Checkout repository
-        if: steps.token.outputs.present == 'true'
         uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
       - name: Run Claude Code Review
         id: claude-review
-        if: steps.token.outputs.present == 'true'
         uses: anthropics/claude-code-action@beta
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
