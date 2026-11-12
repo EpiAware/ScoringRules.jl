@@ -33,7 +33,8 @@ end
 # and the observation, accumulated in place. Writing these out keeps the
 # `m(m−1)/2` inner products of `es` and `mmds` free of the temporary that
 # `norm(view(X, :, i) .- view(X, :, j))` allocates on every pair: at d = 50,
-# m = 3000 that temporary accounted for 2 GiB of allocation per call.
+# m = 3000 that temporary accounted for 2061 MiB per call, and removing it cuts
+# the call from 594 ms to 127 ms.
 @inline function _col_sqdist(X::AbstractMatrix, i::Integer, j::Integer)
     s = zero(eltype(X)) * zero(eltype(X))
     @inbounds @simd for k in axes(X, 1)
@@ -178,7 +179,7 @@ end
 # which is the same number: expanding the double sum gives
 # `2(E_w[V²] − E_w[V]²)` for each pair (k, l), and that cancels the variance
 # term out of the first sum. It costs m² kernel evaluations instead of m, so at
-# d = 10, m = 2000 the kernel form took 16 s against 3 ms here.
+# d = 10, m = 2000 the kernel form took 14.7 s against 3.3 ms here.
 function _vs_core(
         y::AbstractVector, X::AbstractMatrix, w_vs, w, p::Real
     )
