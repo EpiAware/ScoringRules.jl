@@ -8,4 +8,4 @@ ScoringRules = {path = "../.."}
 
 [compat]
 EpiAwarePackageTools = "0.3, 0.4"
-JET = "0.11, 0.12"
+JET = "0.11, 0.12, 0.13"
