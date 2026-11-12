@@ -36,15 +36,13 @@ using Distributions: Distributions, Beta, Binomial, Censored, Continuous,
     Logistic, MixtureModel, NegativeBinomial, Normal, Poisson, TDist,
     Truncated, Uniform, Univariate, UnivariateDistribution,
     ccdf, cdf, components, dof, location, logpdf, params, pdf, probs,
-    scale, shape, truncated
-using SpecialFunctions: erfc, gamma, digamma, logbeta,
-    besseli, expinti
+    scale, shape, support, truncated
+using SpecialFunctions: erfc, erfcinv, gamma, digamma, logbeta, zeta,
+    besselix, expinti
 using EpiAwareADTools: cdf_ad_safe, ccdf_ad_safe
 using LogExpFunctions: log1pexp, logistic
-using HypergeometricFunctions: _₂F₁
 using QuadGK: quadgk
 using Statistics: mean, var, std, quantile
-using LinearAlgebra: norm
 using Random: AbstractRNG
 using DocStringExtensions: TYPEDSIGNATURES, TYPEDEF, TYPEDFIELDS, DOCSTRING, @template
 
@@ -54,6 +52,8 @@ export crps, logs, dss, dss_moments, ess_moments
 export es, vs, mmds
 # Weighted (threshold- and outcome-weighted) ensemble scores
 export twcrps, owcrps, twes, owes, twvs, owvs, twmmds, owmmds
+# Smooth weight and chaining functions for the weighted scores
+export weight_function, chaining_function
 # Censored and conditional likelihood scores for ensembles
 export clogs
 # Quantile / interval scores and the ranked probability score
@@ -93,6 +93,7 @@ include("crps/boundarymass.jl")
 include("sample/univariate.jl")
 include("sample/multivariate.jl")
 include("sample/weighted.jl")
+include("sample/weightfunctions.jl")
 include("sample/quantiles.jl")
 include("sample/rps.jl")
 
