@@ -56,7 +56,8 @@ forecast.
 
 # Arguments
 - `p` — `AbstractVector` of forecast probabilities over K ≥ 2 ordered outcome
-        categories.  Must be non-negative and sum to 1.
+        categories.  Must be finite, non-negative and sum to 1 (to within
+        `1e-10`); anything else throws, as in R's `rps_probs`.
 - `y` — observed outcome category as an `Integer` in `{1, …, K}`, where
         `y = 1` is the smallest and `y = K` is the largest category.
 
@@ -85,7 +86,28 @@ rps(p, 2)
 ```
 """
 function rps(p::AbstractVector, y::Integer)
+    length(p) >= 2 ||
+        throw(ArgumentError("need at least 2 outcome categories, got $(length(p))"))
     1 <= y <= length(p) ||
         throw(ArgumentError("observed category y must satisfy 1 ≤ y ≤ length(p) = $(length(p)), got $y"))
+    _check_probs(p)
     return _rps0(p, y)
+end
+
+# `p` must be a probability vector, as R's `check_p0` requires. Without the
+# check a vector of counts scores silently: `rps([3, 2, 5], 2)` returns 106.
+# R rejects any sum more than one `eps` from 1; the tolerance here is `1e-10`
+# so that a forecast normalised over many categories, whose rounding error
+# grows with the category count, is not rejected for arithmetic it cannot
+# avoid.
+function _check_probs(p::AbstractVector)
+    total = sum(p)
+    all(x -> isfinite(x) && x >= 0, p) && abs(total - 1) <= 1.0e-10 ||
+        throw(
+        ArgumentError(
+            "forecast probabilities must be finite, non-negative and sum to 1, " *
+                "got a vector summing to $total"
+        )
+    )
+    return nothing
 end

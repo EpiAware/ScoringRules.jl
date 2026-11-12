@@ -237,7 +237,8 @@ nominal coverage `level` (e.g. `level = 0.8` for an 80 % interval), with
 lower endpoint `lower`, upper endpoint `upper`, and observation `y`.
 
 # Arguments
-- `lower` — lower quantile forecast (the α₁ = (1-level)/2 quantile).
+- `lower` — lower quantile forecast (the α₁ = (1-level)/2 quantile); must not
+            exceed `upper`.
 - `upper` — upper quantile forecast (the α₂ = 1 - (1-level)/2 quantile).
 - `y`     — scalar observation.
 - `level` — nominal coverage, `0 < level < 1`.
@@ -264,6 +265,11 @@ interval_score(-1.64, 1.64, 0.5, 0.9)
 """
 function interval_score(lower::Real, upper::Real, y::Real, level::Real)
     0 < level < 1 || throw(ArgumentError("level must lie strictly in (0, 1), got $level"))
+    lower <= upper || throw(
+        ArgumentError(
+            "lower must not exceed upper, got lower=$lower, upper=$upper"
+        )
+    )
     return _ints_quantile(y, lower, upper, level)
 end
 

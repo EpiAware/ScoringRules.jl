@@ -141,3 +141,28 @@ end
     @test_throws ArgumentError clogs(dat, 0.0; a = 1.0, b = 1.0)
     @test_throws ArgumentError clogs(dat, 0.0; a = 2.0, b = 1.0)
 end
+
+@testitem "ensemble scores reject an empty ensemble" tags = [:sample] begin
+    using ScoringRules
+
+    # R raises "Incompatible input vector lengths"; without the check `crps`
+    # returned a silent NaN.
+    empty = Float64[]
+    @test_throws ArgumentError crps(empty, 0.5)
+    @test_throws ArgumentError crps(empty, 0.5; method = :kde)
+    @test_throws ArgumentError logs(empty, 0.5)
+    @test_throws ArgumentError dss(empty, 0.5)
+    @test_throws ArgumentError clogs(empty, 0.5)
+end
+
+@testitem "crps warns when bw is passed to the EDF method" tags = [:sample] begin
+    using ScoringRules
+
+    dat = collect(range(-2.0, 2.0; length = 51))
+    # `bw` belongs to the kernel-density route; the empirical distribution
+    # function has no bandwidth, and silently dropping it hides the mistake.
+    scored = @test_logs (:warn, r"bw.*ignored") crps(dat, 0.5; bw = 0.3)
+    @test scored == crps(dat, 0.5)
+    # The mirror-image warning for `w` on the kernel route already existed.
+    @test_logs (:warn, r"w.*ignored") crps(dat, 0.5; method = :kde, w = ones(51))
+end

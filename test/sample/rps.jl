@@ -16,3 +16,18 @@
         end
     end
 end
+
+@testitem "rps rejects anything that is not a probability vector" tags = [:sample] begin
+    using ScoringRules
+
+    # Handed counts, the score comes out as 106.0 without the check. R's
+    # `rps_probs` errors on a vector that is negative or does not sum to one.
+    @test_throws ArgumentError rps([3.0, 2.0, 5.0], 2)
+    @test_throws ArgumentError rps([-0.1, 0.6, 0.5], 2)
+    @test_throws ArgumentError rps([0.2, 0.2, 0.2], 2)
+    @test_throws ArgumentError rps([0.5, Inf], 1)
+    @test_throws ArgumentError rps([1.0], 1)      # K ≥ 2, as in R
+    # Rounding a user cannot avoid still passes.
+    p = fill(1 / 7, 7)
+    @test rps(p ./ sum(p), 3) ≈ rps(p, 3)
+end

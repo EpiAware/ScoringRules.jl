@@ -153,3 +153,16 @@ end
         @test quantile_score([alpha], [q[i]], y) ≈ per_level[i]
     end
 end
+
+@testitem "interval_score rejects a reversed interval" tags = [:sample] begin
+    using ScoringRules
+
+    # With the endpoints the wrong way round the formula still returns a
+    # number (9.0 for this call), which reads as a legitimate score. R's
+    # `ints_quantiles` errors instead.
+    @test_throws ArgumentError interval_score(2.0, 1.0, 1.5, 0.8)
+    @test_throws ArgumentError interval_score(0.0, -1.0, 0.0, 0.5)
+    # Equal endpoints are a degenerate but valid interval.
+    @test interval_score(1.0, 1.0, 1.0, 0.8) ≈ 0.0
+    @test interval_score(-1.64, 1.64, 0.5, 0.9) > 0
+end
