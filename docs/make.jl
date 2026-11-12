@@ -93,11 +93,12 @@ build_docs(
     # consts still builds -- just without that page rendered.
     heavy_benchmarks = _cfg(:HEAVY_BENCHMARKS, String[]),
     benchmark_stubs = _cfg(:BENCHMARK_STUBS, Pair{String, String}[]),
-    # Where the AD-comparison page's published gradient numbers are. Left
-    # `nothing` by a `docs_config.jl` without the const, and by every package
-    # naming no location of its own, which falls back to the `benchmarks`
-    # branch this package's benchmark run deploys to.
-    ad_benchmark_results = _cfg(:AD_BENCHMARK_RESULTS, nothing),
+    # `ad_benchmark_results` belongs here, pointing at the AD-comparison page's
+    # published gradient numbers. It is omitted because `build_docs` grew that
+    # keyword after v0.4.1 was tagged and the kit has not been released since,
+    # so no compat range reaches a version that accepts it. Nothing is lost
+    # meanwhile: this package names no location of its own, and the page it
+    # configures renders as a stub (see `FORCE_STUB_TUTORIALS`).
     linkcheck_ignore = _cfg(:LINKCHECK_IGNORE, Regex[]),
     index_rewrites = _cfg(:INDEX_REWRITES, Pair{String, String}[]),
     readme_execute = _cfg(:README_EXECUTE, true),
