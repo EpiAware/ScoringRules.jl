@@ -80,12 +80,41 @@ end
     @test_throws DomainError weight_function(:norm_cdf; sigma = -1.0)
     @test_throws ArgumentError weight_function(:norm_cdf; mu = Inf)
     @test_throws DimensionMismatch weight_function(:norm_cdf; mu = [0.0, 1.0], sigma = [1.0, 2.0, 3.0])
-    # As in R, the logistic shapes have no multivariate form.
+    # As in R, the logistic shapes have no multivariate form. R applies the
+    # same check whichever half of the pair it is asked for, and a chaining
+    # function that is the antiderivative of no product weight would leave the
+    # threshold-weighted score improper for the weight the caller chose.
     @test_throws ArgumentError weight_function(:logis_cdf; mu = [0.0, 1.0], sigma = [1.0, 1.0])
+    @test_throws ArgumentError chaining_function(:logis_cdf; mu = [0.0, 1.0], sigma = [1.0, 1.0])
+    @test_throws ArgumentError chaining_function(:logis_surv; mu = zeros(3), sigma = ones(3))
+    @test_throws ArgumentError chaining_function(:logis_pdf; mu = zeros(3), sigma = ones(3))
+    # An empty parameter builds a callable that can only throw.
+    @test_throws DimensionMismatch weight_function(:norm_cdf; mu = Float64[], sigma = Float64[])
+    @test_throws DimensionMismatch chaining_function(:norm_cdf; mu = Float64[], sigma = Float64[])
+    @test_throws DimensionMismatch weight_function(:logis_cdf; mu = Float64[], sigma = Float64[])
     # A length-d parameter applied to a forecast of another dimension.
     w = weight_function(:norm_cdf; mu = [0.0, 1.0], sigma = 1.0)
     @test_throws DimensionMismatch w([0.1, 0.2, 0.3])
     @test w([0.1, 0.2]) > 0
+
+    # A length-one vector is a scalar, and broadcasts like one rather than
+    # running off the end of itself.
+    for (mu, sigma) in (([0.5], [2.0]), (0.5, [2.0]), ([0.5], 2.0))
+        wv = weight_function(:norm_cdf; mu = mu, sigma = sigma)
+        cv = chaining_function(:norm_cdf; mu = mu, sigma = sigma)
+        ws = weight_function(:norm_cdf; mu = 0.5, sigma = 2.0)
+        cs = chaining_function(:norm_cdf; mu = 0.5, sigma = 2.0)
+        @test wv(0.3) ≈ ws(0.3) rtol = 1.0e-14
+        @test wv([0.3, -0.2, 1.1]) ≈ ws(0.3) * ws(-0.2) * ws(1.1) rtol = 1.0e-13
+        @test cv([0.3, -0.2]) ≈ [cs(0.3), cs(-0.2)] rtol = 1.0e-14
+    end
+
+    # A multivariate weight handed a scalar observation used to drop every
+    # dimension but the first and return a plausible wrong number.
+    wmv = weight_function(:norm_cdf; mu = [0.0, 10.0], sigma = [1.0, 1.0])
+    @test_throws DimensionMismatch wmv(1.0)
+    @test_throws DimensionMismatch chaining_function(:norm_cdf; mu = [0.0, 10.0], sigma = [1.0, 1.0])(1.0)
+    @test_throws DimensionMismatch owcrps(randn(50), 0.4; weight_func = wmv)
 
     # Scalars broadcast across dimensions, and the product form is the
     # per-dimension weights multiplied together.

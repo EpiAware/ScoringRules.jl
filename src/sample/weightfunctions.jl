@@ -61,7 +61,9 @@ end
 # --- the callables ---------------------------------------------------------
 
 _param_at(x::Real, ::Integer) = x
-_param_at(x::AbstractVector, i::Integer) = x[i]
+# A length-one vector is a scalar written as a vector, so it broadcasts across
+# dimensions rather than being indexed past its own end.
+_param_at(x::AbstractVector, i::Integer) = length(x) == 1 ? first(x) : x[i]
 
 _param_len(::Real) = 1
 _param_len(x::AbstractVector) = length(x)
@@ -80,7 +82,10 @@ struct SmoothWeight{K, M, S} <: Function
     sigma::S
 end
 
-(f::SmoothWeight)(z::Real) = f.kernel(z, _param_at(f.mu, 1), _param_at(f.sigma, 1))
+function (f::SmoothWeight)(z::Real)
+    _check_scalar_params(f)
+    return f.kernel(z, _param_at(f.mu, 1), _param_at(f.sigma, 1))
+end
 
 function (f::SmoothWeight)(z::AbstractVector)
     _check_param_dim(f, length(z))
@@ -105,7 +110,10 @@ struct SmoothChain{K, M, S} <: Function
     sigma::S
 end
 
-(f::SmoothChain)(z::Real) = f.kernel(z, _param_at(f.mu, 1), _param_at(f.sigma, 1))
+function (f::SmoothChain)(z::Real)
+    _check_scalar_params(f)
+    return f.kernel(z, _param_at(f.mu, 1), _param_at(f.sigma, 1))
+end
 
 function (f::SmoothChain)(z::AbstractVector)
     _check_param_dim(f, length(z))
@@ -113,6 +121,19 @@ function (f::SmoothChain)(z::AbstractVector)
         f.kernel(z[i], _param_at(f.mu, i), _param_at(f.sigma, i))
             for i in eachindex(z)
     ]
+end
+
+# A multivariate weight applied to a scalar observation would use the first
+# dimension's parameters and drop the rest, returning a plausible wrong score.
+function _check_scalar_params(f)
+    n = max(_param_len(f.mu), _param_len(f.sigma))
+    n == 1 || throw(
+        DimensionMismatch(
+            "mu and sigma have length $n, so this function takes a length-$n " *
+                "vector rather than a scalar"
+        )
+    )
+    return nothing
 end
 
 function _check_param_dim(f, d::Integer)
@@ -134,6 +155,10 @@ function _check_weight_params(name::Symbol, mu, sigma)
         )
     )
     lm, ls = _param_len(mu), _param_len(sigma)
+    # An empty parameter would build a callable that can only throw.
+    (lm == 0 || ls == 0) && throw(
+        DimensionMismatch("mu and sigma must not be empty")
+    )
     (lm == ls || lm == 1 || ls == 1) || throw(
         DimensionMismatch("mu has length $lm and sigma has length $ls")
     )
@@ -141,6 +166,17 @@ function _check_weight_params(name::Symbol, mu, sigma)
         throw(DomainError(sigma, "sigma must be strictly positive"))
     all(isfinite, mu) && all(isfinite, sigma) ||
         throw(ArgumentError("mu and sigma must be finite"))
+    # R rejects the logistic shapes for a multivariate forecast whichever half
+    # of the pair it is asked for, and so must both constructors here: an
+    # element-wise logistic chaining function is the antiderivative of no
+    # product weight, which would leave the threshold-weighted score improper
+    # for the weight the caller believes they chose.
+    max(lm, ls) > 1 && name in _LOGIS_NAMES && throw(
+        ArgumentError(
+            "the logistic weight functions are univariate only; use " *
+                ":norm_cdf, :norm_surv or :norm_pdf for a multivariate forecast"
+        )
+    )
     return nothing
 end
 
@@ -194,13 +230,6 @@ owcrps(dat, 0.5; weight_func = w)
 """
 function weight_function(name::Symbol; mu = 0.0, sigma = 1.0)
     _check_weight_params(name, mu, sigma)
-    (_param_len(mu) > 1 || _param_len(sigma) > 1) && name in _LOGIS_NAMES &&
-        throw(
-        ArgumentError(
-            "the logistic weight functions are univariate only; use " *
-                ":norm_cdf, :norm_surv or :norm_pdf for a multivariate forecast"
-        )
-    )
     return SmoothWeight(_weight_kernel(name), mu, sigma)
 end
 
