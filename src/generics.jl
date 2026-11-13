@@ -75,7 +75,16 @@ end
 # evaluates to `Inf`/`NaN` where it does not exist; `Distributions.var` already
 # follows that convention for most families, and the exceptions are handled
 # below.
-_forecast_moments(d::UnivariateDistribution) = (mean(d), _forecast_var(d))
+function _forecast_moments(d::UnivariateDistribution)
+    v = _forecast_var(d)
+    # The mean is asked for only once the variance is known to be usable. A
+    # variance that is not finite and positive makes the score `NaN` whatever
+    # the mean is, and a family with no mean throws rather than returning one:
+    # `LogLogistic` with β ≤ 1 took `dss` down with it where it had returned
+    # `NaN`, which is what this package documents and what R does.
+    (isfinite(v) && v > 0) || return (oftype(float(v) * one(v), NaN), v)
+    return (mean(d), v)
+end
 
 _forecast_var(d::UnivariateDistribution) = var(d)
 
@@ -220,45 +229,61 @@ end
 # of `d`, for the reason `_CRPS_QUAD_PROBS` gives: without them `quadgk` on a
 # half-infinite interval misses a narrow band of mass and reports convergence,
 # and `truncated(Exponential(1e-6), 0, Inf)` came back with both moments zero.
+# Each segment integrated on its own and the results added, rather than handing
+# `quadgk` the whole range in one call. Its convergence test is relative to the
+# total, and the first moment of a near-symmetric forecast is close to zero, so
+# one call spends its entire budget on a stretch that contributes nothing and
+# stops at its evaluation limit: `truncated(Laplace(0, 1); lower = -1e8)` gave
+# a mean of -0.0056 rather than 0. Per segment the budget is relative to that
+# segment's own contribution, so the empty stretch costs nothing and the tail
+# that holds the second moment is still resolved. Clipping the range instead
+# would discard that tail: it holds a negligible share of the probability and a
+# material share of the second moment, which cost the variance of a truncated
+# `LogNormal(0, 3)` 1.4%.
+function _quad_sum(g, pts::AbstractVector)
+    acc = first(quadgk(g, pts[1], pts[2]; rtol = 1.0e-12))
+    for i in 2:(length(pts) - 1)
+        acc += first(quadgk(g, pts[i], pts[i + 1]; rtol = 1.0e-12))
+    end
+    return acc
+end
+
+_quad_pts(d, lo::Real, hi::Real) =
+    [float(lo); _crps_quad_breaks(d, lo, hi, _MOMENT_QUAD_PROBS); float(hi)]
+
 _quad_first(f, d, lo::Real, hi::Real, c::Real) =
-    first(quadgk(x -> (x - c) * f(x), lo, _crps_quad_breaks(d, lo, hi)..., hi))
+    _quad_sum(x -> (x - c) * f(x), _quad_pts(d, lo, hi))
 
 _quad_central(f, d, lo::Real, hi::Real, m::Real) =
-    first(quadgk(x -> (x - m)^2 * f(x), lo, _crps_quad_breaks(d, lo, hi)..., hi))
+    _quad_sum(x -> (x - m)^2 * f(x), _quad_pts(d, lo, hi))
 
-# The range to integrate over, clipped to where the forecast keeps any mass.
-# Handed a bound 1e8 away from everything, `quadgk` apportions a relative error
-# budget against a total that is near zero and stops at its evaluation limit
-# instead of converging: the mean of `truncated(Laplace(0, 1); lower = -1e8)`
-# came out as -0.0056 rather than 0, even with the first moment measured from
-# the median. The clip drops at most 1e-16 of the probability either side.
-function _effective_range(d, lo::Real, hi::Real)
-    ql = try
-        Float64(quantile(d, 1.0e-16))
-    catch
-        NaN
+# A truncation that keeps an infinite tail has moments only where the base
+# does. Without this the quadrature stops at the deepest quantile it can
+# represent and reports a finite number for an integral that diverges: a
+# `Cauchy` truncated from below scored 37.4, where its variance does not exist
+# and the same family untruncated correctly scores `NaN`.
+function _tail_moments_exist(base, lo::Real, hi::Real)
+    isfinite(lo) && isfinite(hi) && return true
+    v = try
+        _forecast_var(base)
+    catch e
+        e isa MethodError || rethrow()
+        return false
     end
-    qh = try
-        Float64(quantile(d, 1 - 1.0e-16))
-    catch
-        NaN
-    end
-    l = isfinite(ql) ? max(float(lo), ql) : float(lo)
-    h = isfinite(qh) ? min(float(hi), qh) : float(hi)
-    return l < h ? (l, h) : (float(lo), float(hi))
+    return isfinite(v)
 end
 
 function _numeric_moments(d::Truncated{<:ContinuousUnivariateDistribution})
     base = d.untruncated
     lo = d.lower === nothing ? minimum(base) : float(d.lower)
     hi = d.upper === nothing ? maximum(base) : float(d.upper)
+    _tail_moments_exist(base, lo, hi) || return (NaN, NaN)
     z = _trunc_mass(base, lo, hi)
     z > 0 || return (oftype(float(z), NaN), oftype(float(z), NaN))
     f = x -> pdf(base, x)
-    a, b = _effective_range(d, lo, hi)
-    c = _shift_point(d, a, b)
-    m = c + _quad_first(f, d, a, b, c) / z
-    return (m, _quad_central(f, d, a, b, m) / z)
+    c = _shift_point(d, lo, hi)
+    m = c + _quad_first(f, d, lo, hi, c) / z
+    return (m, _quad_central(f, d, lo, hi, m) / z)
 end
 
 function _numeric_moments(d::Distributions.Censored{<:ContinuousUnivariateDistribution})
@@ -268,14 +293,11 @@ function _numeric_moments(d::Distributions.Censored{<:ContinuousUnivariateDistri
     pl = d.lower === nothing ? zero(float(lo)) : cdf(base, lo)
     pu = d.upper === nothing ? zero(float(hi)) : ccdf(base, hi)
     f = x -> pdf(base, x)
-    # The atoms stay at the censoring bounds; only the interior quadrature is
-    # clipped to where the density has mass.
-    a, b = _effective_range(d, lo, hi)
-    c = _shift_point(d, a, b)
-    m = c + _quad_first(f, d, a, b, c)
+    c = _shift_point(d, lo, hi)
+    m = c + _quad_first(f, d, lo, hi, c)
     pl > 0 && (m += (lo - c) * pl)
     pu > 0 && (m += (hi - c) * pu)
-    v = _quad_central(f, d, a, b, m)
+    v = _quad_central(f, d, lo, hi, m)
     pl > 0 && (v += (lo - m)^2 * pl)
     pu > 0 && (v += (hi - m)^2 * pu)
     return (m, v)
@@ -409,12 +431,19 @@ crps(Normal(0, 1), 0.5)
 # reports convergence: a boundary-mass exponential of scale 0.057 at location
 # 1.985 came out 1.8e-5 relative high, whatever `rtol` was asked for. Splitting
 # at the forecast's own quantiles puts a node in every region that holds mass.
-# The grid reaches 1e-14 because the moment integrands below are weighted by
-# `x` and `(x - m)^2`, so a tail holding only 1e-8 of the probability can still
-# hold 1e-6 of the second moment: stopping at 1e-8 left the variance of
-# `truncated(Exponential(1e-6), 0, Inf)` 3.4e-6 out, and reaching 1e-14 brings
-# it to 1e-11.
 const _CRPS_QUAD_PROBS = (
+    1.0e-8, 1.0e-4, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 1 - 1.0e-4, 1 - 1.0e-8,
+)
+
+# The moment integrands are weighted by `x` and `(x - m)^2`, so a tail holding
+# only 1e-8 of the probability can still hold 1e-6 of the second moment:
+# stopping at 1e-8 left the variance of `truncated(Exponential(1e-6), 0, Inf)`
+# 3.4e-6 out, and reaching 1e-14 brings it to 1e-11. The CRPS integrand is
+# bounded by 1 and needs no such depth, which is just as well: on a heavy tail
+# the 1e-14 quantile is around 1e14, and a segment boundary that far out next
+# to an infinite endpoint puts a Kronrod node on the endpoint itself, where
+# QuadGK's substitution evaluates `0 * Inf` and raises.
+const _MOMENT_QUAD_PROBS = (
     1.0e-14, 1.0e-10, 1.0e-8, 1.0e-4, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99,
     1 - 1.0e-4, 1 - 1.0e-8, 1 - 1.0e-10, 1 - 1.0e-14,
 )
@@ -423,16 +452,28 @@ const _CRPS_QUAD_PROBS = (
 # Anything that does not convert is skipped, which is what keeps the fallback
 # usable under automatic differentiation: a dual-valued quantile is dropped and
 # the call degenerates to the plain two-point one.
-function _crps_quad_breaks(d::ContinuousUnivariateDistribution, a::Real, b::Real)
+# How far out a segment boundary may sit, measured in interquartile ranges
+# from the median. On a heavy tail the 1e-8 quantile can be 1e16, and a
+# boundary that far out next to an infinite endpoint makes QuadGK's
+# substitution produce a NaN and raise, which took `crps` of a truncated
+# `Pareto(0.5, 1)` down. The integrand is bounded by 1, so the quadrature
+# resolves whatever lies beyond the last boundary on its own.
+const _QUAD_BREAK_REACH = 1.0e6
+
+function _crps_quad_breaks(
+        d::ContinuousUnivariateDistribution, a::Real, b::Real,
+        probs = _CRPS_QUAD_PROBS
+    )
     pts = Float64[]
     lo, hi = a < b ? (a, b) : (b, a)
-    for p in _CRPS_QUAD_PROBS
+    reach = _break_reach(d)
+    for p in probs
         q = try
             Float64(quantile(d, p))
         catch
             continue
         end
-        isfinite(q) && lo < q < hi && push!(pts, q)
+        isfinite(q) && lo < q < hi && abs(q) <= reach && push!(pts, q)
     end
     for edge in (minimum(d), maximum(d))
         e = try
@@ -447,12 +488,77 @@ function _crps_quad_breaks(d::ContinuousUnivariateDistribution, a::Real, b::Real
     return a < b ? pts : reverse!(pts)
 end
 
+# The largest magnitude a segment boundary may take, from the forecast's own
+# interquartile scale. Falls back to `Inf` (no bound) where the quartiles are
+# not available.
+function _break_reach(d::ContinuousUnivariateDistribution)
+    q1, q3, md = try
+        (
+            Float64(quantile(d, 0.25)), Float64(quantile(d, 0.75)),
+            Float64(quantile(d, 0.5)),
+        )
+    catch
+        return Inf
+    end
+    (isfinite(q1) && isfinite(q3) && isfinite(md)) || return Inf
+    scale = max(q3 - q1, abs(md), 1.0)
+    return abs(md) + _QUAD_BREAK_REACH * scale
+end
+
 function crps(d::ContinuousUnivariateDistribution, y::Real)
     lo = minimum(d)
     hi = maximum(d)
     left, _ = quadgk(x -> cdf(d, x)^2, lo, _crps_quad_breaks(d, lo, y)..., y)
     right, _ = quadgk(x -> ccdf(d, x)^2, y, _crps_quad_breaks(d, y, hi)..., hi)
     return left + right
+end
+
+# A truncated forecast's own CDF is a difference of base CDFs over its
+# normalising mass, and for a window deep in a tail all three round to the same
+# thing: `cdf` and `ccdf` of `truncated(Exponential(1), 40, Inf)` are both
+# exactly 0 at 45, which made the generic CRPS 0.0 for an observation four
+# units from the forecast mean. Rebuilding both from the base on whichever side
+# keeps its accuracy, and taking the segment boundaries the same way, puts the
+# score back. The families with a closed form have their own more specific
+# methods and never reach this.
+function crps(d::Truncated{<:ContinuousUnivariateDistribution}, y::Real)
+    base = d.untruncated
+    lo = d.lower === nothing ? minimum(base) : float(d.lower)
+    hi = d.upper === nothing ? maximum(base) : float(d.upper)
+    z = _trunc_mass(base, lo, hi)
+    z > 0 || return oftype(float(y), NaN)
+    upper_side = cdf(base, lo) > 0.5
+    F = function (x)
+        x <= lo && return 0.0
+        x >= hi && return 1.0
+        v = upper_side ? (ccdf(base, lo) - ccdf(base, x)) / z :
+            (cdf(base, x) - cdf(base, lo)) / z
+        return clamp(v, 0.0, 1.0)
+    end
+    pts = _trunc_break_pts(base, lo, hi, z, upper_side)
+    left, _ = quadgk(x -> F(x)^2, lo, filter(q -> lo < q < y, pts)..., y)
+    right, _ = quadgk(x -> (1 - F(x))^2, y, filter(q -> y < q < hi, pts)..., hi)
+    return left + right
+end
+
+# Quantiles of the truncated forecast, solved in the base's own tail so that a
+# window deep in one does not collapse: `quantile(truncated(Exponential(1), 40,
+# Inf), 0.5)` is `Inf`, where the answer is 40.69.
+function _trunc_break_pts(base, lo::Real, hi::Real, z::Real, upper_side::Bool)
+    pts = Float64[]
+    reach = _break_reach(base)
+    for p in _CRPS_QUAD_PROBS
+        q = try
+            upper_side ? Float64(cquantile(base, ccdf(base, lo) - p * z)) :
+                Float64(quantile(base, cdf(base, lo) + p * z))
+        catch
+            continue
+        end
+        isfinite(q) && lo < q < hi && abs(q) <= reach && push!(pts, q)
+    end
+    sort!(pts)
+    unique!(pts)
+    return pts
 end
 
 # Tail probability below which the discrete fallback stops widening its

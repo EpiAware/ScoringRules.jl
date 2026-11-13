@@ -35,7 +35,7 @@ using Distributions: Distributions, Beta, Binomial, Censored, Continuous,
     Hypergeometric, Laplace, LogLogistic, LogNormal,
     Logistic, MixtureModel, NegativeBinomial, Normal, Poisson, TDist,
     Truncated, Uniform, Univariate, UnivariateDistribution,
-    ccdf, cdf, components, dof, location, logpdf, params, pdf, probs,
+    ccdf, cdf, components, cquantile, dof, location, logpdf, params, pdf, probs,
     scale, shape, support, truncated
 using SpecialFunctions: erfc, erfcinv, gamma, digamma, logbeta, zeta,
     besselix, expinti
