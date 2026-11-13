@@ -87,11 +87,11 @@ _forecast_var(d::LogLogistic) = d.β > 2 ? var(d) : oftype(float(d.β), Inf)
 #
 # `mean` and `var` of a GEV are built from `Γ(1−ξ)` and `Γ(1−2ξ)`, and both
 # combinations cancel as ξ → 0: `var` evaluates `(Γ(1−2ξ) − Γ(1−ξ)²)/ξ²`,
-# whose numerator is O(ξ²). At ξ = 10⁻⁸ the variance that
-# `Distributions.var` returns is out by a third, and `dss` with it (18.5
-# against 0.81). Replacing `lgamma` differences for the cancelling parts does
-# not help either, because `lgamma(1−ξ)` is itself O(ξ) and carries an
-# absolute, not relative, error.
+# whose numerator is O(ξ²). At ξ = 10⁻⁸ the variance that `Distributions.var`
+# returns is 2.22 against the true 1.645, and the `dss` built on it 0.80
+# against 0.50. Replacing the cancelling parts with `lgamma` differences does
+# not help either, because `lgamma(1−ξ)` is itself O(ξ) and its error is
+# absolute rather than relative.
 #
 # Both are instead taken from the Maclaurin series of `log Γ(1−ξ)`,
 #
@@ -107,8 +107,16 @@ const _ZETA_SERIES = ntuple(k -> zeta(k + 1), 30)   # ζ(2) … ζ(31)
 const _EULER_GAMMA = -digamma(1.0)
 const _GEV_SERIES_ATOL = 0.1
 
-# `expm1(q)/q`, continued to its limit 1 at q = 0.
-@inline _expm1_over(q::Real) = iszero(q) ? one(float(q)) : expm1(q) / q
+# `expm1(q)/q`, continued to its limit 1 at q = 0. Below the cutoff the
+# Maclaurin series `Σ qⁿ/(n+1)!` is used rather than a branch on `q == 0`: the
+# division is 0/0 there, and under automatic differentiation the branch is not
+# even taken, because a dual with a zero value and a nonzero partial is not
+# `iszero`. The series is right in the value and the derivative alike, and its
+# truncation error at the cutoff is below 10⁻²¹.
+@inline function _expm1_over(q::Real)
+    abs(q) < 1.0e-5 && return 1 + q / 2 + q^2 / 6 + q^3 / 24
+    return expm1(q) / q
+end
 
 # `log Γ(1−ξ) / ξ`  =  γ + Σ_{k≥2} ζ(k) ξ^{k−1} / k.
 function _lgamma1m_over(ξ::Real)
@@ -167,23 +175,55 @@ end
 # numerically. The analytic route is still preferred where it exists, so no
 # result that works today moves.
 
-# Raw first and second moments of a continuous density over `[lo, hi]`, by
-# adaptive quadrature. `quadgk` handles the infinite endpoints directly.
-function _raw_moments(f, lo::Real, hi::Real)
-    m1, _ = quadgk(x -> x * f(x), lo, hi)
-    m2, _ = quadgk(x -> x^2 * f(x), lo, hi)
-    return m1, m2
+# Every variance below is taken about the mean rather than as
+# `E[X²] − E[X]²`. The raw second moment of a forecast whose support sits far
+# from the origin is dominated by the mean, so the difference loses the spread
+# entirely: a `Logistic(1e8, 1)` truncated to ±1 gave a variance of −4.4e5
+# where the true one is 0.29, and a `Normal(1e8, 1)` gave exactly 0.
+
+# Probability that a truncation to `[lo, hi]` retains. As a difference of
+# CDFs this cancels when both bounds sit in the same tail:
+# `cdf(Exponential(1), Inf) - cdf(Exponential(1), 40)` is exactly 0 where the
+# retained mass is 4.2e-18, which made the moments below, and the `dss` built
+# on them, nonsense. Taking the difference on whichever side the interval lies
+# keeps both terms small and the result accurate.
+function _trunc_mass(base, lo::Real, hi::Real)
+    return cdf(base, lo) > 0.5 ? ccdf(base, lo) - ccdf(base, hi) :
+        cdf(base, hi) - cdf(base, lo)
 end
+
+# A point inside `[lo, hi]` to measure the first moment from. `∫ x f(x) dx`
+# over `[1e8 − 1, 1e8 + 1]` is dominated by `1e8` times the retained mass, so
+# `quadgk`'s relative tolerance leaves an absolute error of order 1 in a window
+# only 2 wide and the mean is useless. Integrating `x − c` removes that term.
+function _shift_point(lo::Real, hi::Real)
+    isfinite(lo) && isfinite(hi) && return (lo + hi) / 2
+    isfinite(lo) && return float(lo)
+    isfinite(hi) && return float(hi)
+    return zero(float(lo))
+end
+
+# First moment of a continuous density over `[lo, hi]` measured from `c`, and
+# the second about `m`, by adaptive quadrature. Both are split at the quantiles
+# of `d`, for the reason `_CRPS_QUAD_PROBS` gives: without them `quadgk` on a
+# half-infinite interval misses a narrow band of mass and reports convergence,
+# and `truncated(Exponential(1e-6), 0, Inf)` came back with both moments zero.
+_quad_first(f, d, lo::Real, hi::Real, c::Real) =
+    first(quadgk(x -> (x - c) * f(x), lo, _crps_quad_breaks(d, lo, hi)..., hi))
+
+_quad_central(f, d, lo::Real, hi::Real, m::Real) =
+    first(quadgk(x -> (x - m)^2 * f(x), lo, _crps_quad_breaks(d, lo, hi)..., hi))
 
 function _numeric_moments(d::Truncated{<:ContinuousUnivariateDistribution})
     base = d.untruncated
     lo = d.lower === nothing ? minimum(base) : float(d.lower)
     hi = d.upper === nothing ? maximum(base) : float(d.upper)
-    z = cdf(base, hi) - cdf(base, lo)
+    z = _trunc_mass(base, lo, hi)
     z > 0 || return (oftype(float(z), NaN), oftype(float(z), NaN))
-    m1, m2 = _raw_moments(x -> pdf(base, x), lo, hi)
-    m = m1 / z
-    return (m, m2 / z - m^2)
+    f = x -> pdf(base, x)
+    c = _shift_point(lo, hi)
+    m = c + _quad_first(f, d, lo, hi, c) / z
+    return (m, _quad_central(f, d, lo, hi, m) / z)
 end
 
 function _numeric_moments(d::Distributions.Censored{<:ContinuousUnivariateDistribution})
@@ -192,24 +232,36 @@ function _numeric_moments(d::Distributions.Censored{<:ContinuousUnivariateDistri
     hi = d.upper === nothing ? maximum(base) : float(d.upper)
     pl = d.lower === nothing ? zero(float(lo)) : cdf(base, lo)
     pu = d.upper === nothing ? zero(float(hi)) : ccdf(base, hi)
-    m1, m2 = _raw_moments(x -> pdf(base, x), lo, hi)
-    pl > 0 && (m1 += lo * pl; m2 += lo^2 * pl)
-    pu > 0 && (m1 += hi * pu; m2 += hi^2 * pu)
-    return (m1, m2 - m1^2)
+    f = x -> pdf(base, x)
+    c = _shift_point(lo, hi)
+    m = c + _quad_first(f, d, lo, hi, c)
+    pl > 0 && (m += (lo - c) * pl)
+    pu > 0 && (m += (hi - c) * pu)
+    v = _quad_central(f, d, lo, hi, m)
+    pl > 0 && (v += (lo - m)^2 * pl)
+    pu > 0 && (v += (hi - m)^2 * pu)
+    return (m, v)
 end
 
 # Discrete truncated/censored wrappers: the same two moments by summation over
-# the support window the CRPS fallback already knows how to find.
+# the support window the CRPS fallback already knows how to find. The window
+# can clip a negligible tail, so both are normalised by the mass it holds.
 function _numeric_moments(d::DiscreteUnivariateDistribution)
     nodes = _crps_discrete_nodes(d)
-    m1 = 0.0
-    m2 = 0.0
+    w = 0.0
+    m = 0.0
     for k in nodes
         p = pdf(d, k)
-        m1 += p * k
-        m2 += p * k^2
+        w += p
+        m += p * k
     end
-    return (m1, m2 - m1^2)
+    w > 0 || return (NaN, NaN)
+    m /= w
+    v = 0.0
+    for k in nodes
+        v += pdf(d, k) * (k - m)^2
+    end
+    return (m, v / w)
 end
 
 # Prefer the analytic moments; fall back to the numerical ones only where
@@ -317,10 +369,16 @@ crps(Normal(0, 1), 0.5)
 # forecast whose mass sits in a narrow band far from the midpoint of a
 # half-infinite interval can be missed entirely, and the error estimate then
 # reports convergence: a boundary-mass exponential of scale 0.057 at location
-# 1.985 came out 1.8e-5 relative low, whatever `rtol` was asked for. Splitting
+# 1.985 came out 1.8e-5 relative high, whatever `rtol` was asked for. Splitting
 # at the forecast's own quantiles puts a node in every region that holds mass.
+# The grid reaches 1e-14 because the moment integrands below are weighted by
+# `x` and `(x - m)^2`, so a tail holding only 1e-8 of the probability can still
+# hold 1e-6 of the second moment: stopping at 1e-8 left the variance of
+# `truncated(Exponential(1e-6), 0, Inf)` 3.4e-6 out, and reaching 1e-14 brings
+# it to 1e-11.
 const _CRPS_QUAD_PROBS = (
-    1.0e-8, 1.0e-4, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 1 - 1.0e-4, 1 - 1.0e-8,
+    1.0e-14, 1.0e-10, 1.0e-8, 1.0e-4, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99,
+    1 - 1.0e-4, 1 - 1.0e-8, 1 - 1.0e-10, 1 - 1.0e-14,
 )
 
 # Interior segment boundaries strictly between `a` and `b`, as `Float64`.
@@ -360,9 +418,13 @@ function crps(d::ContinuousUnivariateDistribution, y::Real)
 end
 
 # Tail probability below which the discrete fallback stops widening its
-# summation window, and the largest number of support points it will walk.
+# summation window; the largest support it will enumerate directly rather than
+# fall back to that window; and the widest window it will walk at all, beyond
+# which a single score would take minutes (`Geometric(1e-9)` spreads over
+# 2.8e10 lattice points) and an error is the better answer.
 const _CRPS_DISCRETE_TOL = 1.0e-12
 const _CRPS_DISCRETE_MAXNODES = 1 << 24
+const _CRPS_DISCRETE_MAXWINDOW = 1 << 31
 
 """
     _crps_step(d, y, nodes)
@@ -445,17 +507,45 @@ function _crps_discrete_nodes(d::DiscreteUnivariateDistribution)
     lo, hi = minimum(d), maximum(d)
     if isfinite(lo) && isfinite(hi)
         s = support(d)
-        length(s) <= _CRPS_DISCRETE_MAXNODES && return s
+        if length(s) <= _CRPS_DISCRETE_MAXNODES
+            # `support` is an `AbstractVector` for every family in
+            # Distributions.jl but `Dirac`, whose is a one-element tuple.
+            return s isa AbstractVector ? s : collect(s)
+        end
     end
     tol = _CRPS_DISCRETE_TOL
     klo = _first_true(k -> cdf(d, k) > tol)
     khi = _first_true(k -> ccdf(d, k) <= tol)
     isfinite(lo) && (klo = max(klo, ceil(Int, lo)))
     isfinite(hi) && (khi = min(khi, floor(Int, hi)))
-    return klo:max(khi, klo)
+    khi = max(khi, klo)
+    (khi - klo) <= _CRPS_DISCRETE_MAXWINDOW || throw(
+        ArgumentError(
+            "the forecast $d spreads over $(khi - klo + 1) lattice points, " *
+                "more than the generic discrete CRPS will sum"
+        )
+    )
+    return klo:khi
 end
 
 # Generic discrete fallback. The named discrete families in `crps/discrete.jl`
-# have closed forms and never reach this.
+# have closed forms and never reach this. Where the support is unbounded,
+# `_crps_discrete_nodes` places the nodes on the integers, so the step CDF has
+# to jump there; an affine transform of such a forecast is routed through the
+# equivariance below rather than summed off its own lattice.
 crps(d::DiscreteUnivariateDistribution, y::Real) =
     _crps_step(d, y, _crps_discrete_nodes(d))
+
+# CRPS is equivariant under an increasing affine map: for `d = μ + σX` with
+# σ > 0, CRPS(d, y) = σ·CRPS(X, (y − μ)/σ). Without this, `3.5 + Poisson(2)`
+# was summed at the integers while its CDF jumps at the half-integers, and the
+# score came out 0.499 against the true 0.405.
+function crps(
+        d::Distributions.LocationScale{<:Real, Discrete, <:DiscreteUnivariateDistribution},
+        y::Real
+    )
+    σ = d.σ
+    σ == 0 && return abs(float(y - d.μ))
+    σ > 0 || return oftype(float(y) * float(σ), NaN)
+    return σ * crps(d.ρ, (y - d.μ) / σ)
+end
