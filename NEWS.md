@@ -81,11 +81,7 @@ Lerch and Allen). See the README for attribution and provenance.
   exponential of scale 0.057 at location 1.985 was 1.8e-5 relative high at
   every tolerance asked for, and the same miss left both moments of
   `truncated(Exponential(1e-6), 0, Inf)` at zero.
-- Input validation: `rps` rejects a vector that is negative or does not sum to
-  one and the ensemble scores reject an empty ensemble, both as R does;
-  `interval_score` rejects a reversed interval, which R has no counterpart for.
-  Passing `bw` to `crps(dat, y; method = :edf)` warns rather than being dropped
-  in silence, as R's message does.
+- Input validation: `rps` rejects a vector that is negative or does not sum to one, the univariate ensemble scores reject an empty ensemble, and `interval_score` rejects a reversed interval, all as R does. Passing `bw` to `crps(dat, y; method = :edf)` warns rather than being dropped in silence, as R's message does.
 - `es` and `mmds` no longer allocate a temporary per member pair, which at
   `d = 50`, `m = 3000` takes `es` from 2061 MiB and 594 ms per call to
   0.02 MiB and 127 ms. `vs` with member weights now computes the same number in

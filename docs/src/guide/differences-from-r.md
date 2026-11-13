@@ -156,20 +156,9 @@ all-zero weight vector.
 
 ### Input validation
 
-Two arguments are checked here that R checks too, with the same effect but a
-different message: a forecast vector in `rps` that is negative or does not sum
-to one, and an empty univariate ensemble. Passing `bw` to
-`crps(dat, y; method = :edf)` warns, where R prints a message saying the same
-thing.
+Three arguments are checked here that R checks too, with the same effect but a different message: a forecast vector in `rps` that is negative or does not sum to one, an empty univariate ensemble, and a prediction interval in `interval_score` whose lower end is above its upper one, which R's `ints_quantiles` rejects. Passing `bw` to `crps(dat, y; method = :edf)` warns, where R prints a message saying the same thing.
 
-Three of the checks have no counterpart in R, or depart from it. `rps` accepts a
-probability vector whose sum is within `1e-10` of one, where R insists on a
-single `eps`, which keeps a forecast normalised over many categories from being
-rejected for rounding it cannot avoid. `es` and `mmds` throw on an ensemble
-with no members, where R's `es_sample` and `mmds_sample` return 0; R's
-`vs_sample` errors, as `vs` does here. And `interval_score` rejects a reversed
-prediction interval, which R cannot do either way: `scoringRules` 1.1.3 has no
-interval score, only the `ints_*` functions this one is named after.
+Two of the checks have no counterpart in R, or depart from it. `rps` accepts a probability vector whose sum is within `1e-10` of one, where R insists on a single `eps`, which keeps a forecast normalised over many categories from being rejected for rounding it cannot avoid. `es` and `mmds` throw on an ensemble with no members, where R's `es_sample` and `mmds_sample` return 0; R's `vs_sample` errors, as `vs` does here.
 
 ## Parameter conventions
 
