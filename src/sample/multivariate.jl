@@ -75,6 +75,13 @@ end
     return s
 end
 
+# The Euclidean distance from its square. Two coincident columns put the
+# square at exactly zero, where the derivative of `sqrt` is `0 * Inf`, so
+# automatic differentiation would return NaN for any score with a tied pair.
+# The distance has a kink there and zero is its subgradient, which is also
+# what `norm` gave.
+@inline _sqrt_dist(s::Real) = s > 0 ? sqrt(s) : zero(s)
+
 """
     _member_weights(m, w)
 
@@ -141,7 +148,7 @@ end
 function _esC_xy(y::AbstractVector, X::AbstractMatrix, w::AbstractVector)
     out = 0.0
     @inbounds for i in axes(X, 2)
-        out += w[i] * sqrt(_col_sqdist(X, i, y))
+        out += w[i] * _sqrt_dist(_col_sqdist(X, i, y))
     end
     return out
 end
@@ -154,7 +161,7 @@ function _esC_xx(X::AbstractMatrix, w::AbstractVector)
         wi = w[i]
         acc = 0.0
         for j in (i + 1):m
-            acc += w[j] * sqrt(_col_sqdist(X, i, j))
+            acc += w[j] * _sqrt_dist(_col_sqdist(X, i, j))
         end
         out += 2.0 * wi * acc
     end

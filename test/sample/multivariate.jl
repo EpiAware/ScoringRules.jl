@@ -287,3 +287,31 @@ end
             twvs(Float64.(X), Float64.(y); a = -Inf) rtol = 1.0e-12
     end
 end
+
+@testitem "energy score gradients stay finite where members coincide" tags = [:sample] begin
+    using ScoringRules
+    using ForwardDiff: derivative
+
+    # Ties are ordinary: an integer ensemble has them, and the default clamp
+    # in `twes` sends every member past the bound to the same point. The
+    # distance between two tied members is a kink, and the subgradient there
+    # is zero; the score must not turn it into NaN.
+    cd(f, x; h = 1.0e-6) = (f(x + h) - f(x - h)) / (2h)
+    y = [0.5, 1.0]
+    tied = [1.0 1.0 3.0; 2.0 2.0 0.0]
+    at_obs = [0.5 1.0 3.0; 1.0 2.0 0.0]
+    clamped = [0.2 5.0 6.0 -0.3; 0.1 7.0 8.0 0.4]
+    wf = weight_function(:norm_cdf; mu = 0.0, sigma = 2.0)
+    cases = [
+        s -> es(tied .+ s, y),
+        s -> es(tied .* (1 + s), y),
+        s -> es(at_obs .+ s, y),
+        s -> twes(clamped .+ s, y; b = 1.0),
+        s -> owes(tied .+ s, y; weight_func = wf),
+    ]
+    for f in cases
+        g = derivative(f, 0.0)
+        @test isfinite(g)
+        @test g ≈ cd(f, 0.0) atol = 1.0e-6
+    end
+end
