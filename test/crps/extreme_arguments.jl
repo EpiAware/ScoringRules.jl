@@ -484,7 +484,7 @@ end
     # mean, near the mode and well into both tails.
     setprecision(BigFloat, 300) do
         exact(λ, k) = exp(big(k) * log(big(λ)) - big(λ) - loggamma(big(k) + 1))
-        for λ in (0.5, 3.0, 20.0, 350.0, 1.0e4, 1.0e6, 1.0e8, 1.0e9, 1.0e10)
+        for λ in (0.5, 3.0, 20.0, 350.0, 1.0e4, 1.0e6, 1.0e8, 1.0e9, 1.0e10, 5.0e18, 9.0e18)
             for z in (-6.0, -2.0, 0.0, 0.5, 3.0, 6.0)
                 k = max(0, round(Int, λ + z * sqrt(λ)))
                 @test _pois_dens(λ, k) ≈ Float64(exact(λ, k)) rtol = 1.0e-13

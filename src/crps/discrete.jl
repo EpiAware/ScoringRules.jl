@@ -83,7 +83,8 @@ function _bd0(k::Integer, lambda::Real)
     if abs(d) < (k + lambda) / 10
         v = d / (k + lambda)
         s = d * v
-        ej = 2 * k * v
+        # In floating point: `2k` overflows an `Int` past a mean of 4.6e18.
+        ej = 2 * float(k) * v
         v2 = v * v
         for j in 1:1000
             ej *= v2
