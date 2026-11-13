@@ -29,8 +29,8 @@ function _check_multiv(X::AbstractMatrix, y::AbstractVector)
     # Every loop below pairs `axes(X, …)` with a weight vector that
     # `_member_weights` builds one-based, or with `y`, so offset axes would
     # index past the end of one of them. `@inbounds` makes that a silent read
-    # of whatever is next in memory rather than an error: with a row offset,
-    # `es` returned 0.9276 for an ensemble whose score is 0.7042.
+    # of whatever is next in memory rather than an error, which is why the
+    # wrong answer it produced was different on each call.
     # `Base.require_one_based_indexing` would say this in one call but is not
     # public API, and this package has just finished removing its reliance on
     # an unexported one.
@@ -54,7 +54,8 @@ _one_based(A) = all(ax -> ax == 1:length(ax), axes(A))
 # an integer difference squares to an integer and overflows there, which
 # `norm` (the call this replaced) never did.
 # `es(Int32[2147483647 0; 0 0], Int32[0, 0])` came out as 0.25 against the
-# true 536870911.75, and the Int64 version threw out of `sqrt`.
+# true 536870911.75, and at `Int64[4000000000 0; 0 0]` the wrapped negative
+# square threw out of `sqrt`.
 @inline function _col_sqdist(X::AbstractMatrix, i::Integer, j::Integer)
     T = float(eltype(X))
     s = zero(T)
@@ -208,6 +209,11 @@ function _vs_core(
     out = 0.0
     d = length(y)
     m = size(X, 2)
+    # Floating point before the subtraction, for the reason `_col_sqdist`
+    # gives: an integer difference raised to `p` wraps, and `abs` of `typemin`
+    # stays negative, so `vs` returned 5.9e8 for an ensemble scoring 8.0e9 and
+    # threw out of `^0.5` on the wrapped case.
+    T = float(promote_type(eltype(X), eltype(y)))
     @inbounds for k in 1:d
         for l in k:d
             wkl = w_vs === nothing ? 1.0 : w_vs[k, l]
@@ -215,15 +221,15 @@ function _vs_core(
             vdat = 0.0
             if w === nothing
                 for i in 1:m
-                    vdat += abs(X[k, i] - X[l, i])^p
+                    vdat += abs(T(X[k, i]) - T(X[l, i]))^p
                 end
                 vdat /= m
             else
                 for i in 1:m
-                    vdat += w[i] * abs(X[k, i] - X[l, i])^p
+                    vdat += w[i] * abs(T(X[k, i]) - T(X[l, i]))^p
                 end
             end
-            vy = abs(y[k] - y[l])^p
+            vy = abs(T(y[k]) - T(y[l]))^p
             out += 2.0 * wkl * (vy - vdat)^2
         end
     end
