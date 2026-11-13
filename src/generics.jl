@@ -290,6 +290,7 @@ function _numeric_moments(d::Distributions.Censored{<:ContinuousUnivariateDistri
     base = d.uncensored
     lo = d.lower === nothing ? minimum(base) : float(d.lower)
     hi = d.upper === nothing ? maximum(base) : float(d.upper)
+    _tail_moments_exist(base, lo, hi) || return (NaN, NaN)
     pl = d.lower === nothing ? zero(float(lo)) : cdf(base, lo)
     pu = d.upper === nothing ? zero(float(hi)) : ccdf(base, hi)
     f = x -> pdf(base, x)
