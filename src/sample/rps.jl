@@ -57,7 +57,8 @@ forecast.
 # Arguments
 - `p` — `AbstractVector` of forecast probabilities over K ≥ 2 ordered outcome
         categories.  Must be finite, non-negative and sum to 1 (to within
-        `1e-10`); anything else throws, as in R's `rps_probs`.
+        `1e-10`, or `K` of the element type's `eps` where that is larger);
+        anything else throws, as in R's `rps_probs`.
 - `y` — observed outcome category as an `Integer` in `{1, …, K}`, where
         `y = 1` is the smallest and `y = K` is the largest category.
 
@@ -96,13 +97,17 @@ end
 
 # `p` must be a probability vector, as R's `check_p0` requires. Without the
 # check a vector of counts scores silently: `rps([3, 2, 5], 2)` returns 106.
-# R rejects any sum more than one `eps` from 1; the tolerance here is `1e-10`
-# so that a forecast normalised over many categories, whose rounding error
-# grows with the category count, is not rejected for arithmetic it cannot
-# avoid.
+# R rejects any sum more than one `eps` from 1. Here the tolerance is `1e-10`,
+# or `K` of the vector's own `eps` where that is larger: a forecast normalised
+# over many categories, or held in Float32, carries rounding in its sum that
+# it cannot avoid, and is a probability vector all the same.
+_prob_eps(::AbstractVector{T}) where {T <: AbstractFloat} = eps(T)
+_prob_eps(::AbstractVector) = eps(Float64)
+
 function _check_probs(p::AbstractVector)
     total = sum(p)
-    all(x -> isfinite(x) && x >= 0, p) && abs(total - 1) <= 1.0e-10 ||
+    tol = max(1.0e-10, length(p) * _prob_eps(p))
+    all(x -> isfinite(x) && x >= 0, p) && abs(total - 1) <= tol ||
         throw(
         ArgumentError(
             "forecast probabilities must be finite, non-negative and sum to 1, " *

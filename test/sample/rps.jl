@@ -31,3 +31,19 @@ end
     p = fill(1 / 7, 7)
     @test rps(p ./ sum(p), 3) ≈ rps(p, 3)
 end
+
+@testitem "rps accepts a probability vector normalised in lower precision" tags = [:sample] begin
+    using ScoringRules
+    using Random: Xoshiro
+
+    # A Float32 vector divided by its own sum lands within a few Float32 eps
+    # of one, far more than 1e-10; it is still a probability vector.
+    rng = Xoshiro(1)
+    for k in (3, 20, 200)
+        p = rand(rng, Float32, k)
+        p ./= sum(p)
+        @test rps(p, 2) ≈ rps(Float64.(p) ./ sum(Float64.(p)), 2) rtol = 1.0e-5
+    end
+    # A Float32 vector that is plainly not normalised is still refused.
+    @test_throws ArgumentError rps(Float32[0.2, 0.2, 0.5], 2)
+end
