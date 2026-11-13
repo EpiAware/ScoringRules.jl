@@ -40,6 +40,10 @@ the exponential integral Ei.
 function _crps_gev(y::Real, shape::Real, location::Real = 0.0, scale::Real = 1.0)
     scale < 0 && return oftype(float(y), NaN)
     shape >= 1 && return oftype(float(y), NaN)
+    # With shape below 1 the mean is finite, so an observation at infinity is
+    # infinitely far from the forecast. The Gumbel form would meet that as
+    # `-Inf + Inf`.
+    isinf(y) && return oftype(float(y), Inf)
 
     y_std = (y - location) / scale   # standardised observation
 
@@ -95,6 +99,9 @@ function _crps_gpd(
     scale < 0 && return oftype(float(y), NaN)
     shape >= 1 && return oftype(float(y), NaN)
     (mass < 0 || mass > 1) && return oftype(float(y), NaN)
+    # As for the GEV: a finite mean, so an infinite observation scores `Inf`.
+    # At shape zero the exponent would otherwise form `0 * Inf`.
+    isinf(y) && return oftype(float(y), Inf)
 
     z = (y - location) / scale   # standardised observation
 
