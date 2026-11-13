@@ -51,7 +51,7 @@ through `log1p`, which is accurate to the last bit or two for every shape.
 
 The CRPS has a Gauss hypergeometric factor in it. R sums the series for that factor through the `hypergeo` package, which returns `-Inf` for every half-integer size below a threshold that depends on `prob`: sizes 0.5 to 5.5 at `prob = 0.1`, 0.5 to 9.5 at `prob = 0.3`, and 0.5 to 26.5 at `prob = 0.7`. Only the half-integers are affected; quarter-integer and other fractional sizes come out finite and right. This package evaluates the same factor as an Euler integral and reproduces brute-force summation over the probability mass function to 15 digits at moderate sizes, and to 1e-10 at a size of 1e10. Everywhere R returns a finite value it agrees, to 1e-14 at sizes up to 1000.
 
-The closed form subtracts terms that grow like `size/prob` to leave a score that grows like `√size/prob`, and loses digits as the size grows. Past a size of about 1e14 it has no reliable digits left, and below a `prob` of about 1e-154 one of its terms overflows; at both, this package returns `NaN`. R stops with an error in `hypergeo` at the first and returns `Inf` at the second.
+The closed form subtracts terms that grow like `size/prob` to leave a score that grows like `√size/prob`, and loses digits as the size grows. A nearly degenerate forecast observed at zero loses them the same way, and is summed exactly over its few lattice points. Past a size of 1e15 to 1e18, depending on `prob`, the closed form keeps fewer than six digits, and below a `prob` of about 1e-154 one of its terms overflows; at both, this package returns `NaN`. R stops with an error in `hypergeo` at the first and returns `Inf` at the second.
 
 ### Truncated-density log score with a far lower bound
 

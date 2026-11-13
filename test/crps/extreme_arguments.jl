@@ -528,3 +528,20 @@ end
     # An infinite observation is still an infinite score.
     @test crps(NegativeBinomial(5.0, 0.3), Inf) == Inf
 end
+
+@testitem "the negative binomial CRPS holds for a nearly degenerate forecast" tags = [:crps] setup = [DefinitionOracle] begin
+    using ScoringRules
+    using Distributions
+
+    # A size near zero or a `prob` near one puts almost all the mass at zero,
+    # and the score at `y = 0` is tiny. The closed form reaches it by
+    # cancelling two terms of order one, which costs about `log10(1/(1 - prob))`
+    # digits unless the hypergeometric factor's distance from one is taken
+    # without forming the factor itself.
+    for (r, p) in ((1.0e-8, 0.5), (1.0e-12, 0.5), (1.0, 1 - 1.0e-9), (5.0, 1 - 1.0e-9), (1.0, 1 - 1.0e-12), (0.5, 1 - 1.0e-6))
+        d = NegativeBinomial(r, p)
+        for y in (0.0, 1.0, 3.0)
+            @test crps(d, y) ≈ oracle_crps(d, y) rtol = 1.0e-10
+        end
+    end
+end

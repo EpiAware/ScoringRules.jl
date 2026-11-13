@@ -165,18 +165,57 @@ function _crps_nbinom(y::Real, size::Real, prob::Real)
     h = _f21_half_two(size + 1, 4 * c2)
     out = c1 - size * c2 * (u + h)
     # Each `2F − 1` is a difference of two probabilities, good to about one
-    # `eps` absolute however small it comes out, and the closed form then
-    # multiplies those errors by `y` and by `size * c2 ≈ size/prob` while the
-    # score itself grows only like `√size/prob`. So the score keeps about
-    # `16 − log10(√size)` digits, and none from a size near 1e32 on; below
-    # `prob ≈ 1e-154`, `c2` overflows outright. Past either point the closed
-    # form has no score to give, and a NaN says so where the subtraction
-    # would hand back an arbitrary, often negative, number. An infinite
-    # observation keeps its infinite score.
+    # `eps` absolute however small it comes out, and the closed form multiplies
+    # those errors by `y` and by `size * c2 ≈ size/prob`. Where the score is
+    # small beside that, the result keeps few digits: at a huge size, where
+    # the score grows only like `√size/prob`; at a nearly degenerate forecast
+    # observed at zero, where the score is of order `size·(1 − prob)`; and
+    # below `prob ≈ 1e-154`, where `c2` overflows outright. The bound below is
+    # within a few times of the error measured against lattice sums.
+    #
+    # A forecast compact enough to sum is summed exactly wherever the closed
+    # form falls short of 1e-10. One too wide to sum keeps the closed form to
+    # 1e-6, and past that has no score to give: a NaN says so where the
+    # subtraction would hand back an arbitrary, often negative, number. An
+    # infinite observation keeps its infinite score.
     isfinite(y) || return out
-    err = 64 * eps(Float64) * (abs(y) + size * c2 * (prob + abs(h)))
-    reliable = isfinite(err) && err <= 1.0e-6 * abs(out)
-    return reliable ? out : oftype(out, NaN)
+    rel = 2 * eps(Float64) * (abs(y) + size * c2 * (prob + abs(h))) / abs(out)
+    rel <= 1.0e-10 && return out
+    usable = rel <= 1.0e-6 ? out : oftype(out, NaN)
+    # How far the sum has to run: past `y`, past the bulk, and down a tail that
+    # shrinks by `1 − prob` a step, which takes about `20/prob` steps to fall
+    # below `eps` squared.
+    mu = size * (1 - prob) / prob
+    span = max(y, mu + 40 * sqrt(mu / prob), 20 / prob)
+    span <= 1.0e6 && return _crps_nbinom_sum(y, size, prob, usable)
+    return usable
+end
+
+# The CRPS of a negative binomial forecast as the integral over its step CDF,
+# for a forecast the closed form scores too coarsely. Below the support the
+# integrand is one; on `[k, k + 1)` it is `F(k)²` below `y` and `S(k)²` above.
+# The sum runs until the tail left is too small to change the total, which for
+# a compact forecast is a handful of terms; past a million it gives up and
+# returns `fallback`.
+function _crps_nbinom_sum(y::Real, size::Real, prob::Real, fallback::Real)
+    d = NegativeBinomial(size, prob)
+    total = y < 0 ? -float(y) : zero(float(y))
+    for k in 0:1_000_000
+        F, S = cdf(d, k), ccdf(d, k)
+        total += if y <= k
+            S^2
+        elseif y >= k + 1
+            F^2
+        else
+            F^2 * (y - k) + S^2 * (k + 1 - y)
+        end
+        # Past `k` each step multiplies the mass by at most `ρ`, the largest
+        # ratio `P(j + 1)/P(j)` from here on, so once `ρ < 1` what the tail
+        # can still add after a term `S²` is at most `S²/(1 − ρ²)`.
+        ρ = (1 - prob) * max(one(size), (k + size) / (k + 1))
+        k >= y && ρ < 1 && S^2 / (1 - ρ^2) <= eps(Float64) * total && return total
+    end
+    return fallback
 end
 
 crps(d::NegativeBinomial, y::Real) = _crps_nbinom(y, d.r, d.p)
