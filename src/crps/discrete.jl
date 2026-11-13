@@ -31,16 +31,69 @@ function _crps_pois(y::Real, lambda::Real)
     # `besselix(ν, x) = exp(−x)·besseli(ν, x)` is R's `besselI(expon.scaled =
     # TRUE)`. Forming the unscaled `besseli(0, 2λ)` first overflows the Amos
     # routine from λ ≈ 351 even though the scaled product is O(10⁻²) there.
-    c2 = 2 * _pois_dens(lambda, y) - (besselix(0, x) + besselix(1, x))
+    c2 = 2 * _pois_dens(lambda, y) - _besselix01(x)
     return c1 + lambda * c2
+end
+
+# `besselix(0, x) + besselix(1, x)`. Past about `x = 1e9` the Amos routine
+# refuses its argument outright, so above `1e8` the sum is taken from its
+# large-argument expansion, `sqrt(2 / (π x)) · (1 − 1/(8x) − 3/(128x²) …)`,
+# whose first omitted term is below 1e-17 relative there.
+@inline function _besselix01(x::Real)
+    x > 1.0e8 || return besselix(0, x) + besselix(1, x)
+    return sqrt(2 / (oftype(float(x), π) * x)) * (1 - 1 / (8 * x))
 end
 
 # `dpois(⌊y⌋, λ)`, zero outside the support. The `Int` conversion is guarded so
 # that an observation beyond `typemax(Int)` gives the correct zero density
 # rather than an `InexactError`.
+#
+# The mass is taken in Loader's saddle-point form, as R's `dpois` takes it. The
+# textbook `exp(k log λ − λ − log k!)`, which `pdf(::Poisson)` uses, subtracts
+# terms of size `k log λ` to leave one of size one, and is 2.5e-7 out at a mean
+# of 1e8. Here those terms cancel analytically inside `_bd0`.
 @inline function _pois_dens(lambda::Real, y::Real)
     (isfinite(y) && 0 <= y <= typemax(Int)) || return zero(float(lambda))
-    return pdf(Poisson(lambda), floor(Int, y))
+    k = floor(Int, y)
+    k == 0 && return exp(-float(lambda))
+    iszero(lambda) && return zero(float(lambda))
+    return exp(-_stirlerr(k) - _bd0(k, lambda)) / sqrt(2 * oftype(float(lambda), π) * k)
+end
+
+# The error of Stirling's formula, `log k! − ((k + 1/2) log k − k + log √(2π))`.
+# Small `k` takes it directly, where the terms are small enough not to cancel;
+# above that its asymptotic series, with as many terms as `k` needs for the
+# first omitted one to fall below 1e-16 (the split points are R's).
+function _stirlerr(k::Integer)
+    k <= 15 && return loggamma(k + 1.0) - (k + 0.5) * log(Float64(k)) + k - log(sqrt(2π))
+    n = Float64(k)
+    nn = n * n
+    S0, S1, S2, S3, S4 = 1 / 12, 1 / 360, 1 / 1260, 1 / 1680, 1 / 1188
+    k > 500 && return (S0 - S1 / nn) / n
+    k > 80 && return (S0 - (S1 - S2 / nn) / nn) / n
+    k > 35 && return (S0 - (S1 - (S2 - S3 / nn) / nn) / nn) / n
+    return (S0 - (S1 - (S2 - (S3 - S4 / nn) / nn) / nn) / nn) / n
+end
+
+# `k log(k/λ) + λ − k`, the deviance term of the saddle-point form. Near the
+# mode the two halves nearly cancel, so there it is summed as a series in
+# `v = (k − λ)/(k + λ)`, whose terms are all of one sign.
+function _bd0(k::Integer, lambda::Real)
+    d = k - lambda
+    if abs(d) < (k + lambda) / 10
+        v = d / (k + lambda)
+        s = d * v
+        ej = 2 * k * v
+        v2 = v * v
+        for j in 1:1000
+            ej *= v2
+            s1 = s + ej / (2j + 1)
+            s1 == s && return s1
+            s = s1
+        end
+        return s
+    end
+    return k * log(k / lambda) + lambda - k
 end
 
 crps(d::Poisson, y::Real) = _crps_pois(y, d.λ)

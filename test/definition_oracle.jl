@@ -103,8 +103,13 @@
 
     function _window(d)
         lo, hi = float(minimum(d)), float(maximum(d))
-        left = isfinite(lo) ? Int(ceil(lo)) : Int(floor(quantile(d, 1.0e-17))) - 2
-        right = isfinite(hi) ? Int(floor(hi)) : Int(ceil(cquantile(d, 1.0e-17))) + 2
+        # A finite bound can sit far from the mass, as zero does for a Poisson
+        # with a large mean, so the window starts at whichever is nearer. Beyond
+        # the 1e-17 quantiles the summands are below 1e-34.
+        left = floor(Int, quantile(d, 1.0e-17)) - 2
+        right = ceil(Int, cquantile(d, 1.0e-17)) + 2
+        isfinite(lo) && (left = max(left, ceil(Int, lo)))
+        isfinite(hi) && (right = min(right, floor(Int, hi)))
         return left, right
     end
 

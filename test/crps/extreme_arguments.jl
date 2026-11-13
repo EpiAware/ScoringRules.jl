@@ -472,3 +472,37 @@ end
         var(truncated(Normal(0.0, 1.0), 0.0, 2.0))
     ) rtol = 1.0e-14
 end
+
+@testitem "the Poisson CRPS holds at means past where besselix stops" tags = [:crps] setup = [DefinitionOracle] begin
+    using ScoringRules
+    using Distributions
+    using ScoringRules: _pois_dens, loggamma
+
+    # The score uses the probability mass at the observation, and the textbook
+    # `exp(k log λ - λ - log k!)` subtracts numbers of size `k log λ` to get
+    # one of size one: 2.5e-7 out at a mean of 1e8. It has to hold at any
+    # mean, near the mode and well into both tails.
+    setprecision(BigFloat, 300) do
+        exact(λ, k) = exp(big(k) * log(big(λ)) - big(λ) - loggamma(big(k) + 1))
+        for λ in (0.5, 3.0, 20.0, 350.0, 1.0e4, 1.0e6, 1.0e8, 1.0e9, 1.0e10)
+            for z in (-6.0, -2.0, 0.0, 0.5, 3.0, 6.0)
+                k = max(0, round(Int, λ + z * sqrt(λ)))
+                @test _pois_dens(λ, k) ≈ Float64(exact(λ, k)) rtol = 1.0e-13
+            end
+        end
+    end
+    @test _pois_dens(0.0, 0) == 1
+    @test _pois_dens(0.0, 3) == 0
+    @test _pois_dens(2.0, 0) ≈ exp(-2.0) rtol = 1.0e-15
+
+    # `besselix` raises an error once its argument passes about 1e9, which is
+    # a Poisson mean of 5e8. The score itself is unremarkable there.
+    for λ in (1.0e8, 1.0e9, 1.0e10), z in (-2.0, 0.0, 0.7, 3.0)
+        y = round(λ + z * sqrt(λ))
+        @test crps(Poisson(λ), y) ≈ oracle_crps(Poisson(λ), y) rtol = 1.0e-8
+    end
+    # No step where the large-argument form takes over.
+    for λ in (4.99e7, 5.0e7, 5.01e7)
+        @test crps(Poisson(λ), λ) ≈ oracle_crps(Poisson(λ), λ) rtol = 1.0e-9
+    end
+end
