@@ -102,9 +102,10 @@ println(grad_parity("t",
 ```
 
 R's `gradcrps_t` agrees with central differences of its own `crps_t` at every
-degree of freedom and bound tried, so it is a usable reference. Its truncated
-counterpart `gradcrps_tt` does not, which is why only the untruncated families
-appear here (see [Differences from R](@ref differences-from-r)).
+degree of freedom, location and scale tried, which makes it a usable reference.
+Its truncated counterpart `gradcrps_tt` does not, which is why only the
+untruncated families appear here (see
+[Differences from R](@ref differences-from-r)).
 
 ## Which families are AD-differentiable
 

@@ -50,12 +50,14 @@ through `log1p`, which is accurate to the last bit or two for every shape.
 ### Negative binomial CRPS at a half-integer size
 
 The CRPS has a Gauss hypergeometric factor in it. R sums the series for that
-factor through the `hypergeo` package, which returns `-Inf` for some
-half-integer sizes: `size = 2.5` and `5.5` at `prob = 0.3`, and `size = 10.5`
-at `prob = 0.7`. This package evaluates the same factor as an Euler integral
-and reproduces brute-force summation over the probability mass function to 15
-digits at every size, integer or not. Away from those sizes R is accurate, to
-1e-14 at sizes up to 1000.
+factor through the `hypergeo` package, which returns `-Inf` for every
+half-integer size below a threshold that depends on `prob`: sizes 0.5 to 5.5 at
+`prob = 0.1`, 0.5 to 9.5 at `prob = 0.3`, and 0.5 to 26.5 at `prob = 0.7`.
+Only the half-integers are affected; quarter-integer and other fractional sizes
+come out finite and right. This package evaluates the same factor as an Euler
+integral and reproduces brute-force summation over the probability mass
+function to 15 digits at every size. Everywhere R returns a finite value it
+agrees, to 1e-14 at sizes up to 1000.
 
 ### Truncated-density log score with a far lower bound
 
@@ -154,18 +156,20 @@ all-zero weight vector.
 
 ### Input validation
 
-Several arguments are checked here that R checks too, with the same effect but
-a different message: a reversed prediction interval in `interval_score`, a
-forecast vector in `rps` that is negative or does not sum to one, and an empty
-univariate ensemble. Passing `bw` to `crps(dat, y; method = :edf)` warns, where
-R prints a message saying the same thing.
+Two arguments are checked here that R checks too, with the same effect but a
+different message: a forecast vector in `rps` that is negative or does not sum
+to one, and an empty univariate ensemble. Passing `bw` to
+`crps(dat, y; method = :edf)` warns, where R prints a message saying the same
+thing.
 
-Two of the checks do depart from R. `rps` accepts a probability vector whose sum
-is within `1e-10` of one, where R insists on a single `eps`, which keeps a
-forecast normalised over many categories from being rejected for rounding it
-cannot avoid. And `es` and `mmds` throw on an ensemble with no members, where
-R's `es_sample` and `mmds_sample` return 0; R's `vs_sample` errors, as `vs`
-does here.
+Three of the checks have no counterpart in R, or depart from it. `rps` accepts a
+probability vector whose sum is within `1e-10` of one, where R insists on a
+single `eps`, which keeps a forecast normalised over many categories from being
+rejected for rounding it cannot avoid. `es` and `mmds` throw on an ensemble
+with no members, where R's `es_sample` and `mmds_sample` return 0; R's
+`vs_sample` errors, as `vs` does here. And `interval_score` rejects a reversed
+prediction interval, which R cannot do either way: `scoringRules` 1.1.3 has no
+interval score, only the `ints_*` functions this one is named after.
 
 ## Parameter conventions
 
