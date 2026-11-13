@@ -58,14 +58,15 @@ way. Most of those comparisons run at `atol = 1e-9` with `rtol` between `1e-6`
 and `1e-9`, the looser end being the ensemble scores and the GEV near its
 Gumbel limit, where R itself integrates numerically.
 
-Two things about the table above are worth knowing. It skips any row whose R
-value is not finite, so a family that R scores as `NaN` or `Inf` contributes
-nothing to the maximum; the `NaN`/`Inf` conventions are checked in the test
-suite instead. And the reference grids were widened in 1.0.0 to reach the
-parameters where the closed forms misbehave (a Poisson mean past 350, a
-negative binomial size past 40, a shape within `1e-3` of the Gumbel limit, a
-truncation bound 1000 standard units into the tail), so the rows counted here
-include those.
+Two things about the table above are worth knowing. It skips any row where
+either value is not finite. That means a family R scores as `NaN` or `Inf`
+contributes nothing to the maximum, and so does one this package scores that
+way, which is the side that would hide a regression here; the `NaN`/`Inf`
+conventions are checked in the test suite instead. The reference grids were
+also widened in 1.0.0 to reach the parameters where the closed forms misbehave:
+a Poisson mean past 350, a negative binomial size past 40, a shape within
+`1e-3` of the Gumbel limit, a truncation bound 1000 standard units into the
+tail. The rows counted here include those.
 
 ## Gradients via automatic differentiation
 
@@ -94,7 +95,16 @@ println(grad_parity("norm",
 println(grad_parity("logis",
     (r, h) -> ForwardDiff.gradient(p -> crps(Logistic(p[1], p[2]), r[col(h, "y")]),
         [r[col(h, "location")], r[col(h, "scale")]])))
+println(grad_parity("t",
+    (r, h) -> ForwardDiff.gradient(
+        p -> crps(p[1] + p[2] * TDist(r[col(h, "df")]), r[col(h, "y")]),
+        [r[col(h, "location")], r[col(h, "scale")]])))
 ```
+
+R's `gradcrps_t` agrees with central differences of its own `crps_t` at every
+degree of freedom and bound tried, so it is a usable reference. Its truncated
+counterpart `gradcrps_tt` does not, which is why only the untruncated families
+appear here (see [Differences from R](@ref differences-from-r)).
 
 ## Which families are AD-differentiable
 

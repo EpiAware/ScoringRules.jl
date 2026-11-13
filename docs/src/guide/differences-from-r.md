@@ -23,8 +23,8 @@ v <- ell^2 * 2 * b/sin(2 * b) - b^2/sb^2
 ```
 
 which is missing a pair of parentheses: `ell^2` should multiply both terms. The
-two packages therefore disagree for **every** log-logistic forecast with a
-nonzero `locationlog`, not just in a corner:
+two packages disagree for every log-logistic forecast with a nonzero
+`locationlog`, at `scalelog = 0.3`:
 
 | `locationlog` | R variance | correct variance |
 |:---|:---|:---|
@@ -33,9 +33,11 @@ nonzero `locationlog`, not just in a corner:
 | 1.0 | 13.2877 | 4.61677 |
 | 2.0 | 106.8542 | 34.1136 |
 
-Below zero R's expression goes negative, so `dss_llogis` returns `NaN`; above
-zero it returns a finite but wrong number. This package evaluates the
-parenthesised formula and matches the correct column at every point.
+Far enough below zero R's expression goes negative and `dss_llogis` returns
+`NaN`, which at that `scalelog` starts around `locationlog = -0.19`. Between
+there and zero, and everywhere above it, R returns a finite but wrong number.
+This package evaluates the parenthesised formula and matches the correct column
+at every point.
 
 ### Generalised Pareto CRPS near shape 0
 
@@ -45,25 +47,26 @@ error by `1/ξ`: at `shape = 1e-12` and `y = 0.5`, `crps_gpd` gives 0.2130074
 where the exponential limit is 0.2130613. This package takes the same expression
 through `log1p`, which is accurate to the last bit or two for every shape.
 
-### Negative binomial CRPS at a non-integer size
+### Negative binomial CRPS at a half-integer size
 
-The CRPS carries a Gauss hypergeometric factor. R sums its series through the
-`hypergeo` package, which returns `-Inf` for some non-integer sizes
-(`size = 2.5` and `5.5` at `prob = 0.3`, `size = 10.5` at `prob = 0.7`) and
-loses digits for large ones (from `size ≈ 40` at `prob = 0.3`, `NaN` from
-`size ≈ 100`). This package evaluates the same factor as an Euler integral,
-whose integrand is bounded by 1 for every parameter the CRPS reaches, and
-reproduces brute-force summation over the pmf to 15 digits throughout.
+The CRPS has a Gauss hypergeometric factor in it. R sums the series for that
+factor through the `hypergeo` package, which returns `-Inf` for some
+half-integer sizes: `size = 2.5` and `5.5` at `prob = 0.3`, and `size = 10.5`
+at `prob = 0.7`. This package evaluates the same factor as an Euler integral
+and reproduces brute-force summation over the probability mass function to 15
+digits at every size, integer or not. Away from those sizes R is accurate, to
+1e-14 at sizes up to 1000.
 
 ### Truncated-density log score with a far lower bound
 
 R's `ft`, `fnorm` and `flogis` (behind `logs_tt`, `logs_tnorm` and
 `logs_tlogis`) normalise a lower-bounded truncation by `1 - p(lower)`, which
 keeps no relative accuracy once the retained tail is small, and reaches exactly
-zero further out. At `df = 10` with a standardised lower bound of 50,
-`logs_tt` is 6e-5 out; `logs_tlogis` at `location = 0, scale = 2, lower = 100`
-returns `-Inf` where the truncated density is 0.303. This package reads the
-upper tail directly and matches 300-bit quadrature.
+zero further out. At `df = 10` with a standardised lower bound of 50, `logs_tt`
+is 1.6e-4 relative out, and 6.1e-5 at a bound of 60; `logs_tlogis` at
+`location = 0, scale = 2, lower = 100` returns `-Inf` at `y = 101`, where the
+truncated density is 0.303. This package reads the upper tail directly and
+matches 300-bit quadrature to 1e-13.
 
 ## Where the two packages take different routes to the same number
 
@@ -83,7 +86,10 @@ package evaluates the Gumbel limit analytically with the exponential integral
 where ``z = (y - \mu)/\sigma`` and ``\gamma_E = -\psi(1)`` is the
 Euler–Mascheroni constant. The switch between the two expressions sits at
 ``|\xi| = \sqrt{\mathrm{eps}}``, where the error of each is around
-``3 \times 10^{-8}``; R is out by ``8 \times 10^{-5}`` in the same region.
+``3 \times 10^{-8}``. R switches at ``10^{-12}`` instead, which leaves its
+general expression to cancel for four more orders of magnitude: just above that
+threshold it is out by up to ``5 \times 10^{-4}``. At ``\sqrt{\mathrm{eps}}``
+R is on its general branch and accurate.
 
 ### GEV moments near the Gumbel limit
 
@@ -148,14 +154,18 @@ all-zero weight vector.
 
 ### Input validation
 
-A few arguments are checked here that R checks too, with the same effect but a
-different message: a reversed prediction interval in `interval_score`, a
+Several arguments are checked here that R checks too, with the same effect but
+a different message: a reversed prediction interval in `interval_score`, a
 forecast vector in `rps` that is negative or does not sum to one, and an empty
-ensemble. One check is looser than R's: `rps` accepts a probability vector whose
-sum is within `1e-10` of one, where R insists on a single `eps`, so that a
-forecast normalised over many categories is not rejected for rounding it cannot
-avoid. Passing `bw` to `crps(dat, y; method = :edf)` warns rather than being
-dropped silently; R has no `bw` argument on that route at all.
+univariate ensemble. Passing `bw` to `crps(dat, y; method = :edf)` warns, where
+R prints a message saying the same thing.
+
+Two of the checks do depart from R. `rps` accepts a probability vector whose sum
+is within `1e-10` of one, where R insists on a single `eps`, which keeps a
+forecast normalised over many categories from being rejected for rounding it
+cannot avoid. And `es` and `mmds` throw on an ensemble with no members, where
+R's `es_sample` and `mmds_sample` return 0; R's `vs_sample` errors, as `vs`
+does here.
 
 ## Parameter conventions
 
@@ -168,8 +178,8 @@ The following parameter conventions differ from R's function arguments.
 | Student-t | `crps_t(y, df, location, scale)` | `location + scale * TDist(df)` |
 | `LogLogistic` | `locationlog, scalelog` | `LogLogistic(α, β)`: α = exp(locationlog), β = 1/scalelog |
 | `LogLaplace` | `locationlog, scalelog` | `LogLaplace(locationlog, scalelog)` — same |
-| `GeneralizedExtremeValue` | `location, scale, shape` | `GeneralizedExtremeValue(μ, σ, ξ)` — same order |
-| `GeneralizedPareto` | `location, scale, shape` | `GeneralizedPareto(μ, σ, ξ)` — same order |
+| `GeneralizedExtremeValue` | `crps_gev(y, shape, location, scale)` | `GeneralizedExtremeValue(μ, σ, ξ)` |
+| `GeneralizedPareto` | `crps_gpd(y, shape, location, scale)` | `GeneralizedPareto(μ, σ, ξ)` |
 | `NegativeBinomial` | `size, prob` (success prob) | `NegativeBinomial(r, p)` — same meaning |
 | `Hypergeometric` | `m, n, k` (white, black, draws) | `Hypergeometric(s, f, n)` (successes, failures, draws) — s=m, f=n, n=k |
 | `TwoPieceNormal` | `crps_2pnorm(y, scale1, scale2, location)` | `TwoPieceNormal(location, scale1, scale2)` |

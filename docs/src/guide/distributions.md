@@ -76,7 +76,7 @@ Fisk distribution); `crps` for it uses the closed form from R's
 
 `BoundaryMass(dist; lower, upper, lmass, umass)` truncates a continuous
 distribution `dist` to `[lower, upper]` and places free point masses `lmass`
-and `umass` at the bounds, with the interior renormalised to carry the
+and `umass` at the bounds, with the interior renormalised to hold the
 remaining probability. This is the "generalised truncated/censored"
 construction of R `scoringRules` (`crps_gtcnorm` and friends): zero masses
 recover `truncated(dist; ...)` and tail-probability masses recover

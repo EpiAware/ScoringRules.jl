@@ -41,7 +41,7 @@ What that means in practice:
   in each case because an independent reference (brute-force summation,
   300-bit quadrature, or an analytic limit) says the R value is wrong: the
   log-logistic Dawid–Sebastiani score, the generalised Pareto CRPS near shape
-  zero, the negative binomial CRPS at a large or non-integer size, and the
+  zero, the negative binomial CRPS at a half-integer size, and the
   log score of a truncated density with a far lower bound. Two further
   divergences are design choices rather than corrections. Every one of them is
   listed, with the numbers, under

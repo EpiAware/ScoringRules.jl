@@ -9,8 +9,9 @@ Lerch and Allen). See the README for attribution and provenance.
   `Distributions.jl` has no analytic variance for a truncated or censored base,
   the first two moments are taken by quadrature. `crps` has a closed form for
   each supported family; otherwise it falls back to quadrature for a continuous
-  forecast and to exact integration of the step CDF for a discrete one, which
-  needs only `cdf` and so reaches families with no `quantile` method.
+  forecast and to exact integration of the step CDF for a discrete one. The
+  discrete route needs only `cdf`, which brings families with no `quantile`
+  method within reach.
 - Closed-form CRPS for the normal (plus truncated, censored and generalised
   truncated/censored), logistic, Student-t, Laplace, exponential, gamma, beta,
   uniform, log-normal, log-logistic, log-Laplace, GEV, GPD, two-piece normal,
@@ -51,42 +52,47 @@ Lerch and Allen). See the README for attribution and provenance.
   function is the antiderivative of the weight of the same name, which is what
   keeps the threshold-weighted score proper. Scalar `mu`/`sigma` give a
   univariate function; length-`d` vectors give the product weight and the
-  element-wise chaining function of a `d`-dimensional forecast, and as in R the
-  logistic shapes are univariate only.
+  element-wise chaining function of a `d`-dimensional forecast. As in R, both
+  constructors reject the logistic shapes for a multivariate forecast.
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
   suite. The reference grids reach the parameters where closed forms
   misbehave: a Poisson mean past 350, a negative binomial size past 40, a
-  normal or logistic scale of zero, an extreme-value shape within `1e-3` of the
-  Gumbel limit, a Student-t truncation bound 1000 standard units into the tail,
-  and observations outside the support.
+  normal scale of zero and a logistic scale of `1e-8`, an extreme-value shape
+  within `1e-3` of the Gumbel limit, a Student-t truncation bound 1000 standard
+  units into the tail, and observations outside the support.
 - Scores that were wrong or threw outside those grids now hold up. The
   negative binomial CRPS takes its hypergeometric factor through an Euler
-  integral rather than a Gauss series (which lost digits from `size ≈ 40` and
-  returned `NaN` from 100); the Poisson CRPS scales its Bessel terms (the
+  integral, split at the integrand's peak, in place of a Gauss series that
+  returned `NaN` from `size ≈ 100`; the Poisson CRPS scales its Bessel terms (the
   unscaled ones overflowed from `λ ≈ 351`); the generic discrete CRPS
   integrates the whole step CDF, including the half-infinite pieces outside the
-  support, and needs only `cdf`, so it no longer flattens out below the support
-  or throws on a `Skellam`; the logistic CRPS stays finite past `z ≈ -745`; the
-  Student-t CDF is oriented to its tail, so a truncation bound far out no
-  longer divides by an underflowed probability; `crps(Normal(μ, 0))` returns the
-  absolute error; the GEV moments come from a series that holds through the
+  support, and needs only `cdf`, which stops it flattening out below the
+  support or throwing on a `Skellam`; the logistic CRPS stays finite past
+  `z ≈ -745`; the Student-t CDF is oriented to its tail, where a truncation
+  bound far out used to divide by an underflowed probability;
+  `crps(Normal(μ, 0))` returns the absolute error; the GEV moments come from a series that holds through the
   Gumbel limit, where the stock variance was out by a third at `shape = 1e-8`;
   the extreme-value shape threshold sits at `√eps` and the GPD survival goes
   through `log1p`; and `dss` falls back to numerical moments for the truncated
   and censored bases where `Distributions.jl` has no analytic variance, which
-  used to throw a `MethodError`. The continuous quadrature fallback now splits
-  the integral at the forecast's own quantiles, so a narrow band of mass or a
-  jump in the CDF cannot be missed; a boundary-mass exponential of scale 0.057
-  at location 1.985 was 1.8e-5 relative low whatever tolerance was asked for.
+  used to throw a `MethodError`. The continuous quadrature fallback splits the
+  integral at the forecast's own quantiles, which keeps a narrow band of mass
+  or a jump in the CDF from falling between the first nodes. A boundary-mass
+  exponential of scale 0.057 at location 1.985 was 1.8e-5 relative high at
+  every tolerance asked for, and the same miss left both moments of
+  `truncated(Exponential(1e-6), 0, Inf)` at zero.
 - Input validation to match R's: `interval_score` rejects a reversed interval,
   `rps` rejects a vector that is negative or does not sum to one, and the
   ensemble scores reject an empty ensemble. Passing `bw` to `crps(dat, y;
   method = :edf)` warns rather than being dropped in silence.
-- `es`, `mmds` and `vs` no longer allocate a temporary per member pair, which
-  at `d = 50`, `m = 3000` takes `es` from 2061 MiB and 594 ms per call to
+- `es` and `mmds` no longer allocate a temporary per member pair, which at
+  `d = 50`, `m = 3000` takes `es` from 2061 MiB and 594 ms per call to
   0.02 MiB and 127 ms. `vs` with member weights now computes the same number in
   one pass over the ensemble instead of `m²` kernel evaluations, 14.7 s to
-  3.3 ms at `d = 10`, `m = 2000`; `owvs` goes through the same path.
+  3.3 ms at `d = 10`, `m = 2000`; `owvs` goes through the same path. All three
+  promote an integer ensemble before squaring, which an element type as wide as
+  `Int32` could overflow, and all three now reject an ensemble whose axes are
+  not one-based rather than reading past the end of the weights.
 - `dss` returns `NaN` whenever the forecast variance is not finite and
   positive (for example t with `df ≤ 2`, GEV/GPD with `shape ≥ 1/2`,
   log-Laplace with `σ ≥ 1/2`, log-logistic with `β ≤ 2`), matching R.
