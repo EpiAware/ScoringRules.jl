@@ -80,7 +80,11 @@ This is the negatively-oriented (lower = better) formulation of the check
 function / pinball loss.
 """
 @inline function _qs_quantile(y::Real, x::Real, alpha::Real)
-    return (Float64(y < x) - alpha) * (x - y)
+    # Floating point before the subtraction: an unsigned or wide-integer
+    # difference wraps in its own type, and `interval_score(UInt32(1),
+    # UInt32(3), UInt32(5), 0.8)` came back as -4.29e10 rather than 22.
+    yf, xf = float(y), float(x)
+    return (Float64(yf < xf) - alpha) * (xf - yf)
 end
 
 """
@@ -226,7 +230,7 @@ function quantile_score(
     )
     _check_nonempty(dat)
     0 < alpha < 1 || throw(ArgumentError("alpha must lie strictly in (0, 1), got $alpha"))
-    q_hat = _quantile_hf(dat, alpha, type)
+    q_hat = _quantile_hf(_as_float(dat), alpha, type)
     return _qs_quantile(y, q_hat, alpha)
 end
 
@@ -311,7 +315,8 @@ function interval_score(
     0 < level < 1 || throw(ArgumentError("level must lie strictly in (0, 1), got $level"))
     alpha1 = 0.5 * (1 - level)
     alpha2 = 1 - alpha1
-    lower = _quantile_hf(dat, alpha1, type)
-    upper = _quantile_hf(dat, alpha2, type)
+    datf = _as_float(dat)
+    lower = _quantile_hf(datf, alpha1, type)
+    upper = _quantile_hf(datf, alpha2, type)
     return _ints_quantile(y, lower, upper, level)
 end

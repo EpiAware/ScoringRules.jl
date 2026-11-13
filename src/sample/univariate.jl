@@ -29,6 +29,15 @@ export clogs
 # CRPS below reuses `_crps_mixnorm`: a Gaussian KDE is an equally-weighted normal
 # mixture with common bandwidth as the standard deviation.
 
+# Scores are computed in floating point whatever the ensemble's element type.
+# An unsigned or wide-integer difference wraps in its own type:
+# `crps(UInt32[0, 2], UInt32(5))` came back as -4.29e9 rather than 3.5. The
+# multivariate scores promote inside their inner loops; here the ensemble is
+# converted once, which costs an allocation only for the element types that
+# would otherwise be wrong.
+_as_float(dat::AbstractVector{<:AbstractFloat}) = dat
+_as_float(dat::AbstractVector) = float.(dat)
+
 # An empty ensemble has no forecast to score. R raises "Incompatible input
 # vector lengths"; returning a silent NaN instead hides the mistake.
 function _check_nonempty(dat::AbstractVector)
@@ -167,6 +176,8 @@ function crps(
         method::Symbol = :edf, w = nothing, bw = nothing
     )
     _check_nonempty(dat)
+    dat = _as_float(dat)
+    y = float(y)
     if method === :edf
         bw === nothing ||
             @warn "the `bw` argument is ignored for method = :edf" maxlog = 1
@@ -217,6 +228,8 @@ logs(dat, 0.5)
 """
 function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing)
     _check_nonempty(dat)
+    dat = _as_float(dat)
+    y = float(y)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     n = length(dat)
     den = 0.0
@@ -279,6 +292,8 @@ function clogs(
         a::Real = -Inf, b::Real = Inf, bw = nothing, cens::Bool = true
     )
     _check_nonempty(dat)
+    dat = _as_float(dat)
+    y = float(y)
     a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     n = length(dat)
@@ -341,6 +356,8 @@ dss(dat, 0.5)
 """
 function dss(dat::AbstractVector{<:Real}, y::Real; w = nothing)
     _check_nonempty(dat)
+    dat = _as_float(dat)
+    y = float(y)
     if w === nothing
         m = mean(dat)
         # Population variance: mean(dat.^2) - mean(dat).^2  (matches R dss_edf)
