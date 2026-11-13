@@ -220,6 +220,26 @@ end
         @test_throws ArgumentError twes(X, y; a = -1.0)
         @test_throws ArgumentError owvs(X, y; a = -1.0)
     end
+    # The weights are indexed over one-based ranges too, and `_member_weights`
+    # keeps whatever axes it was given, so an offset weight vector was the same
+    # silent out-of-bounds read reached through another argument.
+    struct OffsetVec{T} <: AbstractVector{T}
+        parent::Vector{T}
+        off::Int
+    end
+    Base.size(a::OffsetVec) = size(a.parent)
+    Base.axes(a::OffsetVec) = (a.off .+ axes(a.parent, 1),)
+    Base.getindex(a::OffsetVec, i::Int) = a.parent[i - a.off]
+
+    wv = collect(1:4) ./ 10
+    wvs = [1.0 0.5 0.2; 0.5 1.0 0.3; 0.2 0.3 1.0]
+    @test isfinite(es(P, y; w = wv))
+    for off in (-1, 1, 10)
+        @test_throws ArgumentError es(P, y; w = OffsetVec(wv, off))
+        @test_throws ArgumentError vs(P, y; w = OffsetVec(wv, off))
+        @test_throws ArgumentError mmds(P, y; w = OffsetVec(wv, off))
+        @test_throws ArgumentError vs(P, y; w_vs = Offset(wvs, off, off))
+    end
     # A one-based wrapper of the same data still scores, and to the same value.
     @test es(Offset(P, 0, 0), y) ≈ ref[1] rtol = 1.0e-14
     @test vs(Offset(P, 0, 0), y) ≈ ref[2] rtol = 1.0e-14

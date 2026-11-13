@@ -256,6 +256,85 @@ end
     end
 end
 
+@testitem "scores stay defined where a wrapper's own CDF has cancelled" tags = [:crps] begin
+    using ScoringRules
+    using Distributions
+    using ForwardDiff: derivative
+
+    # A truncated forecast's CDF is a difference of base CDFs over its
+    # normalising mass. Deep in a tail all three round to the same thing, and
+    # `cdf` and `ccdf` of this object are both exactly 0 at 45, which made the
+    # generic CRPS 0.0 for an observation four units from the forecast mean.
+    # Reference: by memorylessness this forecast is 40 + Exponential(1).
+    d = truncated(Exponential(1.0), 40.0, nothing)
+    @test cdf(d, 45.0) == 0.0 && ccdf(d, 45.0) == 0.0
+    @test crps(d, 45.0) ≈ crps(Exponential(1.0), 5.0) rtol = 1.0e-10
+    @test crps(d, 0.5) ≈ 40.0 rtol = 1.0e-12
+    @test dss(d, 45.0) ≈ dss_moments(45.0, 41.0, 1.0) rtol = 1.0e-9
+
+    # The same cancellation in the moments: the mean of this one came out
+    # below its own lower bound.
+    let m = first(ScoringRules._forecast_moments(truncated(Gamma(2.0, 1.0), 40.0, nothing)))
+        @test m > 40.0
+    end
+
+    # A heavy tail puts the deepest quantile around 1e16, and a segment
+    # boundary that far out next to an infinite endpoint made QuadGK produce a
+    # NaN and raise. Reference for the Cauchy: 300-bit quadrature of the exact
+    # truncated CDF, 0.8745799901742567.
+    @test crps(truncated(Cauchy(0.0, 1.0), 0.5, nothing), 0.7) ≈
+        0.8745799901742567 rtol = 1.0e-10
+    for dd in (
+            truncated(Cauchy(0.0, 1.0), 0.5, nothing),
+            truncated(LogLogistic(1.0, 1.0), 0.5, nothing),
+            truncated(Gamma(0.5, 4.0), 0.5, nothing),
+        )
+        @test isfinite(crps(dd, 0.7))
+    end
+    # A truncated Student-t reaches its own closed form, which returns NaN for
+    # one degree of freedom or fewer, as R's `crps_tt` does.
+    @test isnan(crps(truncated(TDist(1.0), 0.5, nothing), 0.7))
+
+    # `dss` reports NaN where the forecast has no variance, including a
+    # truncation that keeps an infinite tail of a base that has none. The
+    # quadrature would otherwise stop at the deepest quantile it can represent
+    # and call the result a score: a truncated Cauchy scored 37.4.
+    for dd in (
+            truncated(Cauchy(0.0, 1.0), 0.5, nothing),
+            truncated(TDist(1.0), 0.5, nothing),
+            truncated(LogNormal(0.0, 30.0), 0.5, nothing),
+        )
+        @test isnan(dss(dd, 0.7))
+    end
+    # With both bounds finite the moments always exist, so these must not be
+    # swept up by that check.
+    @test isfinite(dss(truncated(Cauchy(0.0, 1.0), -2.0, 3.0), 0.7))
+    @test isfinite(dss(truncated(TDist(1.0), -2.0, 3.0), 0.7))
+
+    # The variance guard has to run before the mean is asked for: a
+    # log-logistic with β ≤ 1 has no mean and throws rather than returning
+    # one, which took `dss` down where it had returned NaN.
+    @test isnan(dss(LogLogistic(1.0, 1.0), 0.5))
+    @test isnan(dss(LogLogistic(1.0, 0.5), 0.5))
+    @test isnan(dss(LogLogistic(1.0, 2.0), 0.5))
+    @test isfinite(dss(LogLogistic(1.0, 2.5), 0.5))
+
+    # The generalised Pareto survival function is `exp(-log1p(ξz)/ξ)`, which is
+    # 0/0 at ξ = 0. Branching on `ξ == 0` is not enough: equality is false for
+    # a dual with a zero value and a nonzero partial, so under automatic
+    # differentiation the branch was skipped and both the value and the
+    # gradient came out NaN.
+    @test crps(GeneralizedPareto(0.0, 1.0, 0.0), 0.5) ≈
+        crps(Exponential(1.0), 0.5) rtol = 1.0e-14
+    let g0 = derivative(x -> crps(GeneralizedPareto(0.0, 1.0, x), 0.5), 0.0)
+        @test isfinite(g0)
+        @test g0 ≈ derivative(x -> crps(GeneralizedPareto(0.0, 1.0, x), 0.5), 1.0e-12) rtol = 1.0e-9
+    end
+    for y in (0.3, 2.0, 7.0)
+        @test isfinite(derivative(x -> crps(GeneralizedPareto(0.0, 1.0, x), y), 0.0))
+    end
+end
+
 @testitem "dss moments stay accurate and defined on wrapped forecasts" tags = [:crps] begin
     using ScoringRules
     using Distributions
