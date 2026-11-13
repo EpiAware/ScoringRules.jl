@@ -28,7 +28,7 @@ function _crps_gev(y::Real, shape::Real, location::Real = 0.0, scale::Real = 1.0
 
     out = if abs(shape) < _SHAPE_ATOL
         # Gumbel limit: use exponential integral Ei
-        # out = -y_std - γ_E - log 2 - 2·Ei(-exp(-y_std))
+        # out = -y_std + γ_E - log 2 - 2·Ei(-exp(-y_std))
         # where γ_E = -digamma(1)
         -y_std - digamma(one(float(y_std))) - log(oftype(float(y_std), 2)) -
             2 * expinti(-exp(-y_std))
@@ -61,8 +61,11 @@ crps(d::GeneralizedExtremeValue, y::Real) = _crps_gev(y, d.ξ, d.μ, d.σ)
 CRPS of a GPD(location, scale, shape) forecast at observation `y`,
 in closed form (Friederichs & Thorarinsdottir 2012). Shape must be < 1.
 
-The exponential limit is exact at `shape == 0`; away from it the general
-expression is accurate for every shape, so no threshold is needed here.
+The exponential limit is exact at `shape == 0`, and `log1p` makes the general
+expression accurate to the last bit or two for every `|shape| ≥ 1e-308`, so no
+threshold is needed between them. Subnormal shapes, where `shape * z`
+underflows, and shapes within about `1e-9` of 1, where `2/(1-ξ)·(1-x^{1-ξ})`
+cancels, are both less accurate; R does the same at the upper end.
 
 `mass` is an optional point mass at the location (lower boundary); it is
 retained for internal use but not exposed through the Distributions dispatch.
