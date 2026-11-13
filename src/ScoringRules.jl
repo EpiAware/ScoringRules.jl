@@ -30,7 +30,7 @@ crps(Normal(0, 1), 0.5)
 module ScoringRules
 
 using Distributions: Distributions, Beta, Binomial, Censored, Continuous,
-    ContinuousUnivariateDistribution, DiscreteUnivariateDistribution,
+    ContinuousUnivariateDistribution, Discrete, DiscreteUnivariateDistribution,
     Exponential, Gamma, GeneralizedExtremeValue, GeneralizedPareto,
     Hypergeometric, Laplace, LogLogistic, LogNormal,
     Logistic, MixtureModel, NegativeBinomial, Normal, Poisson, TDist,
