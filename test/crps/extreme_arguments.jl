@@ -506,3 +506,25 @@ end
         @test crps(Poisson(λ), λ) ≈ oracle_crps(Poisson(λ), λ) rtol = 1.0e-9
     end
 end
+
+@testitem "the negative binomial CRPS returns where its hypergeometric argument overflows" tags = [:crps] begin
+    using ScoringRules
+    using Distributions
+
+    # As `prob` goes to zero, `prob * X` tends to a Gamma(size, 1) variable,
+    # so the score tends to the Gamma one rescaled, with a relative error of
+    # order `prob`. Right up to where `(1 - prob) / prob^2` overflows, the
+    # closed form must agree with it.
+    for (r, p, y) in ((5.0, 1.0e-150, 3.0), (5.0, 1.0e-153, 3.0), (2.5, 1.0e-140, 1.0e140))
+        @test crps(NegativeBinomial(r, p), y) ≈ crps(Gamma(r, 1.0), y * p) / p rtol = 1.0e-8
+    end
+    # Past it, and at a size where the closed form's two terms cancel beyond
+    # what double precision holds, there is no score to give. The quadrature's
+    # panel loop used to go round for ever on the first, and the second came
+    # out negative.
+    @test isnan(crps(NegativeBinomial(5.0, 1.0e-160), 3.0))
+    @test isnan(crps(NegativeBinomial(3.0e307, 0.5), 3.0e307))
+    @test isnan(crps(NegativeBinomial(1.0e300, 0.3), 1.0e300 * 0.7 / 0.3))
+    # An infinite observation is still an infinite score.
+    @test crps(NegativeBinomial(5.0, 0.3), Inf) == Inf
+end

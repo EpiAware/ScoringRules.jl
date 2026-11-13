@@ -138,8 +138,14 @@ function _f21_half_two(a::Real, Z::Real)
     # `crps(NegativeBinomial(724, 0.01), 71680)` 2136 instead of 626, with the
     # knife edge one unit of `size` away. Splitting at geometric multiples of
     # the half-width puts nodes where the mass is, whatever the parameters.
+    #
+    # The half-width is taken as `1/(√a·√Z)`: the product `a·Z` overflows for
+    # a `prob` below about 1e-154, and a step of exactly zero never grows.
+    # An infinite `Z` leaves nothing to integrate, the integrand being zero
+    # for every θ > 0.
+    isinf(Z) && return zero(float(a) * float(Z))
     segments = Float64[]
-    step = 1 / (8 * sqrt(max(a * Z, 1.0)))
+    step = 1 / (8 * max(sqrt(a) * sqrt(Z), 1.0))
     while step < hi
         push!(segments, step)
         step *= 4
@@ -155,12 +161,22 @@ function _crps_nbinom(y::Real, size::Real, prob::Real)
     c1 = y * (2 * cdf(NegativeBinomial(size, prob), y) - 1)
     c2 = (1 - prob) / prob^2
     # pnbinom(y-1, size+1, prob) is the CDF of NB(size+1, prob) at y-1
-    c3 = (
-        prob * (2 * cdf(NegativeBinomial(size + 1, prob), y - 1) - 1)
-            +
-            _f21_half_two(size + 1, 4 * c2)
-    )
-    return c1 - size * c2 * c3
+    u = prob * (2 * cdf(NegativeBinomial(size + 1, prob), y - 1) - 1)
+    h = _f21_half_two(size + 1, 4 * c2)
+    out = c1 - size * c2 * (u + h)
+    # Each `2F − 1` is a difference of two probabilities, good to about one
+    # `eps` absolute however small it comes out, and the closed form then
+    # multiplies those errors by `y` and by `size * c2 ≈ size/prob` while the
+    # score itself grows only like `√size/prob`. So the score keeps about
+    # `16 − log10(√size)` digits, and none from a size near 1e32 on; below
+    # `prob ≈ 1e-154`, `c2` overflows outright. Past either point the closed
+    # form has no score to give, and a NaN says so where the subtraction
+    # would hand back an arbitrary, often negative, number. An infinite
+    # observation keeps its infinite score.
+    isfinite(y) || return out
+    err = 64 * eps(Float64) * (abs(y) + size * c2 * (prob + abs(h)))
+    reliable = isfinite(err) && err <= 1.0e-6 * abs(out)
+    return reliable ? out : oftype(out, NaN)
 end
 
 crps(d::NegativeBinomial, y::Real) = _crps_nbinom(y, d.r, d.p)
