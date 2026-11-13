@@ -333,3 +333,18 @@ end
         @test owvs(Xa, ya; weight_func = wf) ≈ owvs(X, y; weight_func = wf) rtol = 1.0e-14
     end
 end
+
+@testitem "a NaN member or observation gives a NaN multivariate score" tags = [:sample] begin
+    using ScoringRules
+
+    # As in R: a missing value is not a distance of zero.
+    wf = weight_function(:norm_cdf; mu = 0.0, sigma = 2.0)
+    scores = (
+        (X, y) -> es(X, y), (X, y) -> vs(X, y), (X, y) -> mmds(X, y),
+        (X, y) -> twes(X, y; b = 3.0), (X, y) -> owes(X, y; weight_func = wf),
+    )
+    for f in scores
+        @test isnan(f([1.0 NaN 3.0; 2.0 2.0 0.0], [0.5, 1.0]))
+        @test isnan(f([1.0 1.0; 2.0 2.0], [NaN, 1.0]))
+    end
+end

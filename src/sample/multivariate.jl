@@ -79,8 +79,9 @@ end
 # square at exactly zero, where the derivative of `sqrt` is `0 * Inf`, so
 # automatic differentiation would return NaN for any score with a tied pair.
 # The distance has a kink there and zero is its subgradient, which is also
-# what `norm` gave.
-@inline _sqrt_dist(s::Real) = s > 0 ? sqrt(s) : zero(s)
+# what `norm` gave. Only an exact zero is special: a NaN square, from a
+# missing member or observation, has to stay NaN.
+@inline _sqrt_dist(s::Real) = iszero(s) ? zero(s) : sqrt(s)
 
 """
     _member_weights(m, w)
