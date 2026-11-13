@@ -123,6 +123,13 @@ enumerated (an upper-unbounded truncated `Poisson`), and it keeps the two
 half-infinite pieces of the integral, so the score keeps growing as the
 observation moves away from the support rather than flattening out.
 
+One limit of the continuous fallback is worth knowing. The CRPS integral
+converges only where the forecast's survival function decays faster than
+``x^{-1/2}``, so a forecast with a heavier tail than that (a
+`Pareto` with shape below 1/2, say) has an infinite CRPS, and the quadrature
+returns a large finite number instead of reporting that. A mean is not needed:
+a Cauchy forecast has none and still has a finite CRPS.
+
 If you encounter a distribution family that should have a closed form but does
 not, please open an issue.
 
