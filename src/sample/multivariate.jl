@@ -58,7 +58,7 @@ _one_based(A) = all(ax -> ax == 1:length(ax), axes(A))
 # true 536870911.75, and at `Int64[4000000000 0; 0 0]` the wrapped negative
 # square threw out of `sqrt`.
 @inline function _col_sqdist(X::AbstractMatrix, i::Integer, j::Integer)
-    T = float(eltype(X))
+    T = _float_type(view(X, :, i), view(X, :, j))
     s = zero(T)
     @inbounds @simd for k in axes(X, 1)
         s += abs2(T(X[k, i]) - T(X[k, j]))
@@ -67,7 +67,7 @@ _one_based(A) = all(ax -> ax == 1:length(ax), axes(A))
 end
 
 @inline function _col_sqdist(X::AbstractMatrix, i::Integer, y::AbstractVector)
-    T = float(promote_type(eltype(X), eltype(y)))
+    T = _float_type(view(X, :, i), y)
     s = zero(T)
     @inbounds @simd for k in axes(X, 1)
         s += abs2(T(X[k, i]) - T(y[k]))
@@ -228,7 +228,7 @@ function _vs_core(
     # gives: an integer difference raised to `p` wraps, and `abs` of `typemin`
     # stays negative, so `vs` returned 5.9e8 for an ensemble scoring 8.0e9 and
     # threw out of `^0.5` on the wrapped case.
-    T = float(promote_type(eltype(X), eltype(y)))
+    T = _float_type(X, y)
     @inbounds for k in 1:d
         for l in k:d
             wkl = w_vs === nothing ? 1.0 : w_vs[k, l]

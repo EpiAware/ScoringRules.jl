@@ -18,3 +18,11 @@ const _SHAPE_ATOL = sqrt(eps(Float64))
 # full relative accuracy in both tails and uses only public SpecialFunctions
 # API (`Distributions.norminvcdf` is neither exported nor public).
 @inline _norm_invcdf(p::Real) = -sqrt(oftype(float(p), 2)) * erfcinv(2 * p)
+
+# The floating-point type to compute in. `float` needs a numeric type, and an
+# array declared `Any` (as one read from a table often is) has none, so there
+# its elements decide. Walking them costs no more than the loop the type is
+# for, and a numeric array never takes that path.
+_float_type(A::AbstractArray{<:Number}) = float(eltype(A))
+_float_type(A::AbstractArray) = float(mapreduce(typeof, promote_type, A; init = Bool))
+_float_type(A, B) = promote_type(_float_type(A), _float_type(B))

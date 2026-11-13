@@ -315,3 +315,21 @@ end
         @test g ≈ cd(f, 0.0) atol = 1.0e-6
     end
 end
+
+@testitem "multivariate scores accept an ensemble whose element type is abstract" tags = [:sample] begin
+    using ScoringRules
+
+    # A matrix read from a table or built up with `push!` often comes out as
+    # `Matrix{Any}`. Its entries are numbers, so it scores like any other.
+    X = [1.0 2.0 3.0 0.5; 4.0 5.0 6.0 1.5]
+    y = [1.0, 2.0]
+    wf = weight_function(:norm_cdf; mu = 0.0, sigma = 2.0)
+    for (Xa, ya) in ((Any[1 2.0 3 0.5; 4 5 6 1.5], y), (X, Any[1, 2.0]), (Real[1 2.0 3 0.5; 4 5 6 1.5], Real[1, 2]))
+        @test es(Xa, ya) ≈ es(X, y) rtol = 1.0e-14
+        @test vs(Xa, ya) ≈ vs(X, y) rtol = 1.0e-14
+        @test mmds(Xa, ya) ≈ mmds(X, y) rtol = 1.0e-14
+        @test twes(Xa, ya; b = 3.0) ≈ twes(X, y; b = 3.0) rtol = 1.0e-14
+        @test owes(Xa, ya; weight_func = wf) ≈ owes(X, y; weight_func = wf) rtol = 1.0e-14
+        @test owvs(Xa, ya; weight_func = wf) ≈ owvs(X, y; weight_func = wf) rtol = 1.0e-14
+    end
+end

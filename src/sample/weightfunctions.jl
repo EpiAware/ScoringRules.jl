@@ -89,7 +89,7 @@ end
 
 function (f::SmoothWeight)(z::AbstractVector)
     _check_param_dim(f, length(z))
-    out = one(float(eltype(z)))
+    out = one(_float_type(z))
     @inbounds for i in eachindex(z)
         out *= f.kernel(z[i], _param_at(f.mu, i), _param_at(f.sigma, i))
     end
