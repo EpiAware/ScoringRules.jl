@@ -32,14 +32,10 @@
         "Binomial(20,0.3)" => Binomial(20, 0.3),
     ]
 
-    # The bounds that matter are the ones a branch is written for: inside the
-    # body, one-sided either way, and far enough out that the retained mass
-    # has to be read from the tail rather than from a difference of two
-    # nearly equal probabilities.
-    # Bounds in the body of the distribution and one-sided either way. A
-    # bound far out in a tail belongs to the high-precision item below: there
-    # the retained mass is 1e-8, and a double-precision CDF of the truncation
-    # is cancellation noise, which cannot referee anything.
+    # Bounds in the body of the distribution and one-sided either way. A bound
+    # far enough into a tail to test how the retained mass is read belongs to
+    # the high-precision item below: the double-precision reference here forms
+    # that mass as a difference of two probabilities, and would lose it.
     cuts(d) = [
         (quantile(d, 0.2), quantile(d, 0.8)),
         (quantile(d, 0.3), Inf),
@@ -113,28 +109,34 @@ end
     using Distributions
     using ScoringRules
 
-    # Truncating at the 1e-8 quantile leaves a tail of that mass, and the
-    # generic `(F(x) - F(lo)) / (F(hi) - F(lo))` loses all of it to
-    # cancellation in double precision. Reading the mass from the other tail
-    # is what the package does; at 300 bits the naive expression needs no such
-    # care, so it can referee the result. Only the families whose CDF has a
+    # Truncating at the 1e-15 quantile leaves a tail of that mass. The generic
+    # `(F(x) - F(lo)) / (F(hi) - F(lo))` then subtracts two probabilities that
+    # agree to fifteen digits, and in double precision comes out several per
+    # cent wrong. Reading the mass from the other tail is what the package
+    # does; at 300 bits the naive expression needs no such care, so it can
+    # referee the result. A shallower bound will not do: at the 1e-8 quantile
+    # the naive form still keeps eight digits, which no sensible tolerance
+    # tells apart from a correct one. Only the families whose CDF has a
     # generic-real method can be checked this way.
     setprecision(BigFloat, 300)
 
+    mass = 1.0e-15
     n = Ref(0)
     for base in (Normal(0, 1), Normal(5, 3), Logistic(0, 1), Logistic(2, 0.5))
-        for (lo, hi) in (
-                (quantile(base, 1 - 1.0e-8), nothing),
-                (nothing, quantile(base, 1.0e-8)),
-            )
+        for upper_tail in (true, false)
+            lo, hi = upper_tail ? (cquantile(base, mass), nothing) : (nothing, quantile(base, mass))
             d = truncated(base; lower = lo, upper = hi)
             tw = bigtwin(d)
             @test tw !== nothing
             for p in (0.1, 0.5, 0.9)
-                y = quantile(d, p)
+                # Placed from the base: the truncation's own quantile function
+                # forms the same difference of probabilities.
+                y = upper_tail ? cquantile(base, (1 - p) * mass) : quantile(base, p * mass)
                 n[] += 1
                 want = Float64(oracle_crps(tw, BigFloat(y); rtol = 1.0e-20, ref = d))
-                @test crps(d, y) ≈ want atol = 1.0e-12 rtol = 1.0e-6
+                # The package is within 1.2e-12 of the reference here, and
+                # the naive normaliser 4.7e-2 out.
+                @test crps(d, y) ≈ want rtol = 1.0e-9
             end
         end
     end
