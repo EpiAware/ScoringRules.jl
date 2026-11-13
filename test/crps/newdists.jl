@@ -142,7 +142,6 @@ end
     using ScoringRules
     using Distributions
     using Random: MersenneTwister
-    using Statistics: mean, var
 
     # `quantile` and `rand` rest on the standard normal quantile function;
     # neither had a test, so this pins them to `cdf` and to the closed-form
@@ -154,9 +153,16 @@ end
             TwoPieceExponential(0.0, 1.0, 1.0),
             TwoPieceExponential(1.0, 0.3, 2.5),
         )
-        for p in (1.0e-10, 0.001, 0.1, 0.25, 0.5, 0.75, 0.9, 0.999, 1 - 1.0e-10)
-            q = quantile(d, p)
-            @test cdf(d, q) ≈ p atol = 1.0e-9 rtol = 1.0e-7
+        # Relative, and through `ccdf` in the upper tail. With an absolute
+        # tolerance the two extreme levels assert nothing: at p = 1e-10 any
+        # `q` whose CDF is below ~1e-9 passes, and near p = 1 the CDF
+        # comparison is insensitive by construction, so a 30% error in the
+        # tail quantile went unnoticed.
+        for p in (1.0e-10, 0.001, 0.1, 0.25, 0.5, 0.75, 0.9, 0.999)
+            @test cdf(d, quantile(d, p)) ≈ p rtol = 1.0e-9
+        end
+        for p in (1.0e-10, 0.001, 0.1, 0.25)
+            @test ccdf(d, quantile(d, 1 - p)) ≈ p rtol = 1.0e-7
         end
         # The median splits the mass in half whichever arm it falls on.
         @test cdf(d, quantile(d, 0.5)) ≈ 0.5 rtol = 1.0e-10

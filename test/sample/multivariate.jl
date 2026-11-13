@@ -189,3 +189,64 @@ end
     @test_throws ArgumentError vs(X, y)
     @test_throws ArgumentError mmds(X, y)
 end
+
+@testitem "multivariate scores reject an ensemble with offset axes" tags = [:sample] begin
+    using ScoringRules
+
+    # Every loop in the multivariate file pairs `axes(X, ...)` with a weight
+    # vector built one-based, and `@inbounds` turns the mismatch into a read of
+    # whatever sits next in memory rather than an error. With a row offset
+    # `es` returned 0.9276553962740587 for an ensemble whose score is
+    # 0.70419137025989309, having read `y` out of bounds.
+    struct Offset{T} <: AbstractMatrix{T}
+        parent::Matrix{T}
+        roff::Int
+        coff::Int
+    end
+    Base.size(A::Offset) = size(A.parent)
+    Base.axes(A::Offset) = (A.roff .+ axes(A.parent, 1), A.coff .+ axes(A.parent, 2))
+    Base.getindex(A::Offset, i::Int, j::Int) = A.parent[i - A.roff, j - A.coff]
+
+    P = [0.3 -1.2 0.8 0.1; -0.4 0.9 -0.2 1.3; 1.1 0.2 -1.5 0.6]
+    y = [0.2, -0.3, 0.7]
+    ref = (es(P, y), vs(P, y), mmds(P, y))
+    @test all(isfinite, ref)
+
+    for (roff, coff) in ((-1, 0), (0, -1), (100, 100), (3, 0))
+        X = Offset(P, roff, coff)
+        @test_throws ArgumentError es(X, y)
+        @test_throws ArgumentError vs(X, y)
+        @test_throws ArgumentError mmds(X, y)
+        @test_throws ArgumentError twes(X, y; a = -1.0)
+        @test_throws ArgumentError owvs(X, y; a = -1.0)
+    end
+    # A one-based wrapper of the same data still scores, and to the same value.
+    @test es(Offset(P, 0, 0), y) ≈ ref[1] rtol = 1.0e-14
+    @test vs(Offset(P, 0, 0), y) ≈ ref[2] rtol = 1.0e-14
+    @test mmds(Offset(P, 0, 0), y) ≈ ref[3] rtol = 1.0e-14
+end
+
+@testitem "multivariate scores promote an integer ensemble" tags = [:sample] begin
+    using ScoringRules
+
+    # The squared-distance accumulator used to be seeded at the matrix element
+    # type, so an integer ensemble accumulated in integer arithmetic and
+    # overflowed: `es(Int32[2147483647 0; 0 0], Int32[0, 0])` returned 0.25
+    # against the true 536870911.75, and the Int64 version threw a DomainError
+    # out of `sqrt`.
+    for T in (Int32, Int64)
+        big_val = T === Int32 ? T(2147483647) : T(4_000_000_000)
+        X = T[big_val 0; 0 0]
+        y = T[0, 0]
+        Xf = Float64.(X)
+        yf = Float64.(y)
+        @test es(X, y) ≈ es(Xf, yf) rtol = 1.0e-12
+        @test mmds(X, y) ≈ mmds(Xf, yf) rtol = 1.0e-12
+        @test vs(X, y) ≈ vs(Xf, yf) rtol = 1.0e-12
+    end
+    # Small integer ensembles already worked and must keep their value.
+    Xs = [1 4 2; 3 0 5]
+    ys = [2, 1]
+    @test es(Xs, ys) ≈ es(Float64.(Xs), Float64.(ys)) rtol = 1.0e-14
+    @test mmds(Xs, ys) ≈ mmds(Float64.(Xs), Float64.(ys)) rtol = 1.0e-14
+end

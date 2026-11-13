@@ -7,6 +7,12 @@
 #
 #     Rscript test/references/generate_references.R
 #
+# One caveat on regenerating: `crps_gev` at shape exactly 0 uses
+# `gsl::expint_Ei` when the `gsl` package is installed and falls back to
+# `integrate` with a warning when it is not. The fallback is about 8e-11
+# relative from the exact Gumbel CRPS, so the shape = 0 rows of gev.csv differ
+# between machines by that much. Both sit far inside the GEV test tolerance.
+#
 # Each family writes one CSV under test/references/data/ whose columns are the
 # natural parameters of that family plus the observation `y` and one column per
 # scoring rule (crps/logs/dss) that scoringRules provides for it.

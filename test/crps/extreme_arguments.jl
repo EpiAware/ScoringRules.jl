@@ -26,6 +26,20 @@
     @test crps(NegativeBinomial(2.5, 0.3), 5.0) ≈ 0.950281678491355 rtol = rtol
     @test crps(NegativeBinomial(10.5, 0.7), 5.0) ≈ 0.670705084814377 rtol = rtol
 
+    # A peak the quadrature has to be told about. The integrand of the
+    # hypergeometric factor is a spike at the origin of half-width 1/√(aZ);
+    # sampling the whole interval blind, every node underflows to zero, the
+    # error estimate is zero too, and the factor comes back as 0 having
+    # "converged". That dropped a term the size of the score itself:
+    # `NegativeBinomial(724, 0.01)` gave 2135.92 against the true 625.71, one
+    # unit of `size` away from a case that was right.
+    # Reference: brute-force Σ_k (F(k) − 1{k ≥ y})² over the pmf, which R's
+    # crps_nbinom also agrees with to the digits it prints.
+    @test crps(NegativeBinomial(723.0, 0.01), 71580.0) ≈ 625.270617245071 rtol = rtol
+    @test crps(NegativeBinomial(724.0, 0.01), 71680.0) ≈ 625.713745875651 rtol = rtol
+    @test crps(NegativeBinomial(200.0, 0.002), 1.0e5) ≈ 1656.97968453583 rtol = rtol
+    @test crps(NegativeBinomial(2.1e6, 0.5), 2.1e6) ≈ 478.932173935184 rtol = rtol
+
     # Poisson: `besseli(0, 2λ)` overflows the Amos routine from λ ≈ 351, so the
     # exponentially scaled form has to be used. Reference: crps_pois.
     @test crps(Poisson(350.0), 340.0) ≈ 6.39185500767645 rtol = rtol
@@ -101,6 +115,27 @@ end
     @test crps(Normal(1.0, 0.0), 1.0) ≈ 0.0
     @test crps(Normal(-2.0, 0.0), -5.0) ≈ 3.0
     @test isnan(crps(Normal(0.0, -1.0; check_args = false), 0.5))
+end
+
+@testitem "a degenerate truncation window is a point forecast" tags = [:crps] begin
+    using ScoringRules
+    using Distributions
+
+    # Coincident bounds leave a point mass at the bound, so the CRPS is the
+    # absolute error. The logistic paths returned 0 instead, where the normal
+    # and Student-t ones, and R, all return |y − l|.
+    for base in (Logistic(0.0, 1.0), Normal(0.0, 1.0), TDist(5.0), 1.0 + 2.0 * TDist(5.0))
+        for y in (3.0, 1.0, -2.5)
+            @test crps(Distributions.censored(base, 1.0, 1.0), y) ≈ abs(y - 1.0)
+            @test crps(truncated(base, 1.0, 1.0), y) ≈ abs(y - 1.0)
+        end
+    end
+    # The generalised form is not reachable with coincident bounds through
+    # `BoundaryMass`, which requires `lower < upper`, so it is checked
+    # directly. R returns 2 for all three of these.
+    @test ScoringRules._crps_gtclogis(3.0, 0.0, 1.0, 1.0, 1.0, 0.2, 0.3) ≈ 2.0
+    @test ScoringRules._crps_gtcnorm(3.0, 0.0, 1.0, 1.0, 1.0, 0.2, 0.3) ≈ 2.0
+    @test ScoringRules._crps_gtct(3.0, 5.0, 0.0, 1.0, 1.0, 1.0, 0.2, 0.3) ≈ 2.0
 end
 
 @testitem "truncated Student-t CRPS holds up at a far bound" tags = [:crps] begin
@@ -240,10 +275,82 @@ end
             BoundaryMass(Exponential(1.0); lower = 0.0, upper = 2.0, lmass = 0.1, umass = 0.2),
             BoundaryMass(Gamma(2.0, 1.5); lower = 1.0, upper = 4.0, lmass = 0.05),
         )
-        s = dss(d, 1.0)
-        @test isfinite(s)
+        @test isfinite(dss(d, 1.0))
+    end
+
+    # Anchors with a closed form, so the moments are checked against something
+    # other than themselves. For `Exponential(1)` truncated to [0, 2],
+    # `E[X] = (1 − 3e⁻²)/Z` and `E[X²] = (2 − 10e⁻²)/Z` with `Z = 1 − e⁻²`;
+    # censoring at 2 instead moves the upper tail onto an atom there, giving
+    # `E[Y] = 1 − e⁻²` and `E[Y²] = 2 − 6e⁻²`.
+    let em2 = exp(-2.0), z = 1 - exp(-2.0)
+        mt = (1 - 3em2) / z
+        vt = (2 - 10em2) / z - mt^2
+        m, v = ScoringRules._forecast_moments(truncated(Exponential(1.0), 0.0, 2.0))
+        @test m ≈ mt rtol = 1.0e-12
+        @test v ≈ vt rtol = 1.0e-12
+        @test dss(truncated(Exponential(1.0), 0.0, 2.0), 1.0) ≈
+            dss_moments(1.0, mt, vt) rtol = 1.0e-12
+
+        mc = 1 - em2
+        vc = (2 - 6em2) - mc^2
+        m, v = ScoringRules._forecast_moments(
+            Distributions.censored(Exponential(1.0), 0.0, 2.0)
+        )
+        @test m ≈ mc rtol = 1.0e-12
+        @test v ≈ vc rtol = 1.0e-12
+    end
+
+    # A bound deep in the upper tail: the retained mass is a difference of CDFs
+    # that cancels to exactly zero there, which made the mean of
+    # `truncated(Gamma(2, 1), 40, Inf)` come out below its own lower bound.
+    # Reference: the upper incomplete gammas, `Γ(3,40)/Γ(2,40) = 1682/41`.
+    let d = truncated(Gamma(2.0, 1.0), 40.0, nothing)
         m, v = ScoringRules._forecast_moments(d)
-        @test s ≈ dss_moments(1.0, m, v) rtol = 1.0e-10
+        @test m ≈ 1682 / 41 rtol = 1.0e-12
+        @test v ≈ 6 * (1 + 40 + 800 + 40.0^3 / 6) / 41 - (1682 / 41)^2 rtol = 1.0e-10
+        @test m > 40
+    end
+
+    # A forecast whose whole support is narrow and far from the midpoint of a
+    # half-infinite interval: both moments came back as zero.
+    let d = truncated(Exponential(1.0e-6), 0.0, nothing)
+        m, v = ScoringRules._forecast_moments(d)
+        @test m ≈ 1.0e-6 rtol = 1.0e-9
+        @test v ≈ 1.0e-12 rtol = 1.0e-8
+    end
+
+    # The variance has to be taken about the mean. Built as `E[X²] − E[X]²` it
+    # cancels away for an interval far from the origin: a `BoundaryMass` on
+    # `Normal(1e8, 1)` gave a variance of exactly 0, and the truncated
+    # `Logistic(1e8, 1)` a negative one, where the spread is O(1).
+    for (base, shifted) in (
+            (Normal(1.0e8, 1.0), Normal(0.0, 1.0)),
+            (Normal(1.0e6, 1.0), Normal(0.0, 1.0)),
+            (Logistic(1.0e8, 1.0), Logistic(0.0, 1.0)),
+            (Logistic(-1.0e9, 2.0), Logistic(0.0, 2.0)),
+        )
+        c = mean(base)
+        for (far, near) in (
+                (
+                    BoundaryMass(base; lower = c - 1, upper = c + 1, lmass = 0.1, umass = 0.1),
+                    BoundaryMass(shifted; lower = -1.0, upper = 1.0, lmass = 0.1, umass = 0.1),
+                ),
+                (truncated(base, c - 1, c + 1), truncated(shifted, -1.0, 1.0)),
+                (
+                    Distributions.censored(base, c - 1, c + 1),
+                    Distributions.censored(shifted, -1.0, 1.0),
+                ),
+            )
+            _, vfar = ScoringRules._forecast_moments(far)
+            _, vnear = ScoringRules._forecast_moments(near)
+            @test vfar > 0
+            # `x − m` inside the quadrature is known only to `eps(c)`, so the
+            # variance of a unit-wide window at `c` cannot beat that relative
+            # to its own size. The tolerance is that floor, not a guess.
+            @test vfar ≈ vnear rtol = max(1.0e-9, 100 * eps(c))
+            @test isfinite(dss(far, c))
+        end
     end
 
     # Where Distributions.jl does supply analytic moments they are still used,
