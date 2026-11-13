@@ -26,8 +26,23 @@ function _check_multiv(X::AbstractMatrix, y::AbstractVector)
     )
     size(X, 2) >= 1 ||
         throw(ArgumentError("the ensemble X must have at least one member"))
+    # Every loop below pairs `axes(X, …)` with a weight vector that
+    # `_member_weights` builds one-based, or with `y`, so offset axes would
+    # index past the end of one of them. `@inbounds` makes that a silent read
+    # of whatever is next in memory rather than an error: with a row offset,
+    # `es` returned 0.9276 for an ensemble whose score is 0.7042.
+    # `Base.require_one_based_indexing` would say this in one call but is not
+    # public API, and this package has just finished removing its reliance on
+    # an unexported one.
+    (_one_based(X) && _one_based(y)) || throw(
+        ArgumentError(
+            "X and y must have one-based axes, got $(axes(X)) and $(axes(y))"
+        )
+    )
     return nothing
 end
+
+_one_based(A) = all(ax -> ax == 1:length(ax), axes(A))
 
 # Euclidean distance between two columns of the ensemble, and between a column
 # and the observation, accumulated in place. Writing these out keeps the
@@ -35,18 +50,25 @@ end
 # `norm(view(X, :, i) .- view(X, :, j))` allocates on every pair: at d = 50,
 # m = 3000 that temporary accounted for 2061 MiB per call, and removing it cuts
 # the call from 594 ms to 127 ms.
+# Each element is converted before the subtraction, not just the accumulator:
+# an integer difference squares to an integer and overflows there, which
+# `norm` (the call this replaced) never did.
+# `es(Int32[2147483647 0; 0 0], Int32[0, 0])` came out as 0.25 against the
+# true 536870911.75, and the Int64 version threw out of `sqrt`.
 @inline function _col_sqdist(X::AbstractMatrix, i::Integer, j::Integer)
-    s = zero(eltype(X)) * zero(eltype(X))
+    T = float(eltype(X))
+    s = zero(T)
     @inbounds @simd for k in axes(X, 1)
-        s += abs2(X[k, i] - X[k, j])
+        s += abs2(T(X[k, i]) - T(X[k, j]))
     end
     return s
 end
 
 @inline function _col_sqdist(X::AbstractMatrix, i::Integer, y::AbstractVector)
-    s = zero(eltype(X)) * zero(eltype(X))
+    T = float(promote_type(eltype(X), eltype(y)))
+    s = zero(T)
     @inbounds @simd for k in axes(X, 1)
-        s += abs2(X[k, i] - y[k])
+        s += abs2(T(X[k, i]) - T(y[k]))
     end
     return s
 end
