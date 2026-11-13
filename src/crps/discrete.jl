@@ -184,10 +184,11 @@ function _crps_nbinom(y::Real, size::Real, prob::Real)
     usable = rel <= 1.0e-6 ? out : oftype(out, NaN)
     # How far the sum has to run: past `y`, past the bulk, and down a tail that
     # shrinks by `1 − prob` a step, which takes about `20/prob` steps to fall
-    # below `eps` squared.
+    # below `eps` squared. Each step is a `cdf` and a `ccdf` call, so the sum
+    # is kept to forecasts it can finish in a few milliseconds.
     mu = size * (1 - prob) / prob
     span = max(y, mu + 40 * sqrt(mu / prob), 20 / prob)
-    span <= 1.0e6 && return _crps_nbinom_sum(y, size, prob, usable)
+    span <= 1.0e4 && return _crps_nbinom_sum(y, size, prob, usable)
     return usable
 end
 
@@ -195,12 +196,12 @@ end
 # for a forecast the closed form scores too coarsely. Below the support the
 # integrand is one; on `[k, k + 1)` it is `F(k)²` below `y` and `S(k)²` above.
 # The sum runs until the tail left is too small to change the total, which for
-# a compact forecast is a handful of terms; past a million it gives up and
-# returns `fallback`.
+# a compact forecast is a handful of terms; past a hundred thousand it gives up
+# and returns `fallback`.
 function _crps_nbinom_sum(y::Real, size::Real, prob::Real, fallback::Real)
     d = NegativeBinomial(size, prob)
     total = y < 0 ? -float(y) : zero(float(y))
-    for k in 0:1_000_000
+    for k in 0:100_000
         F, S = cdf(d, k), ccdf(d, k)
         total += if y <= k
             S^2

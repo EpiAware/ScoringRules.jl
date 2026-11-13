@@ -544,4 +544,10 @@ end
             @test crps(d, y) ≈ oracle_crps(d, y) rtol = 1.0e-10
         end
     end
+    # A tiny size with a small `prob` has a tail that shrinks by only
+    # `1 - prob` a step. Summing it would take of order `20/prob` terms, about
+    # a second here, and the closed form is already within 1e-8.
+    d = NegativeBinomial(1.0e-6, 2.0e-5)
+    @test crps(d, 0.0) ≈ oracle_crps(d, 0.0) rtol = 1.0e-8
+    @test (@elapsed crps(d, 0.0)) < 0.05
 end
