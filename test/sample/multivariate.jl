@@ -249,4 +249,21 @@ end
     ys = [2, 1]
     @test es(Xs, ys) ≈ es(Float64.(Xs), Float64.(ys)) rtol = 1.0e-14
     @test mmds(Xs, ys) ≈ mmds(Float64.(Xs), Float64.(ys)) rtol = 1.0e-14
+
+    # The variogram score raises its differences to a power rather than going
+    # through the squared-distance helper, so it is a separate path: it
+    # returned 5.899e8 for an ensemble whose score is 8.0e9, and threw out of
+    # `^0.5` when a wrapped difference landed on `typemin`.
+    for (X, y) in (
+            (Int32[2000000000 2000000000; -2000000000 -2000000000], Int32[0, 0]),
+            (Int32[2147483647 2147483647; -1 -1], Int32[0, 0]),
+            (Int64[4000000000 0; 0 4000000000], Int64[0, 0]),
+        )
+        @test vs(X, y) ≈ vs(Float64.(X), Float64.(y)) rtol = 1.0e-12
+        for p in (0.5, 1.0, 2.0)
+            @test vs(X, y; p = p) ≈ vs(Float64.(X), Float64.(y); p = p) rtol = 1.0e-12
+        end
+        @test twvs(X, y; a = -Inf) ≈
+            twvs(Float64.(X), Float64.(y); a = -Inf) rtol = 1.0e-12
+    end
 end

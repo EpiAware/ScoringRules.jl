@@ -10,7 +10,7 @@
     rtol = 1.0e-9
 
     # The hypergeometric factor of the negative binomial CRPS. The Gauss series
-    # loses digits from size ≈ 40 and returns NaN from size ≈ 100.
+    # that `HypergeometricFunctions` sums returns NaN from size ≈ 100 here.
     # Reference: crps_nbinom(y, size, prob) in R scoringRules 1.1.3.
     @test crps(NegativeBinomial(40.0, 0.3), 5.0) ≈ 78.4150319255607 rtol = rtol
     @test crps(NegativeBinomial(100.0, 0.3), 5.0) ≈ 212.61976265306 rtol = rtol
@@ -75,6 +75,21 @@ end
     # Reference: brute-force summation over the pmf.
     @test crps(Skellam(1.0, 2.0), 2.0) ≈ 2.08717915795548 rtol = rtol
     @test crps(truncated(Poisson(3.0), 1, nothing), 2.0) ≈ 0.578038899674316 rtol = rtol
+
+    # An affine transform of a lattice forecast, in both directions. A
+    # decreasing map is still a forecast, and its lattice is the integers when
+    # the location and scale are: guarding the equivariance route on `σ > 0`
+    # alone answered `NaN` where the step-CDF sum had been right.
+    # Reference: brute-force Σ_k (F(k) − 1{k ≥ y})² over the lattice.
+    @test crps(-1 * Poisson(2.0), -2.0) ≈ 0.31117674444005744 rtol = rtol
+    for base in (Poisson(2.0), Binomial(6, 0.4), Geometric(0.3))
+        for y in (-3.0, -0.5, 0.0, 1.0, 2.5, 7.0)
+            # CRPS is invariant under reflecting both forecast and observation.
+            @test crps(-1 * base, -y) ≈ crps(base, y) rtol = rtol
+            @test crps((-2) * base + 3, 3 - 2 * y) ≈ 2 * crps(base, y) rtol = rtol
+            @test crps(2 * base + 3, 3 + 2 * y) ≈ 2 * crps(base, y) rtol = rtol
+        end
+    end
 
     # A support that is not the unit lattice: the step CDF is integrated
     # exactly, not summed over integers.
@@ -278,7 +293,7 @@ end
         @test isfinite(dss(d, 1.0))
     end
 
-    # Anchors with a closed form, so the moments are checked against something
+    # Cases with a closed form, so the moments are checked against something
     # other than themselves. For `Exponential(1)` truncated to [0, 2],
     # `E[X] = (1 − 3e⁻²)/Z` and `E[X²] = (2 − 10e⁻²)/Z` with `Z = 1 − e⁻²`;
     # censoring at 2 instead moves the upper tail onto an atom there, giving
@@ -318,6 +333,23 @@ end
         m, v = ScoringRules._forecast_moments(d)
         @test m ≈ 1.0e-6 rtol = 1.0e-9
         @test v ≈ 1.0e-12 rtol = 1.0e-8
+    end
+
+    # The mirror image: a bound so far out that it retains the whole base, with
+    # the mass nowhere near it. Measuring the first moment from the bound puts
+    # the cancellation straight back, and `dss` on a truncated `Laplace(0, 1)`
+    # at `lower = -1e6` came out 1.224 against `log 2`.
+    for (d, mref, vref) in (
+            (truncated(TDist(5.0); lower = -1.0e6), 0.0, 5 / 3),
+            (truncated(TDist(5.0); lower = -1.0e8), 0.0, 5 / 3),
+            (truncated(Laplace(0.0, 1.0); lower = -1.0e6), 0.0, 2.0),
+            (truncated(Laplace(0.0, 1.0); lower = -1.0e8), 0.0, 2.0),
+            (Distributions.censored(Laplace(0.0, 1.0); lower = -1.0e6), 0.0, 2.0),
+        )
+        m, v = ScoringRules._forecast_moments(d)
+        @test m ≈ mref atol = 1.0e-6
+        @test v ≈ vref rtol = 1.0e-6
+        @test dss(d, 0.0) ≈ dss_moments(0.0, mref, vref) rtol = 1.0e-6
     end
 
     # The variance has to be taken about the mean. Built as `E[X²] − E[X]²` it

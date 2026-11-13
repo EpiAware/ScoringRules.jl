@@ -9,9 +9,10 @@
 #
 # One caveat on regenerating: `crps_gev` at shape exactly 0 uses
 # `gsl::expint_Ei` when the `gsl` package is installed and falls back to
-# `integrate` with a warning when it is not. The fallback is about 8e-11
-# relative from the exact Gumbel CRPS, so the shape = 0 rows of gev.csv differ
-# between machines by that much. Both sit far inside the GEV test tolerance.
+# `integrate` with a warning when it is not. Over the shape = 0 rows of
+# gev.csv the fallback is a median 1.3e-10 and at worst 1.9e-8 relative from
+# the exact Gumbel CRPS, so those rows differ between machines by that much.
+# Both sit far inside the 1e-6 the GEV test allows.
 #
 # Each family writes one CSV under test/references/data/ whose columns are the
 # natural parameters of that family plus the observation `y` and one column per
