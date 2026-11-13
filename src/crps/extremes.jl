@@ -9,6 +9,23 @@
 # Dependencies (in the module): SpecialFunctions gamma, digamma, expinti;
 #   EpiAwareADTools cdf_ad_safe (the Gamma CDF, dual-safe in shape and x).
 
+# `log1p(ξz)/ξ`, the exponent of the generalised Pareto survival function,
+# continued to its limit `z` at ξ = 0 through the series
+# `z − ξz²/2 + ξ²z³/3 − …`.
+#
+# `log1p` rather than `log(1 + ξz)`: the latter loses the whole of `ξz` to
+# rounding for a small shape, and dividing by `ξ` then multiplies that error by
+# 1/ξ (relative error 2·10⁻⁴ at ξ = 10⁻¹²). The series rather than a branch on
+# `ξ == 0`: equality is false for a dual with a zero value and a nonzero
+# partial, so under automatic differentiation the branch is not taken and
+# `exp(-0/0)` makes both the value and the gradient `NaN`. The series is right
+# in both, and its truncation error at the cutoff is below 10⁻¹⁷ relative.
+@inline function _log1p_over(ξ::Real, z::Real)
+    u = ξ * z
+    abs(u) < 1.0e-4 && return z * (1 - u / 2 + u^2 / 3 - u^3 / 4)
+    return log1p(u) / ξ
+end
+
 # ---------------------------------------------------------------------------
 # GEV
 # ---------------------------------------------------------------------------
@@ -82,20 +99,13 @@ function _crps_gpd(
     z = (y - location) / scale   # standardised observation
 
     # Survival function of the standardised GPD, (1 + ξz)^(−1/ξ).
-    x = if shape == 0
-        exp(-z)               # exponential limit
-    elseif 1 + shape * z <= 0
+    x = if 1 + shape * z <= 0
         # Match R, which clips 1 + shape·z at 0 before the fractional power:
         # that gives 0^(-1/shape) = Inf below the support for shape > 0 (and
         # the clip from above then makes it 1) and 0 above it for shape < 0.
         shape > 0 ? one(float(z)) : zero(float(z))
     else
-        # `log1p` rather than `log(1 + shape*z)`: the latter loses the whole
-        # of `shape*z` to rounding for a small shape, and dividing by `shape`
-        # then multiplies that error by 1/shape (relative error 2·10⁻⁴ at
-        # shape = 10⁻¹²). Through `log1p` the result is accurate to the last
-        # bit or two for every shape.
-        exp(-log1p(shape * z) / shape)
+        exp(-_log1p_over(shape, z))
     end
     # x represents the survival function value; clip from above at 1
     x = min(x, one(x))
