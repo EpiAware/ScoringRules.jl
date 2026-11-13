@@ -174,6 +174,10 @@ function quantile_score(
             "q_levels and q_forecasts must have the same length"
         )
     )
+    # Without this the level check is vacuous and `mean` of nothing is `NaN`,
+    # where R's `qs_quantiles` errors on a zero-length input.
+    isempty(q_levels) &&
+        throw(ArgumentError("q_levels and q_forecasts must not be empty"))
     all(a -> 0 < a < 1, q_levels) ||
         throw(ArgumentError("all quantile levels must lie strictly in (0, 1)"))
     per_level = [
