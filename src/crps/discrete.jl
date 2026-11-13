@@ -11,8 +11,8 @@
 
 # ── Poisson ────────────────────────────────────────────────────────────────
 # Formula from Jordan et al. (2019), translating crps_pois in scores_pois.R.
-# R's `besselI(x, nu, expon.scaled = TRUE)` equals `exp(-x) * besseli(nu, x)`.
-# The two calls share the same argument x = 2λ, so we factor out exp(-2λ).
+# R's `besselI(x, nu, expon.scaled = TRUE)` equals `exp(-x) * besseli(nu, x)`,
+# which is `besselix` here; both terms use it and no `exp(-x)` is formed.
 """
 CRPS of a `Poisson(λ)` forecast, in closed form.
 
@@ -67,14 +67,30 @@ crps(d::Poisson, y::Real) = _crps_pois(y, d.λ)
 #
 # For `Z ≥ 0` the integrand is smooth and bounded by 1, so the quadrature is
 # accurate for every `a > 0`. The Gauss series that `HypergeometricFunctions`
-# sums instead loses digits from `a ≈ 40` at the `Z ≈ 31` of a `prob = 0.3`
-# forecast and returns `NaN` from `a ≈ 100`; it also needs `a` to be a
-# non-positive integer after a Pfaff transformation, which a half-integer
-# `size` never is.
+# sums instead returns `NaN` from `a ≈ 100` at the `Z ≈ 31` of a `prob = 0.3`
+# forecast, which is what this replaces. R sums the same series through its
+# `hypergeo` package and returns `-Inf` for some half-integer sizes; see the
+# Differences from R page.
 function _f21_half_two(a::Real, Z::Real)
     (Z < 0 || isnan(Z) || isnan(a)) && return oftype(float(a) * float(Z), NaN)
+    hi = Float64(π) / 2
     integrand = θ -> cos(θ)^2 * exp(-a * log1p(Z * sin(θ)^2))
-    val, _ = quadgk(integrand, 0.0, Float64(π) / 2; rtol = 1.0e-13)
+    # The integrand is a peak at θ = 0 whose half-width is about 1/√(aZ).
+    # Left to choose its own first panel over the whole interval, `quadgk`
+    # places its lowest node at θ ≈ 0.0067, and once `a·log1p(Z·sin²θ)` passes
+    # 745 there the integrand underflows to zero at every node it looks at: the
+    # estimate and its error are both zero, the tolerance test passes, and the
+    # function returns 0 having subdivided nothing. That made
+    # `crps(NegativeBinomial(724, 0.01), 71680)` 2136 instead of 626, with the
+    # knife edge one unit of `size` away. Splitting at geometric multiples of
+    # the half-width puts nodes where the mass is, whatever the parameters.
+    segments = Float64[]
+    step = 1 / (8 * sqrt(max(a * Z, 1.0)))
+    while step < hi
+        push!(segments, step)
+        step *= 4
+    end
+    val, _ = quadgk(integrand, 0.0, segments..., hi; rtol = 1.0e-13)
     return 4 * val / π
 end
 
