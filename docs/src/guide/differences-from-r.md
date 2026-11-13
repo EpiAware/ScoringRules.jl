@@ -64,8 +64,6 @@ is 1.6e-4 relative out, and 6.1e-5 at a bound of 60; `logs_tlogis` at
 truncated density is 0.303. This package reads the upper tail directly and
 matches 300-bit quadrature to 1e-13.
 
-## Where the two packages take different routes to the same number
-
 ### GEV CRPS: Gumbel limit (shape ≈ 0)
 
 As the shape goes to zero the general closed form cancels two terms of size
@@ -96,6 +94,8 @@ value: at `ξ = 1e-5` R's `dss_gev` is 6e-7 out, and at `ξ = 1e-8` the variance
 `Distributions.jl` returns is out by a third. This package takes both moments
 from the Maclaurin series of `log Γ(1−ξ)` instead, which is accurate to the last
 bit or two for `|ξ| ≤ 0.1` and gives the Gumbel limit exactly at `ξ = 0`.
+
+## Where the two packages take different routes to the same number
 
 ### Ensemble DSS: population versus sample variance
 

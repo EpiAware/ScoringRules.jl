@@ -148,8 +148,4 @@ analytic gradients for the Normal, Logistic and Student-t families only.
 
 ## Divergences
 
-Four scores return a different number from R because the R value is wrong
-against an independent reference, and two differ by design. The
-[Differences from R](@ref differences-from-r) page lists all six with the
-numbers. The ensemble DSS is **not** one of them: like R it uses the population
-variance, so the two agree.
+Several scores return a different number from R because the R value is wrong against an independent reference, and a few more differ by design. The [Differences from R](@ref differences-from-r) page lists every one, with the numbers. The ensemble DSS is **not** among them: like R it uses the population variance, and the two agree.
