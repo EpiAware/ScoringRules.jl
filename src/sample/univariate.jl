@@ -83,7 +83,10 @@ end
 function _crps_edf_unweighted(y::Real, dat::AbstractVector)
     n = length(dat)
     c1n = 1.0 / n
-    x = sort(dat)
+    # Copied into a plain vector before sorting: the loop takes each member's
+    # rank from its index, and for an ensemble with axes other than `1:n` the
+    # index is not the rank.
+    x = sort!(copyto!(Vector{eltype(dat)}(undef, n), dat))
     s = 0.0
     @inbounds for i in eachindex(x)
         a = (i - 0.5) * c1n       # (i − 0.5) / n, i.e. seq(0.5/n, 1−0.5/n)

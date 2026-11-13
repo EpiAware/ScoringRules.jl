@@ -170,3 +170,29 @@ end
     # The mirror-image warning for `w` on the kernel route already existed.
     @test_logs (:warn, r"w.*ignored") crps(dat, 0.5; method = :kde, w = ones(51))
 end
+
+@testitem "the ensemble CRPS does not depend on the ensemble's axes" tags = [:sample] begin
+    using ScoringRules
+
+    # The empirical CRPS ranks the sorted members, and used to take the rank
+    # from the index. With axes other than `1:n` that gave a wrong score,
+    # here a negative one.
+    struct OffsetVec{T} <: AbstractVector{T}
+        parent::Vector{T}
+        off::Int
+    end
+    Base.size(a::OffsetVec) = size(a.parent)
+    Base.axes(a::OffsetVec) = (a.off .+ axes(a.parent, 1),)
+    Base.getindex(a::OffsetVec, i::Int) = a.parent[i - a.off]
+    Base.setindex!(a::OffsetVec, v, i::Int) = (a.parent[i - a.off] = v)
+    Base.similar(a::OffsetVec, ::Type{T}, dims::Dims{1}) where {T} =
+        OffsetVec(Vector{T}(undef, dims), a.off)
+
+    # `twcrps` ranks through the same code after its chaining function, but
+    # mapping over this type needs more of the array interface than it is
+    # worth building here; it is the same loop either way.
+    d = [0.1, -0.5, 1.2, 0.7, -1.0]
+    for off in (-10, 3), y in (0.3, -2.0, 5.0)
+        @test crps(OffsetVec(d, off), y) ≈ crps(d, y) rtol = 1.0e-14
+    end
+end
