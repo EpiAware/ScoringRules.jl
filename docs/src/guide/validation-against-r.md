@@ -58,15 +58,7 @@ way. Most of those comparisons run at `atol = 1e-9` with `rtol` between `1e-6`
 and `1e-9`, the looser end being the ensemble scores and the GEV near its
 Gumbel limit, where R itself integrates numerically.
 
-Two things about the table above are worth knowing. It skips any row where
-either value is not finite. That means a family R scores as `NaN` or `Inf`
-contributes nothing to the maximum, and so does one this package scores that
-way, which is the side that would hide a regression here; the `NaN`/`Inf`
-conventions are checked in the test suite instead. The reference grids were
-also widened in 1.0.0 to reach the parameters where the closed forms misbehave:
-a Poisson mean past 350, a negative binomial size past 40, a shape within
-`1e-3` of the Gumbel limit, a truncation bound 1000 standard units into the
-tail. The rows counted here include those.
+Two things about the table above are worth knowing. It skips any row where either value is not finite. That means a family R scores as `NaN` or `Inf` contributes nothing to the maximum, and so does one this package scores that way, which is the side that would hide a regression here; the `NaN`/`Inf` conventions are checked in the test suite instead. The reference grids were also widened in 1.0.0 to reach the parameters where the closed forms misbehave: a Poisson mean past 350, a negative binomial size past 40, a shape within `1e-3` of the Gumbel limit, a truncation bound 1000 standard units into the tail. The table counts the widened Poisson and negative binomial rows; it has no GEV or truncated Student's ``t`` rows, and those two grids are compared in the test suite.
 
 ## Gradients via automatic differentiation
 
