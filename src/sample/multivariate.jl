@@ -26,11 +26,12 @@ function _check_multiv(X::AbstractMatrix, y::AbstractVector)
     )
     size(X, 2) >= 1 ||
         throw(ArgumentError("the ensemble X must have at least one member"))
-    # Every loop below pairs `axes(X, …)` with a weight vector that
-    # `_member_weights` builds one-based, or with `y`, so offset axes would
-    # index past the end of one of them. `@inbounds` makes that a silent read
-    # of whatever is next in memory rather than an error, which is why the
-    # wrong answer it produced was different on each call.
+    # Every loop below indexes `X`, `y`, the member weights and `w_vs` over
+    # one-based ranges, so offset axes on any of them read past the end of
+    # another. `@inbounds` makes that a silent read of whatever is next in
+    # memory rather than an error, which is why the wrong answer it produced
+    # was different on each call. `w` and `w_vs` are checked where they are
+    # validated, since they do not reach here.
     # `Base.require_one_based_indexing` would say this in one call but is not
     # public API, and this package has just finished removing its reliance on
     # an unexported one.
@@ -92,6 +93,10 @@ function _member_weights(m::Integer, w)
         )
     )
     any(<(0), w) && throw(ArgumentError("member weights w must be non-negative"))
+    # `w ./ sw` keeps `w`'s axes, and the score loops index it over `1:m`.
+    _one_based(w) || throw(
+        ArgumentError("member weights w must have one-based axes, got $(axes(w))")
+    )
     sw = sum(w)
     return w ./ sw
 end
@@ -118,6 +123,9 @@ function _check_w_vs(w_vs::AbstractMatrix, d::Integer)
         )
     )
     any(<(0), w_vs) && throw(ArgumentError("weight matrix w_vs must be non-negative"))
+    _one_based(w_vs) || throw(
+        ArgumentError("w_vs must have one-based axes, got $(axes(w_vs))")
+    )
     return isapprox(w_vs, w_vs'; atol = 1.0e-12) || throw(
         ArgumentError(
             "weight matrix w_vs must be symmetric"
