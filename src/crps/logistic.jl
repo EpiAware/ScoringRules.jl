@@ -37,7 +37,8 @@ end
 # --- standard logistic --------------------------------------------------------
 # Unit-scale core: z − 2·log F(z) − 1, with `log F(z) = −log1pexp(−z)` so the
 # far lower tail stays finite. Taking `log(logistic(z))` instead returns −Inf
-# once `logistic(z)` underflows to zero (z ≲ −745), and so does the score.
+# once `logistic(z)` underflows to zero (z ≲ −745), which the formula subtracts,
+# so the score came back as +Inf.
 @inline _crps_logis_unit(z::Real) = z + 2 * log1pexp(-z) - 1
 
 """
@@ -71,7 +72,9 @@ function _crps_clogis_unit(y::Real, l::Real, u::Real)
         z = min(u, z)
     end
     l > u && return NaN
-    l == u && return zero(float(y))
+    # Coincident bounds leave a point mass at `l`, whose CRPS is the absolute
+    # error. The normal and Student-t siblings, and R, all return that.
+    l == u && return abs(y - z)
     out_z = _crps_logis_unit(z)
     return out_z + out_l + out_u + abs(y - z)
 end
@@ -122,7 +125,9 @@ function _crps_tlogis_unit(y::Real, l::Real, u::Real)
         z = min(u, z)
     end
     l > u && return NaN
-    l == u && return zero(float(y))
+    # Coincident bounds leave a point mass at `l`, whose CRPS is the absolute
+    # error. The normal and Student-t siblings, and R, all return that.
+    l == u && return abs(y - z)
 
     a = p_u - p_l
     b = out_u - out_l
@@ -217,7 +222,9 @@ function _crps_gtclogis_unit(y::Real, l::Real, u::Real, lmass::Real, umass::Real
     end
 
     l > u && return NaN
-    l == u && return zero(float(y))
+    # Coincident bounds leave a point mass at `l`, whose CRPS is the absolute
+    # error. The normal and Student-t siblings, and R, all return that.
+    l == u && return abs(y - z)
 
     a1 = p_u - p_l
     a2 = 1 - (umass + lmass)
