@@ -13,14 +13,14 @@
 
 A continuous forecast distribution `dist` truncated to the interval
 `[lower, upper]`, with free point masses `lmass` at `lower` and `umass` at
-`upper`; the interior carries the remaining probability `1 - lmass - umass`.
+`upper`; the interior holds the remaining probability `1 - lmass - umass`.
 This is the "generalised truncated/censored" distribution of R `scoringRules`:
 zero masses recover `truncated(dist; lower, upper)`, and
 `lmass = cdf(dist, lower)`, `umass = ccdf(dist, upper)` recover
 `censored(dist; lower, upper)`.
 
 `lower` and `upper` default to the support bounds of `dist` (no truncation);
-a bound must be finite to carry a nonzero mass. As for
+a bound must be finite to hold a nonzero mass. As for
 `Distributions.Censored`, `pdf`/`logpdf` at a bound with nonzero mass return
 the probability mass itself.
 
@@ -170,22 +170,19 @@ end
 function _forecast_moments(d::BoundaryMass)
     a = _interior_mass(d)
     T = float(typeof(a))
+    mi, vi = a > 0 ? _forecast_moments(_interior(d)) : (zero(T), zero(T))
     m = zero(T)
-    m2 = zero(T)
-    if a > 0
-        mi, vi = _forecast_moments(_interior(d))
-        m += a * mi
-        m2 += a * (vi + mi^2)
-    end
-    if d.lmass > 0
-        m += d.lmass * d.lower
-        m2 += d.lmass * d.lower^2
-    end
-    if d.umass > 0
-        m += d.umass * d.upper
-        m2 += d.umass * d.upper^2
-    end
-    return (m, m2 - m^2)
+    a > 0 && (m += a * mi)
+    d.lmass > 0 && (m += d.lmass * d.lower)
+    d.umass > 0 && (m += d.umass * d.upper)
+    # About the mean, as `Distributions.var(::BoundaryMass)` does it: built from
+    # raw moments instead, the variance of an interval far from the origin
+    # cancels away to nothing.
+    v = zero(T)
+    a > 0 && (v += a * (vi + (mi - m)^2))
+    d.lmass > 0 && (v += d.lmass * (d.lower - m)^2)
+    d.umass > 0 && (v += d.umass * (d.upper - m)^2)
+    return (m, v)
 end
 
 function Distributions.rand(rng::AbstractRNG, d::BoundaryMass)
