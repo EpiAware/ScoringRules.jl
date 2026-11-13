@@ -177,9 +177,10 @@ end
 
 # Every variance below is taken about the mean rather than as
 # `E[X²] − E[X]²`. The raw second moment of a forecast whose support sits far
-# from the origin is dominated by the mean, so the difference loses the spread
-# entirely: a `Logistic(1e8, 1)` truncated to ±1 gave a variance of −4.4e5
-# where the true one is 0.29, and a `Normal(1e8, 1)` gave exactly 0.
+# from the origin is dominated by the mean, and the difference loses the spread
+# entirely: a `Logistic(1e8, 1)` truncated to ±1 gave −4.4e5 where its variance
+# is 0.312. On the `BoundaryMass` path, where the same form was used, a
+# `Normal(1e8, 1)` on the same interval gave exactly 0.
 
 # Probability that a truncation to `[lo, hi]` retains. As a difference of
 # CDFs this cancels when both bounds sit in the same tail:
@@ -192,12 +193,23 @@ function _trunc_mass(base, lo::Real, hi::Real)
         cdf(base, hi) - cdf(base, lo)
 end
 
-# A point inside `[lo, hi]` to measure the first moment from. `∫ x f(x) dx`
-# over `[1e8 − 1, 1e8 + 1]` is dominated by `1e8` times the retained mass, so
+# A point to measure the first moment from. `∫ x f(x) dx` over
+# `[1e8 − 1, 1e8 + 1]` is dominated by `1e8` times the retained mass, so
 # `quadgk`'s relative tolerance leaves an absolute error of order 1 in a window
 # only 2 wide and the mean is useless. Integrating `x − c` removes that term.
-function _shift_point(lo::Real, hi::Real)
-    isfinite(lo) && isfinite(hi) && return (lo + hi) / 2
+#
+# The median is the point that sits near the mass whichever way the interval is
+# lopsided. A bound does not: for `truncated(Laplace(0, 1); lower = -1e8)` the
+# whole forecast is at 0 and the bound is 1e8 away, and measuring from there
+# put the mean out by 3.7e6 and `dss` 45 times over.
+function _shift_point(d, lo::Real, hi::Real)
+    q = try
+        Float64(quantile(d, 0.5))
+    catch
+        NaN
+    end
+    isfinite(q) && return q
+    isfinite(lo) && isfinite(hi) && return (float(lo) + float(hi)) / 2
     isfinite(lo) && return float(lo)
     isfinite(hi) && return float(hi)
     return zero(float(lo))
@@ -214,6 +226,28 @@ _quad_first(f, d, lo::Real, hi::Real, c::Real) =
 _quad_central(f, d, lo::Real, hi::Real, m::Real) =
     first(quadgk(x -> (x - m)^2 * f(x), lo, _crps_quad_breaks(d, lo, hi)..., hi))
 
+# The range to integrate over, clipped to where the forecast keeps any mass.
+# Handed a bound 1e8 away from everything, `quadgk` apportions a relative error
+# budget against a total that is near zero and stops at its evaluation limit
+# instead of converging: the mean of `truncated(Laplace(0, 1); lower = -1e8)`
+# came out as -0.0056 rather than 0, even with the first moment measured from
+# the median. The clip drops at most 1e-16 of the probability either side.
+function _effective_range(d, lo::Real, hi::Real)
+    ql = try
+        Float64(quantile(d, 1.0e-16))
+    catch
+        NaN
+    end
+    qh = try
+        Float64(quantile(d, 1 - 1.0e-16))
+    catch
+        NaN
+    end
+    l = isfinite(ql) ? max(float(lo), ql) : float(lo)
+    h = isfinite(qh) ? min(float(hi), qh) : float(hi)
+    return l < h ? (l, h) : (float(lo), float(hi))
+end
+
 function _numeric_moments(d::Truncated{<:ContinuousUnivariateDistribution})
     base = d.untruncated
     lo = d.lower === nothing ? minimum(base) : float(d.lower)
@@ -221,9 +255,10 @@ function _numeric_moments(d::Truncated{<:ContinuousUnivariateDistribution})
     z = _trunc_mass(base, lo, hi)
     z > 0 || return (oftype(float(z), NaN), oftype(float(z), NaN))
     f = x -> pdf(base, x)
-    c = _shift_point(lo, hi)
-    m = c + _quad_first(f, d, lo, hi, c) / z
-    return (m, _quad_central(f, d, lo, hi, m) / z)
+    a, b = _effective_range(d, lo, hi)
+    c = _shift_point(d, a, b)
+    m = c + _quad_first(f, d, a, b, c) / z
+    return (m, _quad_central(f, d, a, b, m) / z)
 end
 
 function _numeric_moments(d::Distributions.Censored{<:ContinuousUnivariateDistribution})
@@ -233,11 +268,14 @@ function _numeric_moments(d::Distributions.Censored{<:ContinuousUnivariateDistri
     pl = d.lower === nothing ? zero(float(lo)) : cdf(base, lo)
     pu = d.upper === nothing ? zero(float(hi)) : ccdf(base, hi)
     f = x -> pdf(base, x)
-    c = _shift_point(lo, hi)
-    m = c + _quad_first(f, d, lo, hi, c)
+    # The atoms stay at the censoring bounds; only the interior quadrature is
+    # clipped to where the density has mass.
+    a, b = _effective_range(d, lo, hi)
+    c = _shift_point(d, a, b)
+    m = c + _quad_first(f, d, a, b, c)
     pl > 0 && (m += (lo - c) * pl)
     pu > 0 && (m += (hi - c) * pu)
-    v = _quad_central(f, d, lo, hi, m)
+    v = _quad_central(f, d, a, b, m)
     pl > 0 && (v += (lo - m)^2 * pl)
     pu > 0 && (v += (hi - m)^2 * pu)
     return (m, v)
@@ -536,16 +574,17 @@ end
 crps(d::DiscreteUnivariateDistribution, y::Real) =
     _crps_step(d, y, _crps_discrete_nodes(d))
 
-# CRPS is equivariant under an increasing affine map: for `d = μ + σX` with
-# σ > 0, CRPS(d, y) = σ·CRPS(X, (y − μ)/σ). Without this, `3.5 + Poisson(2)`
-# was summed at the integers while its CDF jumps at the half-integers, and the
-# score came out 0.499 against the true 0.405.
+# CRPS is equivariant under an affine map: for `d = μ + σX`,
+# CRPS(d, y) = |σ|·CRPS(X, (y − μ)/σ) when σ > 0, and the reflection
+# CRPS(−X, z) = CRPS(X, −z) carries the decreasing case. Without this,
+# `3.5 + Poisson(2)` was summed at the integers while its CDF jumps at the
+# half-integers, and the score came out 0.499 against the true 0.405.
 function crps(
         d::Distributions.LocationScale{<:Real, Discrete, <:DiscreteUnivariateDistribution},
         y::Real
     )
     σ = d.σ
     σ == 0 && return abs(float(y - d.μ))
-    σ > 0 || return oftype(float(y) * float(σ), NaN)
-    return σ * crps(d.ρ, (y - d.μ) / σ)
+    z = (y - d.μ) / abs(σ)
+    return abs(σ) * crps(d.ρ, σ > 0 ? z : -z)
 end
