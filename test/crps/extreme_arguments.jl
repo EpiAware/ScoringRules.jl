@@ -531,6 +531,13 @@ end
     for (r, p) in ((10.0^11.5, 0.5), (1.0e16, 0.5), (1.0e16, 0.3), (10.0^17.5, 0.95), (10.0^15.5, 0.05))
         @test isnan(crps(NegativeBinomial(r, p), round(r * (1 - p) / p)))
     end
+    # A near-Poisson forecast written with a huge size is compact, and is
+    # summed exactly. As the size grows it tends to the Poisson of its mean,
+    # within about mean/size.
+    for (r, mu, y) in ((1.0e11, 5.0, 3.0), (1.0e12, 0.01, 0.0), (2.0e10, 1.0, 1.0))
+        d = NegativeBinomial(r, r / (r + mu))
+        @test crps(d, y) ≈ crps(Poisson(mean(d)), y) rtol = 1.0e-9
+    end
     # An infinite observation is still an infinite score.
     @test crps(NegativeBinomial(5.0, 0.3), Inf) == Inf
 end
