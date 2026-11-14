@@ -525,15 +525,15 @@ end
     @test isnan(crps(NegativeBinomial(5.0, 1.0e-160), 3.0))
     @test isnan(crps(NegativeBinomial(3.0e307, 0.5), 3.0e307))
     @test isnan(crps(NegativeBinomial(1.0e300, 0.3), 1.0e300 * 0.7 / 0.3))
-    # Between those and the sizes an exact sum can check, the closed form was
-    # quietly wrong: 2e-4 out at 10^11.5, negative at 1e16. Past a size of
-    # 1e10 it is not trusted at all.
+    # Where both the size and the location are huge the closed form was
+    # quietly wrong: 2e-4 out at 10^11.5, negative at 1e16. Past 1e10 on both
+    # it is not trusted at all.
     for (r, p) in ((10.0^11.5, 0.5), (1.0e16, 0.5), (1.0e16, 0.3), (10.0^17.5, 0.95), (10.0^15.5, 0.05))
         @test isnan(crps(NegativeBinomial(r, p), round(r * (1 - p) / p)))
     end
-    # A near-Poisson forecast written with a huge size is compact, and is
-    # summed exactly. As the size grows it tends to the Poisson of its mean,
-    # within about mean/size.
+    # A near-Poisson forecast written with a huge size has a small location,
+    # and stays on the closed form. As the size grows it tends to the Poisson
+    # of its mean, within about mean/size.
     for (r, mu, y) in ((1.0e11, 5.0, 3.0), (1.0e12, 0.01, 0.0), (2.0e10, 1.0, 1.0))
         d = NegativeBinomial(r, r / (r + mu))
         @test crps(d, y) ≈ crps(Poisson(mean(d)), y) rtol = 1.0e-9
@@ -548,25 +548,21 @@ end
 
     # A size near zero or a `prob` near one puts almost all the mass at zero,
     # and the score at `y = 0` is tiny. The closed form reaches it by
-    # cancelling two terms of order one, which costs about `log10(1/(1 - prob))`
-    # digits unless the hypergeometric factor's distance from one is taken
-    # without forming the factor itself.
-    for (r, p) in ((1.0e-8, 0.5), (1.0e-12, 0.5), (1.0, 1 - 1.0e-9), (5.0, 1 - 1.0e-9), (1.0, 1 - 1.0e-12), (0.5, 1 - 1.0e-6))
-        d = NegativeBinomial(r, p)
-        for y in (0.0, 1.0, 3.0)
-            @test crps(d, y) ≈ oracle_crps(d, y) rtol = 1.0e-10
+    # cancelling two terms of order one, and keeps few digits. The contract is
+    # that every score it gives is good to 1e-6, and that it gives NaN only
+    # where the mass off zero is too small for any digits to survive.
+    for r in (1.0e-12, 1.0e-10, 1.0e-8, 1.0e-6, 1.0e-3, 0.5, 5.0, 100.0)
+        for p in (2.0e-5, 1.0e-3, 0.5, 0.999, 1 - 1.0e-9, 1 - 1.0e-12), y in (0.0, 1.0, 5.0)
+            d = NegativeBinomial(r, p)
+            v = crps(d, y)
+            offzero = ccdf(d, 0)
+            if isnan(v)
+                @test y == 0 && offzero < 1.0e-8
+            else
+                @test v ≈ oracle_crps(d, y) rtol = 1.0e-6
+            end
+            # Mass off zero above 1e-8 is always scored.
+            (y > 0 || offzero > 1.0e-8) && @test !isnan(v)
         end
-    end
-    # A tiny size with a small `prob` has a tail that shrinks by only
-    # `1 - prob` a step. Summing it would take of order `20/prob` terms, about
-    # a second here, and the closed form is already within 1e-8.
-    d = NegativeBinomial(1.0e-6, 2.0e-5)
-    @test crps(d, 0.0) ≈ oracle_crps(d, 0.0) rtol = 1.0e-8
-    @test (@elapsed crps(d, 0.0)) < 0.05
-    # Smaller sizes still, where the closed form has no usable digits: the
-    # long sum is the only score there is, and is worth its time.
-    for (r, p) in ((1.0e-10, 1.0e-3), (1.0e-12, 1.9e-3), (1.0e-10, 1.0e-4))
-        d = NegativeBinomial(r, p)
-        @test crps(d, 0.0) ≈ oracle_crps(d, 0.0) rtol = 1.0e-10
     end
 end

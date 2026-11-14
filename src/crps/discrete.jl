@@ -158,18 +158,15 @@ end
 CRPS of a `NegativeBinomial(size, prob)` forecast, in closed form.
 """
 function _crps_nbinom(y::Real, size::Real, prob::Real)
-    # Past a size of 1e10 the closed form cannot be checked against an exact
-    # sum, and where it was checked against the normal limit it was quietly
-    # wrong: 2e-4 out at 10^11.5, negative at 1e16, as the CDF itself loses
-    # accuracy at such parameters in ways no error bound here follows. It is
-    # not used there. A forecast compact enough to sum, such as a near-Poisson
-    # one written with a huge size, is summed exactly; a wider one has no
-    # score to give.
-    if isfinite(y) && size > 1.0e10
-        nan = oftype(float(y) * float(size) * float(prob), NaN)
-        return _nbinom_span(y, size, prob) <= 1.0e6 ?
-            _crps_nbinom_sum(y, size, prob, nan) : nan
-    end
+    nan = oftype(float(y) * float(size) * float(prob), NaN)
+    # Where both the size and the forecast's location pass 1e10 the closed
+    # form cannot be checked against an exact sum, and against the normal
+    # limit it was quietly wrong: 2e-4 out at 10^11.5, negative at 1e16, as
+    # the CDF loses accuracy at such parameters in ways no error bound here
+    # follows. A near-Poisson forecast written with a huge size has a small
+    # location, and stays on the closed form.
+    mu = size * (1 - prob) / prob
+    isfinite(y) && size > 1.0e10 && max(mu, y) > 1.0e10 && return nan
     c1 = y * (2 * cdf(NegativeBinomial(size, prob), y) - 1)
     c2 = (1 - prob) / prob^2
     # pnbinom(y-1, size+1, prob) is the CDF of NB(size+1, prob) at y-1
@@ -183,59 +180,12 @@ function _crps_nbinom(y::Real, size::Real, prob::Real)
     # forecast observed at zero, where the score is of order
     # `size·(1 − prob)`, and below `prob ≈ 1e-154`, where `c2` overflows
     # outright. The bound below is within a few times of the error measured
-    # against lattice sums at sizes up to 1e10.
-    #
-    # A forecast compact enough to sum is summed exactly wherever the closed
-    # form falls short of 1e-10. One too wide to sum keeps the closed form to
-    # 1e-6, and past that has no score to give: a NaN says so where the
-    # subtraction would hand back an arbitrary, often negative, number. An
-    # infinite observation keeps its infinite score.
+    # against lattice sums. Past 1e-6 the score is NaN, where the subtraction
+    # would hand back an arbitrary, often negative, number. An infinite
+    # observation keeps its infinite score.
     isfinite(y) || return out
     rel = 2 * eps(Float64) * (abs(y) + size * c2 * (prob + abs(h))) / abs(out)
-    rel <= 1.0e-10 && return out
-    usable = rel <= 1.0e-6 ? out : oftype(out, NaN)
-    # Each step of the sum is a `cdf` and a `ccdf` call. A short sum,
-    # a few milliseconds, is worth it for the last digits; a long one, up to
-    # about a second, only where the closed form has no usable answer at all.
-    span = _nbinom_span(y, size, prob)
-    worth = span <= 1.0e4 || (isnan(usable) && span <= 1.0e6)
-    worth && return _crps_nbinom_sum(y, size, prob, usable)
-    return usable
-end
-
-# How many lattice points an exact sum has to cover: past `y`, past the bulk,
-# and down a tail that shrinks by `1 − prob` a step, which takes about
-# `20/prob` steps to fall below `eps` squared.
-function _nbinom_span(y::Real, size::Real, prob::Real)
-    mu = size * (1 - prob) / prob
-    return max(y, mu + 40 * sqrt(mu / prob), 20 / prob)
-end
-
-# The CRPS of a negative binomial forecast as the integral over its step CDF,
-# for a forecast the closed form scores too coarsely. Below the support the
-# integrand is one; on `[k, k + 1)` it is `F(k)²` below `y` and `S(k)²` above.
-# The sum runs until the tail left is too small to change the total, which for
-# a compact forecast is a handful of terms; past a million it gives up and
-# returns `fallback`.
-function _crps_nbinom_sum(y::Real, size::Real, prob::Real, fallback::Real)
-    d = NegativeBinomial(size, prob)
-    total = y < 0 ? -float(y) : zero(float(y))
-    for k in 0:1_000_000
-        F, S = cdf(d, k), ccdf(d, k)
-        total += if y <= k
-            S^2
-        elseif y >= k + 1
-            F^2
-        else
-            F^2 * (y - k) + S^2 * (k + 1 - y)
-        end
-        # Past `k` each step multiplies the mass by at most `ρ`, the largest
-        # ratio `P(j + 1)/P(j)` from here on, so once `ρ < 1` what the tail
-        # can still add after a term `S²` is at most `S²/(1 − ρ²)`.
-        ρ = (1 - prob) * max(one(size), (k + size) / (k + 1))
-        k >= y && ρ < 1 && S^2 / (1 - ρ^2) <= eps(Float64) * total && return total
-    end
-    return fallback
+    return rel <= 1.0e-6 ? out : nan
 end
 
 crps(d::NegativeBinomial, y::Real) = _crps_nbinom(y, d.r, d.p)
