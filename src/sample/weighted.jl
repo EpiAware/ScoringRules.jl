@@ -98,8 +98,10 @@ function twcrps(
         return _crps_edf_unweighted(v_y, v_dat)
     end
     # Member weights are attached to the transformed members, matching R's
-    # `crps_sample(v_y, v_dat, w = w)`.
-    return _crps_edf_weighted(v_y, v_dat, _member_weights(length(dat), w))
+    # `crps_sample(v_y, v_dat, w = w)`. The weighted score checks and
+    # normalises them itself, on the ensemble's own axes, as `crps` with
+    # weights does.
+    return _crps_edf_weighted(v_y, v_dat, w)
 end
 
 # ---------------------------------------------------------------------------
