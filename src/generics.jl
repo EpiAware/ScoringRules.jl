@@ -653,8 +653,38 @@ needed: neither `quantile` nor `support` has a method for every discrete type
 (`Skellam` has neither, and `support` of an unbounded one throws).
 """
 function _crps_discrete_nodes(d::DiscreteUnivariateDistribution)
-    return _with_bounds(d, _crps_lattice_nodes(d))
+    nodes = _with_bounds(d, _crps_lattice_nodes(d))
+    _check_mass_on_nodes(d, nodes)
+    return nodes
 end
+
+# The step CDF can only jump at the nodes, so between the first node and the
+# last the masses at the nodes must account for the whole rise of the CDF. A
+# forecast placed on the integers it does not take, such as a mixture with a
+# shifted component or a shifted forecast inside a truncation, fails this, and
+# summing it would score it as if the mass between the nodes were not there.
+function _check_mass_on_nodes(d, nodes)
+    length(nodes) < 2 && return nothing
+    # `pdf` of a shifted Poisson at an integer it does not take evaluates the
+    # Poisson at a non-integer, where Distributions.jl throws a `DomainError`
+    # rather than returning zero; that is the same finding.
+    held = try
+        sum(x -> pdf(d, x), @view nodes[2:end])
+    catch e
+        e isa DomainError || rethrow()
+        _off_nodes(d)
+    end
+    rise = cdf(d, last(nodes)) - cdf(d, first(nodes))
+    abs(held - rise) <= 1.0e-8 * max(rise, 1.0e-300) + 1.0e-12 || _off_nodes(d)
+    return nothing
+end
+
+_off_nodes(d) = throw(
+    ArgumentError(
+        "$d has mass between the points the generic discrete CRPS sums on, " *
+            "and cannot be scored by it"
+    )
+)
 
 function _crps_lattice_nodes(d::DiscreteUnivariateDistribution)
     lo, hi = minimum(d), maximum(d)

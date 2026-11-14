@@ -118,3 +118,32 @@ end
     @test crps(t, 0.3) ≈ crps(filter(v -> -0.5 <= v <= 1.2, x), 0.3) rtol = 1.0e-9
     @test (@elapsed crps(t, 0.3)) < 0.5
 end
+
+@testitem "the generic discrete CRPS refuses a forecast with mass between its nodes" tags = [:crps] begin
+    using ScoringRules
+    using Distributions
+
+    # The step CDF can only jump at the nodes it is summed on, so a forecast
+    # with mass between them would be scored as if that mass were not there.
+    # A mixture with a shifted component, or a shifted forecast inside a
+    # truncation or censoring, is placed on the integers it does not take.
+    P = Poisson(2.0)
+    for d in (MixtureModel([P, 3.5 + P]), MixtureModel([Binomial(6, 0.3), 0.5 + Binomial(6, 0.3)]))
+        @test_throws ArgumentError crps(d, 4.0)
+    end
+    # A wrapped one reaches the same nodes for its moments; a mixture takes
+    # its moments from Distributions.jl, exactly, and its `dss` stands.
+    for d in (truncated(3.5 + P, 4, Inf), censored(3.5 + P; upper = 7))
+        @test_throws ArgumentError crps(d, 4.0)
+        @test_throws ArgumentError dss(d, 4.0)
+    end
+    # A mixture whose components both sit on the integers is scored, and
+    # matches E|X - y| - E|X - X'|/2 over its enumerated support.
+    k = 0:60
+    xs = vcat(collect(Float64, k), 2.0 .+ k)
+    ps = vcat(0.5 .* pdf.(P, k), 0.5 .* pdf.(P, k))
+    y = 4.0
+    exact = sum(ps .* abs.(xs .- y)) -
+        0.5 * sum(ps[i] * ps[j] * abs(xs[i] - xs[j]) for i in eachindex(xs), j in eachindex(xs))
+    @test crps(MixtureModel([P, 2 + P]), y) ≈ exact rtol = 1.0e-10
+end
