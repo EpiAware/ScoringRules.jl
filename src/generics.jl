@@ -669,7 +669,9 @@ function _check_mass_on_nodes(d, nodes)
     # Poisson at a non-integer, where Distributions.jl throws a `DomainError`
     # rather than returning zero; that is the same finding.
     held = try
-        sum(x -> pdf(d, x), @view nodes[2:end])
+        # In at least Float64, so that summing many Float32 masses adds no
+        # rounding that grows with the support.
+        sum(x -> pdf(d, x) * 1.0, @view nodes[2:end])
     catch e
         e isa DomainError || rethrow()
         _off_nodes(d)
@@ -678,9 +680,9 @@ function _check_mass_on_nodes(d, nodes)
     # Mass genuinely off the nodes is of the order of a mixture weight. The
     # allowance covers a forecast built from Float32 parameters, whose masses
     # and CDF disagree at about 1e-7 even when both come out in Float64 (and
-    # `partype` does not say so through a wrapper), and the rounding of the
-    # sum itself in whatever precision the masses arrive in.
-    tol = 1.0e-5 + 4 * length(nodes) * max(_value_eps(held), _value_eps(rise))
+    # `partype` does not say so through a wrapper), the Float64 rounding of
+    # the sum, and the rounding of the two CDF values in their own precision.
+    tol = 1.0e-5 + 4 * length(nodes) * _value_eps(held) + 4 * _value_eps(rise)
     abs(held - rise) <= tol || _off_nodes(d)
     return nothing
 end

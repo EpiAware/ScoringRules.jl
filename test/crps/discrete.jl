@@ -147,6 +147,15 @@ end
         @test crps(d32, 4.0) ≈ crps(d64, 4.0) rtol = 1.0e-5
         @test dss(d32, 4.0) ≈ dss(d64, 4.0) rtol = 1.0e-5
     end
+    # The allowance for Float32 rounding must not grow with the support until
+    # it hides a real component off the lattice.
+    for w in (0.005f0, 0.009f0)
+        d = MixtureModel(
+            [Binomial(20000, 0.5f0), DiscreteNonParametric(Float32[10000.5f0], Float32[1])],
+            Float32[1 - w, w]
+        )
+        @test_throws ArgumentError crps(d, 10000.0)
+    end
     # A mixture whose components both sit on the integers is scored, and
     # matches E|X - y| - E|X - X'|/2 over its enumerated support.
     k = 0:60
