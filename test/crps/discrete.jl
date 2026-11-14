@@ -137,6 +137,16 @@ end
         @test_throws ArgumentError crps(d, 4.0)
         @test_throws ArgumentError dss(d, 4.0)
     end
+    # A forecast held in Float32 sums its masses with Float32 rounding, which
+    # is no evidence of mass between the nodes.
+    for (d32, d64) in (
+            (truncated(Poisson(2.0f0), 0, 20), truncated(Poisson(2.0), 0, 20)),
+            (truncated(Binomial(30, 0.3f0), 2, 25), truncated(Binomial(30, 0.3), 2, 25)),
+            (truncated(Poisson(2.0f0), 1, Inf), truncated(Poisson(2.0), 1, Inf)),
+        )
+        @test crps(d32, 4.0) ≈ crps(d64, 4.0) rtol = 1.0e-5
+        @test dss(d32, 4.0) ≈ dss(d64, 4.0) rtol = 1.0e-5
+    end
     # A mixture whose components both sit on the integers is scored, and
     # matches E|X - y| - E|X - X'|/2 over its enumerated support.
     k = 0:60

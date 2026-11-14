@@ -675,9 +675,18 @@ function _check_mass_on_nodes(d, nodes)
         _off_nodes(d)
     end
     rise = cdf(d, last(nodes)) - cdf(d, first(nodes))
-    abs(held - rise) <= 1.0e-8 * max(rise, 1.0e-300) + 1.0e-12 || _off_nodes(d)
+    # Mass genuinely off the nodes is of the order of a mixture weight. The
+    # allowance covers a forecast built from Float32 parameters, whose masses
+    # and CDF disagree at about 1e-7 even when both come out in Float64 (and
+    # `partype` does not say so through a wrapper), and the rounding of the
+    # sum itself in whatever precision the masses arrive in.
+    tol = 1.0e-5 + 4 * length(nodes) * max(_value_eps(held), _value_eps(rise))
+    abs(held - rise) <= tol || _off_nodes(d)
     return nothing
 end
+
+_value_eps(x::AbstractFloat) = eps(typeof(x))
+_value_eps(x) = eps(Float64)
 
 _off_nodes(d) = throw(
     ArgumentError(
