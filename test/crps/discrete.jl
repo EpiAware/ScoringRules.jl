@@ -99,3 +99,22 @@ end
     end
     @test dss(t, 0.3) ≈ dss([-0.3, 0.1, 0.4, 0.9], 0.3) rtol = 1.0e-12
 end
+
+@testitem "an empirical discrete forecast scores in time linear in its support" tags = [:crps] begin
+    using ScoringRules
+    using Distributions
+    using Random: Xoshiro
+
+    # `cdf` of a `DiscreteNonParametric` scans its support, so calling it at
+    # every node made the score quadratic: 3.7 s at a hundred thousand
+    # points. An equally weighted one is an ensemble, which is the reference.
+    x = sort(randn(Xoshiro(1), 100_000))
+    d = DiscreteNonParametric(x, fill(1 / length(x), length(x)))
+    crps(DiscreteNonParametric(x[1:10], fill(0.1, 10)), 0.1)
+    @test crps(d, 0.1) ≈ crps(x, 0.1) rtol = 1.0e-10
+    @test (@elapsed crps(d, 0.1)) < 0.5
+    t = truncated(d; lower = -0.5, upper = 1.2)
+    crps(t, 0.3)
+    @test crps(t, 0.3) ≈ crps(filter(v -> -0.5 <= v <= 1.2, x), 0.3) rtol = 1.0e-9
+    @test (@elapsed crps(t, 0.3)) < 0.5
+end

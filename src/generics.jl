@@ -590,15 +590,19 @@ moves away from the support instead of flattening out.
 """
 function _crps_step(
         d::DiscreteUnivariateDistribution, y::Real,
-        nodes::AbstractVector
+        nodes::AbstractVector; cumulative::Bool = false
     )
     n = length(nodes)
     n == 0 && throw(ArgumentError("the support of $d is empty"))
     out = max(float(first(nodes)) - y, 0.0)
+    # Where the nodes are the whole support, the CDF at each is the running
+    # sum of the masses up to it. `cdf` of a `DiscreteNonParametric` scans its
+    # support on every call, which made the score quadratic in its size.
+    Fa = 0.0
     @inbounds for i in 1:(n - 1)
         a = float(nodes[i])
         b = float(nodes[i + 1])
-        Fa = cdf(d, nodes[i])
+        Fa = cumulative ? Fa + pdf(d, nodes[i]) : cdf(d, nodes[i])
         if y <= a
             out += (Fa - 1)^2 * (b - a)
         elseif y >= b
@@ -717,8 +721,10 @@ end
 # `_crps_discrete_nodes` places the nodes on the integers, so the step CDF has
 # to jump there; an affine transform of such a forecast is routed through the
 # equivariance below rather than summed off its own lattice.
-crps(d::DiscreteUnivariateDistribution, y::Real) =
-    _crps_step(d, y, _crps_discrete_nodes(d))
+function crps(d::DiscreteUnivariateDistribution, y::Real)
+    nodes = _crps_discrete_nodes(d)
+    return _crps_step(d, y, nodes; cumulative = _finite_support(d) !== nothing)
+end
 
 # CRPS is equivariant under an affine map: for `d = μ + σX`,
 # CRPS(d, y) = |σ|·CRPS(X, (y − μ)/σ) when σ > 0, and the reflection
