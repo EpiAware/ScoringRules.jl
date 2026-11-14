@@ -57,8 +57,10 @@ _one_based(A) = all(ax -> ax == 1:length(ax), axes(A))
 # `es(Int32[2147483647 0; 0 0], Int32[0, 0])` came out as 0.25 against the
 # true 536870911.75, and at `Int64[4000000000 0; 0 0]` the wrapped negative
 # square threw out of `sqrt`.
+# The sum runs in at least Float64: a Float32 square overflows past about
+# 1.8e19, which `norm` avoided by rescaling.
 @inline function _col_sqdist(X::AbstractMatrix, i::Integer, j::Integer)
-    T = _float_type(view(X, :, i), view(X, :, j))
+    T = promote_type(_float_type(view(X, :, i), view(X, :, j)), Float64)
     s = zero(T)
     @inbounds @simd for k in axes(X, 1)
         s += abs2(T(X[k, i]) - T(X[k, j]))
@@ -67,7 +69,7 @@ _one_based(A) = all(ax -> ax == 1:length(ax), axes(A))
 end
 
 @inline function _col_sqdist(X::AbstractMatrix, i::Integer, y::AbstractVector)
-    T = _float_type(view(X, :, i), y)
+    T = promote_type(_float_type(view(X, :, i), y), Float64)
     s = zero(T)
     @inbounds @simd for k in axes(X, 1)
         s += abs2(T(X[k, i]) - T(y[k]))

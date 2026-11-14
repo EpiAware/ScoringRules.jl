@@ -375,3 +375,14 @@ end
     y[10] = NaN
     @test isnan(vs(X, y; w_vs = W))
 end
+
+@testitem "the energy score of a Float32 ensemble does not overflow its squares" tags = [:sample] begin
+    using ScoringRules
+
+    # Squares of Float32 values past about 1.8e19 overflow in Float32; the
+    # distances are summed in at least Float64.
+    X = Float32[3.0f19 0 1.0f19; 0 2.0f19 0]
+    y = Float32[0, 0]
+    @test es(X, y) ≈ es(Float64.(X), Float64.(y)) rtol = 1.0e-6
+    @test isfinite(twes(X, y; b = 1.0f20))
+end
