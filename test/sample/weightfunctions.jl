@@ -42,8 +42,9 @@
         raw, cols = load_names("weight_func_mv.csv")
         for i in axes(raw, 1)
             name = Symbol(strip(string(raw[i, cols["name"]]), '"'))
-            mu = fill(Float64(raw[i, cols["mu"]]), 4)
-            sigma = fill(Float64(raw[i, cols["sigma"]]), 4)
+            # The generator varies both across the four dimensions.
+            mu = Float64(raw[i, cols["mu"]]) .+ [0.0, 0.4, -0.3, 0.8]
+            sigma = Float64(raw[i, cols["sigma"]]) .* [1.0, 0.7, 1.3, 0.9]
             wf = weight_function(name; mu = mu, sigma = sigma)
             cf = chaining_function(name; mu = mu, sigma = sigma)
             @test owes(X, yv; weight_func = wf) ≈

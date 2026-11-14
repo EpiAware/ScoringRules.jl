@@ -864,7 +864,10 @@ write_ref("weight_func_univ_dat", data.frame(dat = wf_dat, y = wf_y))
 rows <- list()
 for (nm in c("norm_cdf", "norm_surv", "norm_pdf")) {
   for (mu in c(0, 0.8)) for (sg in c(0.7, 1.5)) {
-    muv <- rep(mu, 4); sgv <- rep(sg, 4)
+    # Different in every dimension, so that a weight applying one dimension's
+    # parameters to all of them cannot match. The test rebuilds the same
+    # vectors from the base `mu` and `sigma` written to the table.
+    muv <- mu + c(0, 0.4, -0.3, 0.8); sgv <- sg * c(1, 0.7, 1.3, 0.9)
     rows[[length(rows) + 1]] <- data.frame(
       name = nm, mu = mu, sigma = sg,
       ow = owes_sample(y = wf_yv, dat = wf_X,
