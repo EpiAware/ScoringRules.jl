@@ -9,15 +9,19 @@
 # antiderivative of the t CDF up to a sign; named G in the R source.
 @inline _t_G(z::Real, df::Real) = -(df + z^2) / (df - 1) * pdf(TDist(df), z)
 
-# AD-safe Student-t CDF, differentiable in `df` (#6): the stock `cdf(::TDist)`
-# reaches `beta_inc`, which has no method for a Dual shape argument. Rebuilt
-# from the tail-oriented identity
-#   F(z; df) = ½·I_v(df/2, ½),   v = df/(z² + df),   for z < 0,
-# and its reflection for z > 0, through `cdf_ad_safe`. Writing it this way
-# keeps the far tail accurate: the equivalent `½ + ½·sign(z)·I_w(½, df/2)`
-# with `w = z²/(z²+df)` has `I_w` round to exactly 1 once the tail falls below
-# `eps/2`, so `F` collapses to exactly 0 and any truncation normaliser built
-# from it divides by zero (df = 10, upper = −200 was −Inf).
+# AD-safe Student-t CDF, differentiable in `df`: the stock `cdf(::TDist)`
+# reaches `beta_inc`, which has no method for a Dual shape argument. Built on
+# `cdf_ad_safe` and `ccdf_ad_safe` from the identity, for z < 0,
+#   F(z; df) = ½·(1 − I_w(½, df/2)) = ½·I_v(df/2, ½),
+#   w = z²/(z² + df),  v = df/(z² + df) = 1 − w,
+# and its reflection for z > 0. The two forms fail in opposite places. The
+# first is good to about one `eps` absolute, so `eps/F` relative, and cancels
+# away the far tail: at df = 10, upper = −200 a truncation normaliser built
+# from it divided by zero. The second is good wherever `v` is, about
+# `eps·(1 + df)` relative, and in the body of a large-`df` forecast `v` rounds
+# towards one: at df = 1e7 a truncation bound of 2e-5 was lost altogether. So
+# the first is used where `F ≥ 1/(1 + df)`, which is where its error is the
+# smaller, and the second elsewhere.
 # Short-circuited at z == 0 (v ≡ 1, where the beta density diverges and IEEE
 # `Inf * 0.0` gives NaN rather than the true ∂F/∂df = 0 limit; `z` here is
 # always observation-derived, never a differentiated parameter, so this is
@@ -26,7 +30,10 @@
 @inline function _t_cdf(df::Real, z::Real)
     isinf(z) && return oftype(float(df) * one(z), z > 0 ? 1.0 : 0.0)
     z == 0 && return oftype(float(df) * one(z), 0.5)
-    tail = 0.5 * cdf_ad_safe(Beta(df / 2, 0.5), df / (z^2 + df))
+    tail = 0.5 * ccdf_ad_safe(Beta(0.5, df / 2), z^2 / (z^2 + df))
+    if tail < 1 / (1 + df)
+        tail = 0.5 * cdf_ad_safe(Beta(df / 2, 0.5), df / (z^2 + df))
+    end
     return z < 0 ? tail : 1 - tail
 end
 
