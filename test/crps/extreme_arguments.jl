@@ -550,4 +550,10 @@ end
     d = NegativeBinomial(1.0e-6, 2.0e-5)
     @test crps(d, 0.0) ≈ oracle_crps(d, 0.0) rtol = 1.0e-8
     @test (@elapsed crps(d, 0.0)) < 0.05
+    # Smaller sizes still, where the closed form has no usable digits: the
+    # long sum is the only score there is, and is worth its time.
+    for (r, p) in ((1.0e-10, 1.0e-3), (1.0e-12, 1.9e-3), (1.0e-10, 1.0e-4))
+        d = NegativeBinomial(r, p)
+        @test crps(d, 0.0) ≈ oracle_crps(d, 0.0) rtol = 1.0e-10
+    end
 end
