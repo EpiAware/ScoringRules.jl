@@ -649,6 +649,10 @@ needed: neither `quantile` nor `support` has a method for every discrete type
 (`Skellam` has neither, and `support` of an unbounded one throws).
 """
 function _crps_discrete_nodes(d::DiscreteUnivariateDistribution)
+    return _with_bounds(d, _crps_lattice_nodes(d))
+end
+
+function _crps_lattice_nodes(d::DiscreteUnivariateDistribution)
     lo, hi = minimum(d), maximum(d)
     if isfinite(lo) && isfinite(hi)
         s = support(d)
@@ -671,6 +675,17 @@ function _crps_discrete_nodes(d::DiscreteUnivariateDistribution)
         )
     )
     return klo:khi
+end
+
+# A forecast censored between the integers piles the mass beyond each bound
+# onto the bound itself, yet `support` lists only the integers inside: for
+# `censored(Poisson(3), 1.5, 6.5)` it is `2:6`, while `pdf` at 1.5 is 0.2. So
+# the forecast's own finite bounds join the nodes. Truncation at the same
+# bounds puts no mass there, and the extra node then changes nothing.
+function _with_bounds(d, nodes)
+    extra = filter(b -> isfinite(b) && !(b in nodes), [minimum(d), maximum(d)])
+    isempty(extra) && return nodes
+    return sort!(vcat(collect(nodes), extra))
 end
 
 # Generic discrete fallback. The named discrete families in `crps/discrete.jl`

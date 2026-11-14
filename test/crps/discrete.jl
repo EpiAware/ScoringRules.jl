@@ -53,3 +53,32 @@
         end
     end
 end
+
+@testitem "a count forecast censored between the integers keeps its point masses" tags = [:crps] begin
+    using ScoringRules
+    using Distributions
+
+    # Censoring at 1.5 piles the mass below it onto 1.5 itself, but
+    # `support` lists only the integers 2:6. The step CDF jumps at the bound
+    # as well as at the integers, and the moments include the mass there.
+    function stepcrps(d, y, pts)
+        xs = sort(pts)
+        s = max(first(xs) - y, 0.0)
+        for i in 1:(length(xs) - 1)
+            a, b, F = xs[i], xs[i + 1], cdf(d, xs[i])
+            s += y <= a ? (1 - F)^2 * (b - a) : y >= b ? F^2 * (b - a) :
+                F^2 * (y - a) + (1 - F)^2 * (b - y)
+        end
+        return s + max(y - last(xs), 0.0)
+    end
+    for (lo, hi, pts) in ((1.5, 6.5, [1.5; 2:6; 6.5]), (1.5, nothing, [1.5; 2:60]), (nothing, 4.5, [0:4; 4.5]))
+        d = censored(Poisson(3.0); lower = lo, upper = hi)
+        for y in (0.0, 1.7, 3.0, 5.2, 9.0)
+            @test crps(d, y) ≈ stepcrps(d, y, pts) rtol = 1.0e-10
+        end
+        p = [pdf(d, x) for x in pts]
+        m = sum(p .* pts)
+        v = sum(p .* (pts .- m) .^ 2)
+        @test dss(d, 2.0) ≈ (2.0 - m)^2 / v + log(v) rtol = 1.0e-10
+    end
+end
