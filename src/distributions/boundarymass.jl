@@ -13,21 +13,27 @@
 
 A continuous forecast distribution `dist` truncated to the interval
 `[lower, upper]`, with free point masses `lmass` at `lower` and `umass` at
-`upper`; the interior carries the remaining probability `1 - lmass - umass`.
+`upper`; the interior holds the remaining probability `1 - lmass - umass`.
 This is the "generalised truncated/censored" distribution of R `scoringRules`:
 zero masses recover `truncated(dist; lower, upper)`, and
 `lmass = cdf(dist, lower)`, `umass = ccdf(dist, upper)` recover
 `censored(dist; lower, upper)`.
 
 `lower` and `upper` default to the support bounds of `dist` (no truncation);
-a bound must be finite to carry a nonzero mass. As for
+a bound must be finite to hold a nonzero mass. As for
 `Distributions.Censored`, `pdf`/`logpdf` at a bound with nonzero mass return
 the probability mass itself.
 
 [`crps`](@ref) has closed forms for normal, logistic and (location–scale)
 Student-t bases, and for the boundary-mass exponential, uniform and
 generalised Pareto forms; other bases fall back to quadrature. [`logs`](@ref)
-and [`dss`](@ref) work through the generic density and moment methods.
+reads the density directly. [`dss`](@ref) takes the boundary masses plus the
+moments of the truncated interior, by quadrature for the bases where
+`Distributions.jl` has no analytic truncated variance.
+
+`pdf` at a bound that has a point mass returns that mass, following
+`Distributions.Censored`. R's `f*` functions instead return the interior
+density there, so `logs` at a bound differs between the two.
 
 # Example
 
@@ -156,6 +162,27 @@ function Distributions.var(d::BoundaryMass)
         v += a * (var(int) + (mean(int) - m)^2)
     end
     return v
+end
+
+# `dss` route. `Distributions.var(::BoundaryMass)` needs `var` of the
+# truncated interior, which has no method for most bases; going through
+# `_forecast_moments` picks up the numerical fallback there.
+function _forecast_moments(d::BoundaryMass)
+    a = _interior_mass(d)
+    T = float(typeof(a))
+    mi, vi = a > 0 ? _forecast_moments(_interior(d)) : (zero(T), zero(T))
+    m = zero(T)
+    a > 0 && (m += a * mi)
+    d.lmass > 0 && (m += d.lmass * d.lower)
+    d.umass > 0 && (m += d.umass * d.upper)
+    # About the mean, as `Distributions.var(::BoundaryMass)` does it: built from
+    # raw moments instead, the variance of an interval far from the origin
+    # cancels away to nothing.
+    v = zero(T)
+    a > 0 && (v += a * (vi + (mi - m)^2))
+    d.lmass > 0 && (v += d.lmass * (d.lower - m)^2)
+    d.umass > 0 && (v += d.umass * (d.upper - m)^2)
+    return (m, v)
 end
 
 function Distributions.rand(rng::AbstractRNG, d::BoundaryMass)

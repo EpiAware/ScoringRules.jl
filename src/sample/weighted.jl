@@ -83,6 +83,9 @@ function twcrps(
         a::Real = -Inf, b::Real = Inf,
         chain_func = nothing, w = nothing
     )
+    _check_nonempty(dat)
+    dat = _as_float(dat)
+    y = float(y)
     if chain_func === nothing
         a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
         v = z -> clamp(z, a, b)
@@ -95,8 +98,10 @@ function twcrps(
         return _crps_edf_unweighted(v_y, v_dat)
     end
     # Member weights are attached to the transformed members, matching R's
-    # `crps_sample(v_y, v_dat, w = w)`.
-    return _crps_edf_weighted(v_y, v_dat, _member_weights(length(dat), w))
+    # `crps_sample(v_y, v_dat, w = w)`. The weighted score checks and
+    # normalises them itself, on the ensemble's own axes, as `crps` with
+    # weights does.
+    return _crps_edf_weighted(v_y, v_dat, w)
 end
 
 # ---------------------------------------------------------------------------
@@ -151,6 +156,9 @@ function owcrps(
         a::Real = -Inf, b::Real = Inf,
         weight_func = nothing, w = nothing
     )
+    _check_nonempty(dat)
+    dat = _as_float(dat)
+    y = float(y)
     if weight_func === nothing
         a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
         w_func = z -> Float64(a < z < b)
@@ -435,8 +443,7 @@ function owvs(
     w_y = wf(y)
     wv = _ow_weights(X, wf, w)
     wv === nothing && return NaN
-    wvs = w_vs === nothing ? ones(d, d) : w_vs
-    return _vsC_w(y, X, wvs, wv, p) * w_y
+    return _vs_core(y, X, w_vs, wv, p) * w_y
 end
 
 # ---------------------------------------------------------------------------

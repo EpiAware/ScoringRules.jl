@@ -1,8 +1,10 @@
 # [Forecast input modes](@id input-modes)
 
-ScoringRules.jl accepts four kinds of forecast input. The same scoring
-function names (`crps`, `logs`, `dss`) dispatch on the type of the first
-argument, so you rarely need to think about which method you are calling.
+ScoringRules.jl accepts five kinds of forecast input: parametric, ensemble,
+moment-based, quantile and multivariate ensemble, each with a section below.
+The same scoring function names (`crps`, `logs`, `dss`) dispatch on the type of
+the first argument, so you rarely need to think about which method you are
+calling.
 
 ## Parametric forecasts (Distributions.jl)
 
@@ -56,6 +58,10 @@ crps(draws, 0.5)
 ```@example modes
 crps(draws, 0.5; method = :kde)   # Gaussian KDE with Silverman bandwidth
 ```
+
+`bw` belongs to the kernel-density route only; passing it with the default
+`:edf` method warns, since the empirical distribution function has no
+bandwidth. An empty ensemble throws.
 
 ```@example modes
 logs(draws, 0.5)   # always uses KDE

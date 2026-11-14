@@ -5,8 +5,13 @@ First working version: a port of the R
 Lerch and Allen). See the README for attribution and provenance.
 
 - Three univariate scores via multiple dispatch: `crps`, `logs`, `dss`. `logs`
-  and `dss` work for any `Distributions.jl` univariate type; `crps` has a
-  closed form for each supported family and a quadrature fallback otherwise.
+  works for any `Distributions.jl` univariate type. So does `dss`: where
+  `Distributions.jl` has no analytic variance for a truncated or censored base,
+  the first two moments are taken by quadrature. `crps` has a closed form for
+  each supported family; otherwise it falls back to quadrature for a continuous
+  forecast and to exact integration of the step CDF for a discrete one. The
+  discrete route needs only `cdf`, which brings families with no `quantile`
+  method within reach.
 - Closed-form CRPS for the normal (plus truncated, censored and generalised
   truncated/censored), logistic, Student-t, Laplace, exponential, gamma, beta,
   uniform, log-normal, log-logistic, log-Laplace, GEV, GPD, two-piece normal,
@@ -39,9 +44,32 @@ Lerch and Allen). See the README for attribution and provenance.
 - Quantile and interval scores (`quantile_score`, `interval_score`), the ranked
   probability score `rps`, and the moment-based `dss_moments` and `ess_moments`
   (error-spread score of Christensen, Moroz and Palmer 2015).
-- `quantile_score` over a vector of quantile levels returns the mean pinball loss, the same scalar shape every other score in the package returns. Pass `reduce = identity` for one score per level, or another reduction such as `sum`.
+- `quantile_score` over a vector of quantile levels returns the mean pinball loss. Pass `reduce = identity` for one score per level, or another reduction such as `sum`.
+- Smooth weight and chaining functions for the weighted scores,
+  `weight_function(name; mu, sigma)` and `chaining_function(name; mu, sigma)`,
+  covering the six shapes of R's `get_weight_func`: `:norm_cdf`, `:norm_surv`,
+  `:norm_pdf`, `:logis_cdf`, `:logis_surv` and `:logis_pdf`. Each chaining
+  function is the antiderivative of the weight of the same name, which is what
+  keeps the threshold-weighted score proper. Scalar `mu`/`sigma` give a
+  univariate function; length-`d` vectors give the product weight and the
+  element-wise chaining function of a `d`-dimensional forecast. As in R, both
+  constructors reject the logistic shapes for a multivariate forecast.
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
-  suite.
+  suite. The reference grids reach the parameters where closed forms
+  misbehave: a Poisson mean past 350, a negative binomial size past 40, a
+  normal scale of zero and a logistic scale of `1e-8`, an extreme-value shape
+  within `1e-3` of the Gumbel limit, a Student-t truncation bound 1000 standard
+  units into the tail, and observations outside the support.
+- Scores that were wrong or threw outside those grids now hold up. The negative binomial CRPS takes its hypergeometric factor through an Euler integral, split at the integrand's peak, in place of a Gauss series that returned `NaN` from `size ≈ 100`. Where the closed form cannot be trusted the score is `NaN`: at a forecast observed at zero that puts all but about 1e-9 of its mass there, below a `prob` of about 1e-154, and where both the size and the forecast's location pass 1e10, where it was found quietly wrong. A near-Poisson forecast written with a huge size is scored as usual. The Poisson CRPS scales its Bessel terms (the unscaled ones overflowed from `λ ≈ 351`), takes them from their large-argument expansion past `λ ≈ 5e8`, where the scaled ones give up, and takes the probability mass in the saddle-point form of R's `dpois`: the textbook form is 2.5e-7 out at `λ = 1e8`. The generic discrete CRPS integrates the whole step CDF, including the half-infinite pieces outside the support, and needs only `cdf`, which stops it flattening out below the support or throwing on a `Skellam`. The logistic CRPS stays finite past `z ≈ -745`; the Student-t CDF is oriented to its tail, where a truncation bound far out used to divide by an underflowed probability; and `crps(Normal(μ, 0))` returns the absolute error. The GEV moments come from a series that holds through the Gumbel limit, where the stock variance was out by a third at `shape = 1e-8`; the extreme-value shape threshold sits at `√eps` and the GPD survival goes through `log1p`; and an infinite observation scores `Inf` under every extreme-value shape, where the Gumbel form gave `NaN`. `dss` falls back to numerical moments for the truncated and censored bases where `Distributions.jl` has no analytic variance. It used to throw a `MethodError` there. Where a kept tail has no variance, it is `NaN`. The continuous quadrature fallback splits the integral at the forecast's own quantiles, which keeps a narrow band of mass or a jump in the CDF from falling between the first nodes. A boundary-mass exponential of scale 0.057 at location 1.985 was 1.8e-5 relative high at every tolerance asked for, and the same miss left both moments of `truncated(Exponential(1e-6), 0, Inf)` at zero. The univariate ensemble CRPS ranks its members by sorted position. It used to take the rank from the index: an ensemble with offset axes got a wrong, even negative, score.
+- Input validation: `rps` rejects a vector that is negative or does not sum to one, the univariate ensemble scores reject an empty ensemble, and `interval_score` rejects a reversed interval, all as R does. Passing `bw` to `crps(dat, y; method = :edf)` warns rather than being dropped in silence, as R's message does.
+- `es` and `mmds` no longer allocate a temporary per member pair, which at
+  `d = 50`, `m = 3000` takes `es` from 2061 MiB and 594 ms per call to
+  0.02 MiB and 127 ms. `vs` with member weights now computes the same number in
+  one pass over the ensemble instead of `m²` kernel evaluations, 14.7 s to
+  3.3 ms at `d = 10`, `m = 2000`; `owvs` goes through the same path. All three
+  promote an integer ensemble before squaring, which an element type as wide as
+  `Int32` could overflow, and all three now reject an ensemble whose axes are
+  not one-based rather than reading past the end of the weights.
 - `dss` returns `NaN` whenever the forecast variance is not finite and
   positive (for example t with `df ≤ 2`, GEV/GPD with `shape ≥ 1/2`,
   log-Laplace with `σ ≥ 1/2`, log-logistic with `β ≤ 2`), matching R.

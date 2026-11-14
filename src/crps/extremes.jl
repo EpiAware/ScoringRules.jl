@@ -9,9 +9,22 @@
 # Dependencies (in the module): SpecialFunctions gamma, digamma, expinti;
 #   EpiAwareADTools cdf_ad_safe (the Gamma CDF, dual-safe in shape and x).
 
-# Below this |shape| the general closed forms are numerically unstable, so the
-# analytic limit (Gumbel for GEV, exponential for GPD) is used instead.
-const _SHAPE_ATOL = 1.0e-12
+# `log1p(ξz)/ξ`, the exponent of the generalised Pareto survival function,
+# continued to its limit `z` at ξ = 0 through the series
+# `z − ξz²/2 + ξ²z³/3 − …`.
+#
+# `log1p` rather than `log(1 + ξz)`: the latter loses the whole of `ξz` to
+# rounding for a small shape, and dividing by `ξ` then multiplies that error by
+# 1/ξ (relative error 2·10⁻⁴ at ξ = 10⁻¹²). The series rather than a branch on
+# `ξ == 0`: equality is false for a dual with a zero value and a nonzero
+# partial, so under automatic differentiation the branch is not taken and
+# `exp(-0/0)` makes both the value and the gradient `NaN`. The series is right
+# in both, and its truncation error at the cutoff is below 10⁻¹⁷ relative.
+@inline function _log1p_over(ξ::Real, z::Real)
+    u = ξ * z
+    abs(u) < 1.0e-4 && return z * (1 - u / 2 + u^2 / 3 - u^3 / 4)
+    return log1p(u) / ξ
+end
 
 # ---------------------------------------------------------------------------
 # GEV
@@ -21,18 +34,22 @@ const _SHAPE_ATOL = 1.0e-12
 CRPS of a GEV(location, scale, shape) forecast at observation `y`,
 in closed form (Friederichs & Thorarinsdottir 2012). Shape must be < 1.
 
-The Gumbel limit (|shape| < 1e-12) is handled analytically via the
-exponential integral Ei.
+The Gumbel limit (|shape| below `_SHAPE_ATOL`) is handled analytically via
+the exponential integral Ei.
 """
 function _crps_gev(y::Real, shape::Real, location::Real = 0.0, scale::Real = 1.0)
     scale < 0 && return oftype(float(y), NaN)
     shape >= 1 && return oftype(float(y), NaN)
+    # With shape below 1 the mean is finite, so an observation at infinity is
+    # infinitely far from the forecast. The Gumbel form would meet that as
+    # `-Inf + Inf`.
+    isinf(y) && return oftype(float(y), Inf)
 
     y_std = (y - location) / scale   # standardised observation
 
     out = if abs(shape) < _SHAPE_ATOL
         # Gumbel limit: use exponential integral Ei
-        # out = -y_std - γ_E - log 2 - 2·Ei(-exp(-y_std))
+        # out = -y_std + γ_E - log 2 - 2·Ei(-exp(-y_std))
         # where γ_E = -digamma(1)
         -y_std - digamma(one(float(y_std))) - log(oftype(float(y_std), 2)) -
             2 * expinti(-exp(-y_std))
@@ -65,6 +82,12 @@ crps(d::GeneralizedExtremeValue, y::Real) = _crps_gev(y, d.ξ, d.μ, d.σ)
 CRPS of a GPD(location, scale, shape) forecast at observation `y`,
 in closed form (Friederichs & Thorarinsdottir 2012). Shape must be < 1.
 
+The exponential limit is exact at `shape == 0`, and `log1p` makes the general
+expression accurate to the last bit or two for every `|shape| ≥ 1e-308`, so no
+threshold is needed between them. Subnormal shapes, where `shape * z`
+underflows, and shapes within about `1e-9` of 1, where `2/(1-ξ)·(1-x^{1-ξ})`
+cancels, are both less accurate; R does the same at the upper end.
+
 `mass` is an optional point mass at the location (lower boundary); it is
 retained for internal use but not exposed through the Distributions dispatch.
 """
@@ -76,16 +99,20 @@ function _crps_gpd(
     scale < 0 && return oftype(float(y), NaN)
     shape >= 1 && return oftype(float(y), NaN)
     (mass < 0 || mass > 1) && return oftype(float(y), NaN)
+    # As for the GEV: a finite mean, so an infinite observation scores `Inf`.
+    # At shape zero the exponent would otherwise form `0 * Inf`.
+    isinf(y) && return oftype(float(y), Inf)
 
     z = (y - location) / scale   # standardised observation
 
-    x = if abs(shape) < _SHAPE_ATOL
-        exp(-z)               # exponential limit
+    # Survival function of the standardised GPD, (1 + ξz)^(−1/ξ).
+    x = if 1 + shape * z <= 0
+        # Match R, which clips 1 + shape·z at 0 before the fractional power:
+        # that gives 0^(-1/shape) = Inf below the support for shape > 0 (and
+        # the clip from above then makes it 1) and 0 above it for shape < 0.
+        shape > 0 ? one(float(z)) : zero(float(z))
     else
-        # Match R: clip 1 + shape·z at 0, then raise to -1/shape. Below the
-        # support this gives 0^(-1/shape) = Inf for shape > 0 (clipped to 1
-        # below) and 0 for shape < 0, exactly as scores_gpd.R does.
-        max(1 + shape * z, zero(float(z)))^(-1 / shape)
+        exp(-_log1p_over(shape, z))
     end
     # x represents the survival function value; clip from above at 1
     x = min(x, one(x))

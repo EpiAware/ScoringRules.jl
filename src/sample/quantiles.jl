@@ -29,7 +29,9 @@ function _quantile_hf(x::AbstractVector, p::Real, qtype::Int)
     1 <= qtype <= 9 ||
         throw(ArgumentError("quantile type must be an integer 1–9, got $qtype"))
     n = length(x)
-    xs = sort(x)
+    # Copied into a plain vector before sorting: the value is read by
+    # position below, and `sort` keeps whatever axes it is given.
+    xs = sort!(copyto!(Vector{eltype(x)}(undef, length(x)), x))
     # R's stats::quantile guards against `n * p` landing just below an integer
     # through floating-point error: the index uses a multiplicative fuzz
     # `floor(nppm * (1 + fuzz))`, with fuzz = 4 eps except for type 7, which
@@ -80,7 +82,11 @@ This is the negatively-oriented (lower = better) formulation of the check
 function / pinball loss.
 """
 @inline function _qs_quantile(y::Real, x::Real, alpha::Real)
-    return (Float64(y < x) - alpha) * (x - y)
+    # Floating point before the subtraction: an unsigned or wide-integer
+    # difference wraps in its own type, and `interval_score(UInt32(1),
+    # UInt32(3), UInt32(5), 0.8)` came back as -4.29e10 rather than 22.
+    yf, xf = float(y), float(x)
+    return (Float64(yf < xf) - alpha) * (xf - yf)
 end
 
 """
@@ -174,6 +180,10 @@ function quantile_score(
             "q_levels and q_forecasts must have the same length"
         )
     )
+    # Without this the level check is vacuous and `mean` of nothing is `NaN`,
+    # where R's `qs_quantiles` errors on a zero-length input.
+    isempty(q_levels) &&
+        throw(ArgumentError("q_levels and q_forecasts must not be empty"))
     all(a -> 0 < a < 1, q_levels) ||
         throw(ArgumentError("all quantile levels must lie strictly in (0, 1)"))
     per_level = [
@@ -220,8 +230,9 @@ function quantile_score(
         dat::AbstractVector, y::Real;
         alpha::Real, type::Int = 7
     )
+    _check_nonempty(dat)
     0 < alpha < 1 || throw(ArgumentError("alpha must lie strictly in (0, 1), got $alpha"))
-    q_hat = _quantile_hf(dat, alpha, type)
+    q_hat = _quantile_hf(_as_float(dat), alpha, type)
     return _qs_quantile(y, q_hat, alpha)
 end
 
@@ -237,7 +248,8 @@ nominal coverage `level` (e.g. `level = 0.8` for an 80 % interval), with
 lower endpoint `lower`, upper endpoint `upper`, and observation `y`.
 
 # Arguments
-- `lower` — lower quantile forecast (the α₁ = (1-level)/2 quantile).
+- `lower` — lower quantile forecast (the α₁ = (1-level)/2 quantile); must not
+            exceed `upper`.
 - `upper` — upper quantile forecast (the α₂ = 1 - (1-level)/2 quantile).
 - `y`     — scalar observation.
 - `level` — nominal coverage, `0 < level < 1`.
@@ -264,6 +276,11 @@ interval_score(-1.64, 1.64, 0.5, 0.9)
 """
 function interval_score(lower::Real, upper::Real, y::Real, level::Real)
     0 < level < 1 || throw(ArgumentError("level must lie strictly in (0, 1), got $level"))
+    lower <= upper || throw(
+        ArgumentError(
+            "lower must not exceed upper, got lower=$lower, upper=$upper"
+        )
+    )
     return _ints_quantile(y, lower, upper, level)
 end
 
@@ -296,10 +313,12 @@ function interval_score(
         dat::AbstractVector, y::Real;
         level::Real, type::Int = 7
     )
+    _check_nonempty(dat)
     0 < level < 1 || throw(ArgumentError("level must lie strictly in (0, 1), got $level"))
     alpha1 = 0.5 * (1 - level)
     alpha2 = 1 - alpha1
-    lower = _quantile_hf(dat, alpha1, type)
-    upper = _quantile_hf(dat, alpha2, type)
+    datf = _as_float(dat)
+    lower = _quantile_hf(datf, alpha1, type)
+    upper = _quantile_hf(datf, alpha2, type)
     return _ints_quantile(y, lower, upper, level)
 end

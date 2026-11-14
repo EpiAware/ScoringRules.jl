@@ -11,8 +11,14 @@ const _INV_SQRTPI = 1 / sqrt(π)
 # --- standard normal, N(μ, σ) ---------------------------------------------
 """
 CRPS of a `Normal(μ, σ)` forecast, in closed form (Gneiting et al. 2005).
+
+A zero scale is the point forecast at `μ`, whose CRPS is the absolute error.
+The general expression cannot reach it: `z` is infinite there and `σ * Inf`
+is `NaN`.
 """
 function _crps_norm(y::Real, μ::Real, σ::Real)
+    σ < 0 && return oftype(float(y) * float(σ), NaN)
+    σ == 0 && return abs(float(y - μ))
     z = (y - μ) / σ
     return σ * (z * (2 * _norm_cdf(z) - 1) + 2 * _norm_pdf(z) - _INV_SQRTPI)
 end

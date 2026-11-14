@@ -16,14 +16,74 @@ export es, vs, mmds
 """
     _check_multiv(X, y)
 
-Verify that `X` is a `d × m` matrix and `y` is a length-`d` vector.
+Verify that `X` is a `d × m` matrix with at least one member and `y` is a
+length-`d` vector.
 """
 function _check_multiv(X::AbstractMatrix, y::AbstractVector)
     d = length(y)
-    return size(X, 1) == d || throw(
+    size(X, 1) == d || throw(
         DimensionMismatch("rows of X ($(size(X, 1))) must equal length of y ($d)")
     )
+    size(X, 2) >= 1 ||
+        throw(ArgumentError("the ensemble X must have at least one member"))
+    # Every loop below indexes `X`, `y`, the member weights and `w_vs` over
+    # one-based ranges, so offset axes on any of them read past the end of
+    # another. `@inbounds` makes that a silent read of whatever is next in
+    # memory rather than an error, which is why the wrong answer it produced
+    # was different on each call. `w` and `w_vs` are checked where they are
+    # validated, since they do not reach here.
+    # `Base.require_one_based_indexing` would say this in one call but is not
+    # public API, and this package has just finished removing its reliance on
+    # an unexported one.
+    (_one_based(X) && _one_based(y)) || throw(
+        ArgumentError(
+            "X and y must have one-based axes, got $(axes(X)) and $(axes(y))"
+        )
+    )
+    return nothing
 end
+
+_one_based(A) = all(ax -> ax == 1:length(ax), axes(A))
+
+# Euclidean distance between two columns of the ensemble, and between a column
+# and the observation, accumulated in place. Writing these out keeps the
+# `m(m−1)/2` inner products of `es` and `mmds` free of the temporary that
+# `norm(view(X, :, i) .- view(X, :, j))` allocates on every pair: at d = 50,
+# m = 3000 that temporary accounted for 2061 MiB per call, and removing it cuts
+# the call from 594 ms to 127 ms.
+# Each element is converted before the subtraction, not just the accumulator:
+# an integer difference squares to an integer and overflows there, which
+# `norm` (the call this replaced) never did.
+# `es(Int32[2147483647 0; 0 0], Int32[0, 0])` came out as 0.25 against the
+# true 536870911.75, and at `Int64[4000000000 0; 0 0]` the wrapped negative
+# square threw out of `sqrt`.
+# The sum runs in at least Float64: a Float32 square overflows past about
+# 1.8e19, which `norm` avoided by rescaling.
+@inline function _col_sqdist(X::AbstractMatrix, i::Integer, j::Integer)
+    T = promote_type(_float_type(view(X, :, i), view(X, :, j)), Float64)
+    s = zero(T)
+    @inbounds @simd for k in axes(X, 1)
+        s += abs2(T(X[k, i]) - T(X[k, j]))
+    end
+    return s
+end
+
+@inline function _col_sqdist(X::AbstractMatrix, i::Integer, y::AbstractVector)
+    T = promote_type(_float_type(view(X, :, i), y), Float64)
+    s = zero(T)
+    @inbounds @simd for k in axes(X, 1)
+        s += abs2(T(X[k, i]) - T(y[k]))
+    end
+    return s
+end
+
+# The Euclidean distance from its square. Two coincident columns put the
+# square at exactly zero, where the derivative of `sqrt` is `0 * Inf`, so
+# automatic differentiation would return NaN for any score with a tied pair.
+# The distance has a kink there and zero is its subgradient, which is also
+# what `norm` gave. Only an exact zero is special: a NaN square, from a
+# missing member or observation, has to stay NaN.
+@inline _sqrt_dist(s::Real) = iszero(s) ? zero(s) : sqrt(s)
 
 """
     _member_weights(m, w)
@@ -43,6 +103,10 @@ function _member_weights(m::Integer, w)
         )
     )
     any(<(0), w) && throw(ArgumentError("member weights w must be non-negative"))
+    # `w ./ sw` keeps `w`'s axes, and the score loops index it over `1:m`.
+    _one_based(w) || throw(
+        ArgumentError("member weights w must have one-based axes, got $(axes(w))")
+    )
     sw = sum(w)
     return w ./ sw
 end
@@ -69,6 +133,9 @@ function _check_w_vs(w_vs::AbstractMatrix, d::Integer)
         )
     )
     any(<(0), w_vs) && throw(ArgumentError("weight matrix w_vs must be non-negative"))
+    _one_based(w_vs) || throw(
+        ArgumentError("w_vs must have one-based axes, got $(axes(w_vs))")
+    )
     return isapprox(w_vs, w_vs'; atol = 1.0e-12) || throw(
         ArgumentError(
             "weight matrix w_vs must be symmetric"
@@ -83,8 +150,8 @@ end
 # "XY" part: Σ_i w_i ‖X_i − y‖
 function _esC_xy(y::AbstractVector, X::AbstractMatrix, w::AbstractVector)
     out = 0.0
-    @inbounds for (wi, xi) in zip(w, eachcol(X))
-        out += wi * norm(xi .- y)
+    @inbounds for i in axes(X, 2)
+        out += w[i] * _sqrt_dist(_col_sqdist(X, i, y))
     end
     return out
 end
@@ -94,9 +161,12 @@ function _esC_xx(X::AbstractMatrix, w::AbstractVector)
     out = 0.0
     m = size(X, 2)
     @inbounds for i in 1:m
-        @inbounds for j in (i + 1):m
-            out += 2.0 * w[i] * w[j] * norm(view(X, :, i) .- view(X, :, j))
+        wi = w[i]
+        acc = 0.0
+        for j in (i + 1):m
+            acc += w[j] * _sqrt_dist(_col_sqdist(X, i, j))
         end
+        out += 2.0 * wi * acc
     end
     return out
 end
@@ -138,65 +208,59 @@ end
 # Variogram score of order p
 # ---------------------------------------------------------------------------
 
-# No-weight path: Σ_{k≤l} 2 (|y_k − y_l|^p − mean_i |X_{k,i} − X_{l,i}|^p)^2
-function _vsC(y::AbstractVector, X::AbstractMatrix, p::Real)
-    out = 0.0
-    d = length(y)
-    @inbounds for k in 1:d
-        @inbounds for l in k:d
-            vdat = mean(abs(X[k, i] - X[l, i])^p for i in 1:size(X, 2))
-            vy = abs(y[k] - y[l])^p
-            out += 2.0 * (vy - vdat)^2
-        end
-    end
-    return out
-end
-
-# w_vs-weighted path: Σ_{k≤l} 2 w_vs[k,l] (|y_k − y_l|^p − mean_i |X_{k,i} − X_{l,i}|^p)^2
-function _vsC_w_vs(y::AbstractVector, X::AbstractMatrix, w_vs::AbstractMatrix, p::Real)
-    out = 0.0
-    d = length(y)
-    @inbounds for k in 1:d
-        @inbounds for l in k:d
-            vdat = mean(abs(X[k, i] - X[l, i])^p for i in 1:size(X, 2))
-            vy = abs(y[k] - y[l])^p
-            out += 2.0 * w_vs[k, l] * (vy - vdat)^2
-        end
-    end
-    return out
-end
-
-# Variogram kernel: Σ_{k≤l} 2 w_vs[k,l] (|x1_k − x1_l|^p − |x2_k − x2_l|^p)^2
-function _vskernel(x1::AbstractVector, x2::AbstractVector, w_vs::AbstractMatrix, p::Real)
-    out = 0.0
-    d = length(x1)
-    @inbounds for k in 1:d
-        @inbounds for l in k:d
-            vx1 = abs(x1[k] - x1[l])^p
-            vx2 = abs(x2[k] - x2[l])^p
-            out += 2.0 * w_vs[k, l] * (vx1 - vx2)^2
-        end
-    end
-    return out
-end
-
-# Member-weight path (w per column, default w_vs = ones)
-function _vsC_w(
-        y::AbstractVector, X::AbstractMatrix, w_vs::AbstractMatrix,
-        w::AbstractVector, p::Real
+# Variogram score, one pass over the ensemble.
+#
+#   VS_p = Σ_{k≤l} 2 w_kl (|y_k − y_l|^p − Σ_i w_i |X_{k,i} − X_{l,i}|^p)²
+#
+# `w_vs` and `w` may each be `nothing`, meaning all-ones pairs and uniform
+# members. The member-weighted case used to be written as the kernel score
+#
+#   Σ_i w_i κ(X_i, y) − ½ Σ_{i,j} w_i w_j κ(X_i, X_j),
+#
+# which is the same number: expanding the double sum gives
+# `2(E_w[V²] − E_w[V]²)` for each pair (k, l), and that cancels the variance
+# term out of the first sum. It costs m² kernel evaluations instead of m, so at
+# d = 10, m = 2000 the kernel form took 14.7 s against 3.3 ms here.
+function _vs_core(
+        y::AbstractVector, X::AbstractMatrix, w_vs, w, p::Real
     )
+    # Every diagonal pair raises zero to the order, which is `Inf` for a
+    # negative one, so the score would be NaN whatever the forecast. R stops
+    # there; at an order of zero it returns 0, as this does.
+    p < 0 && throw(ArgumentError("the order p must not be negative, got $p"))
+    out = 0.0
+    d = length(y)
     m = size(X, 2)
-    s1 = 0.0
-    @inbounds for i in 1:m
-        s1 += w[i] * _vskernel(view(X, :, i), y, w_vs, p)
-    end
-    s2 = 0.0
-    @inbounds for i in 1:m
-        @inbounds for j in 1:m
-            s2 += w[i] * w[j] * _vskernel(view(X, :, i), view(X, :, j), w_vs, p)
+    # Floating point before the subtraction, for the reason `_col_sqdist`
+    # gives: an integer difference raised to `p` wraps, and `abs` of `typemin`
+    # stays negative, so `vs` returned 5.9e8 for an ensemble scoring 8.0e9 and
+    # threw out of `^0.5` on the wrapped case.
+    T = _float_type(X, y)
+    # A pair with zero weight adds nothing unless one of its dimensions holds
+    # a NaN, which has to reach the sum as in R. Those dimensions are found
+    # once, so a sparse `w_vs` keeps the cost of its nonzero pairs.
+    nonfinite = w_vs === nothing ? nothing :
+        [!(isfinite(y[k]) && all(isfinite, view(X, k, :))) for k in 1:d]
+    @inbounds for k in 1:d
+        for l in k:d
+            wkl = w_vs === nothing ? 1.0 : w_vs[k, l]
+            wkl == 0 && !(nonfinite[k] || nonfinite[l]) && continue
+            vdat = 0.0
+            if w === nothing
+                for i in 1:m
+                    vdat += abs(T(X[k, i]) - T(X[l, i]))^p
+                end
+                vdat /= m
+            else
+                for i in 1:m
+                    vdat += w[i] * abs(T(X[k, i]) - T(X[l, i]))^p
+                end
+            end
+            vy = abs(T(y[k]) - T(y[l]))^p
+            out += 2.0 * wkl * (vy - vdat)^2
         end
     end
-    return s1 - s2 / 2.0
+    return out
 end
 
 """
@@ -236,14 +300,9 @@ function vs(
         p::Real = 0.5, w = nothing, w_vs = nothing
     )
     _check_multiv(X, y)
-    d = length(y)
-    w_vs === nothing || _check_w_vs(w_vs, d)
-    if w === nothing
-        return w_vs === nothing ? _vsC(y, X, p) : _vsC_w_vs(y, X, w_vs, p)
-    end
-    wv = _w_helper(X, w)
-    wvs = w_vs === nothing ? ones(d, d) : w_vs
-    return _vsC_w(y, X, wvs, wv, p)
+    w_vs === nothing || _check_w_vs(w_vs, length(y))
+    wv = w === nothing ? nothing : _w_helper(X, w)
+    return _vs_core(y, X, w_vs, wv, p)
 end
 
 # ---------------------------------------------------------------------------
@@ -253,9 +312,8 @@ end
 # "XY" part: Σ_i w_i exp(−½ ‖X_i − y‖²)
 function _mmdsC_xy(y::AbstractVector, X::AbstractMatrix, w::AbstractVector)
     out = 0.0
-    @inbounds for (wi, xi) in zip(w, eachcol(X))
-        d2 = sum(abs2, xi .- y)
-        out += wi * exp(-0.5 * d2)
+    @inbounds for i in axes(X, 2)
+        out += w[i] * exp(-0.5 * _col_sqdist(X, i, y))
     end
     return out
 end
@@ -266,10 +324,11 @@ function _mmdsC_xx(X::AbstractMatrix, w::AbstractVector)
     m = size(X, 2)
     @inbounds for i in 1:m
         out += w[i]^2
-        @inbounds for j in (i + 1):m
-            d2 = sum(abs2, view(X, :, i) .- view(X, :, j))
-            out += 2.0 * w[i] * w[j] * exp(-0.5 * d2)
+        acc = 0.0
+        for j in (i + 1):m
+            acc += w[j] * exp(-0.5 * _col_sqdist(X, i, j))
         end
+        out += 2.0 * w[i] * acc
     end
     return out
 end

@@ -141,3 +141,266 @@ end
         @test_throws ArgumentError mmds(X, y; w = fill(-1.0, m))
     end
 end
+
+@testitem "the weighted variogram score matches its kernel form" tags = [:sample] begin
+    using ScoringRules
+    using Random: MersenneTwister
+
+    # `vs` with member weights used to evaluate the kernel score
+    #   Σ_i w_i κ(X_i, y) − ½ Σ_{i,j} w_i w_j κ(X_i, X_j),
+    # which is m² kernel evaluations for the same number the single pass over
+    # the ensemble gives. This pins the two together.
+    function kernel_form(y, X, w_vs, w, p)
+        d = length(y)
+        m = size(X, 2)
+        κ = (x1, x2) -> sum(
+            2.0 * w_vs[k, l] *
+                (abs(x1[k] - x1[l])^p - abs(x2[k] - x2[l])^p)^2
+                for k in 1:d, l in 1:d if l >= k
+        )
+        s1 = sum(w[i] * κ(view(X, :, i), y) for i in 1:m)
+        s2 = sum(w[i] * w[j] * κ(view(X, :, i), view(X, :, j)) for i in 1:m, j in 1:m)
+        return s1 - s2 / 2
+    end
+
+    rng = MersenneTwister(20260218)
+    for (d, m, p) in ((3, 20, 0.5), (5, 40, 1.0), (4, 13, 2.0), (6, 7, 0.25))
+        X = randn(rng, d, m)
+        y = randn(rng, d)
+        wraw = rand(rng, m) .+ 0.1
+        w = wraw ./ sum(wraw)
+        A = [1 / (1 + abs(k - l)) for k in 1:d, l in 1:d]
+        for wv in (ones(d, d), A)
+            @test vs(X, y; p = p, w = wraw, w_vs = wv) ≈
+                kernel_form(y, X, wv, w, p) rtol = 1.0e-12
+        end
+        # And the unweighted path is the uniform-weight case of the same form.
+        @test vs(X, y; p = p) ≈
+            kernel_form(y, X, ones(d, d), fill(1 / m, m), p) rtol = 1.0e-12
+    end
+end
+
+@testitem "multivariate scores reject an empty ensemble" tags = [:sample] begin
+    using ScoringRules
+
+    X = Matrix{Float64}(undef, 3, 0)
+    y = [0.1, -0.2, 0.5]
+    @test_throws ArgumentError es(X, y)
+    @test_throws ArgumentError vs(X, y)
+    @test_throws ArgumentError mmds(X, y)
+end
+
+@testitem "multivariate scores reject an ensemble with offset axes" tags = [:sample] begin
+    using ScoringRules
+
+    # Every loop in the multivariate file pairs `axes(X, ...)` with a weight
+    # vector built one-based, and `@inbounds` turns the mismatch into a read of
+    # whatever sits next in memory rather than an error. With a row offset
+    # `es` returned 0.9276553962740587 for an ensemble whose score is
+    # 0.70419137025989309, having read `y` out of bounds.
+    struct Offset{T} <: AbstractMatrix{T}
+        parent::Matrix{T}
+        roff::Int
+        coff::Int
+    end
+    Base.size(A::Offset) = size(A.parent)
+    Base.axes(A::Offset) = (A.roff .+ axes(A.parent, 1), A.coff .+ axes(A.parent, 2))
+    Base.getindex(A::Offset, i::Int, j::Int) = A.parent[i - A.roff, j - A.coff]
+
+    P = [0.3 -1.2 0.8 0.1; -0.4 0.9 -0.2 1.3; 1.1 0.2 -1.5 0.6]
+    y = [0.2, -0.3, 0.7]
+    ref = (es(P, y), vs(P, y), mmds(P, y))
+    @test all(isfinite, ref)
+
+    for (roff, coff) in ((-1, 0), (0, -1), (100, 100), (3, 0))
+        X = Offset(P, roff, coff)
+        @test_throws ArgumentError es(X, y)
+        @test_throws ArgumentError vs(X, y)
+        @test_throws ArgumentError mmds(X, y)
+        @test_throws ArgumentError twes(X, y; a = -1.0)
+        @test_throws ArgumentError owvs(X, y; a = -1.0)
+    end
+    # The weights are indexed over one-based ranges too, and `_member_weights`
+    # keeps whatever axes it was given, so an offset weight vector was the same
+    # silent out-of-bounds read reached through another argument.
+    struct OffsetVec{T} <: AbstractVector{T}
+        parent::Vector{T}
+        off::Int
+    end
+    Base.size(a::OffsetVec) = size(a.parent)
+    Base.axes(a::OffsetVec) = (a.off .+ axes(a.parent, 1),)
+    Base.getindex(a::OffsetVec, i::Int) = a.parent[i - a.off]
+
+    wv = collect(1:4) ./ 10
+    wvs = [1.0 0.5 0.2; 0.5 1.0 0.3; 0.2 0.3 1.0]
+    @test isfinite(es(P, y; w = wv))
+    for off in (-1, 1, 10)
+        @test_throws ArgumentError es(P, y; w = OffsetVec(wv, off))
+        @test_throws ArgumentError vs(P, y; w = OffsetVec(wv, off))
+        @test_throws ArgumentError mmds(P, y; w = OffsetVec(wv, off))
+        @test_throws ArgumentError vs(P, y; w_vs = Offset(wvs, off, off))
+    end
+    # A one-based wrapper of the same data still scores, and to the same value.
+    @test es(Offset(P, 0, 0), y) ≈ ref[1] rtol = 1.0e-14
+    @test vs(Offset(P, 0, 0), y) ≈ ref[2] rtol = 1.0e-14
+    @test mmds(Offset(P, 0, 0), y) ≈ ref[3] rtol = 1.0e-14
+end
+
+@testitem "multivariate scores promote an integer ensemble" tags = [:sample] begin
+    using ScoringRules
+
+    # The squared-distance accumulator used to be seeded at the matrix element
+    # type, so an integer ensemble accumulated in integer arithmetic and
+    # overflowed: `es(Int32[2147483647 0; 0 0], Int32[0, 0])` returned 0.25
+    # against the true 536870911.75, and the Int64 version threw a DomainError
+    # out of `sqrt`.
+    for T in (Int32, Int64)
+        big_val = T === Int32 ? T(2147483647) : T(4_000_000_000)
+        X = T[big_val 0; 0 0]
+        y = T[0, 0]
+        Xf = Float64.(X)
+        yf = Float64.(y)
+        @test es(X, y) ≈ es(Xf, yf) rtol = 1.0e-12
+        @test mmds(X, y) ≈ mmds(Xf, yf) rtol = 1.0e-12
+        @test vs(X, y) ≈ vs(Xf, yf) rtol = 1.0e-12
+    end
+    # Small integer ensembles already worked and must keep their value.
+    Xs = [1 4 2; 3 0 5]
+    ys = [2, 1]
+    @test es(Xs, ys) ≈ es(Float64.(Xs), Float64.(ys)) rtol = 1.0e-14
+    @test mmds(Xs, ys) ≈ mmds(Float64.(Xs), Float64.(ys)) rtol = 1.0e-14
+
+    # The variogram score raises its differences to a power rather than going
+    # through the squared-distance helper, so it is a separate path: it
+    # returned 5.899e8 for an ensemble whose score is 8.0e9, and threw out of
+    # `^0.5` when a wrapped difference landed on `typemin`.
+    for (X, y) in (
+            (Int32[2000000000 2000000000; -2000000000 -2000000000], Int32[0, 0]),
+            (Int32[2147483647 2147483647; -1 -1], Int32[0, 0]),
+            (Int64[4000000000 0; 0 4000000000], Int64[0, 0]),
+        )
+        @test vs(X, y) ≈ vs(Float64.(X), Float64.(y)) rtol = 1.0e-12
+        for p in (0.5, 1.0, 2.0)
+            @test vs(X, y; p = p) ≈ vs(Float64.(X), Float64.(y); p = p) rtol = 1.0e-12
+        end
+        @test twvs(X, y; a = -Inf) ≈
+            twvs(Float64.(X), Float64.(y); a = -Inf) rtol = 1.0e-12
+    end
+end
+
+@testitem "energy score gradients stay finite where members coincide" tags = [:sample] begin
+    using ScoringRules
+    using ForwardDiff: derivative
+
+    # Ties are ordinary: an integer ensemble has them, and the default clamp
+    # in `twes` sends every member past the bound to the same point. The
+    # distance between two tied members is a kink, and the subgradient there
+    # is zero; the score must not turn it into NaN.
+    cd(f, x; h = 1.0e-6) = (f(x + h) - f(x - h)) / (2h)
+    y = [0.5, 1.0]
+    tied = [1.0 1.0 3.0; 2.0 2.0 0.0]
+    at_obs = [0.5 1.0 3.0; 1.0 2.0 0.0]
+    clamped = [0.2 5.0 6.0 -0.3; 0.1 7.0 8.0 0.4]
+    wf = weight_function(:norm_cdf; mu = 0.0, sigma = 2.0)
+    cases = [
+        s -> es(tied .+ s, y),
+        s -> es(tied .* (1 + s), y),
+        s -> es(at_obs .+ s, y),
+        s -> twes(clamped .+ s, y; b = 1.0),
+        s -> owes(tied .+ s, y; weight_func = wf),
+    ]
+    for f in cases
+        g = derivative(f, 0.0)
+        @test isfinite(g)
+        @test g ≈ cd(f, 0.0) atol = 1.0e-6
+    end
+end
+
+@testitem "multivariate scores accept an ensemble whose element type is abstract" tags = [:sample] begin
+    using ScoringRules
+
+    # A matrix read from a table or built up with `push!` often comes out as
+    # `Matrix{Any}`. Its entries are numbers, so it scores like any other.
+    X = [1.0 2.0 3.0 0.5; 4.0 5.0 6.0 1.5]
+    y = [1.0, 2.0]
+    wf = weight_function(:norm_cdf; mu = 0.0, sigma = 2.0)
+    for (Xa, ya) in ((Any[1 2.0 3 0.5; 4 5 6 1.5], y), (X, Any[1, 2.0]), (Real[1 2.0 3 0.5; 4 5 6 1.5], Real[1, 2]))
+        @test es(Xa, ya) ≈ es(X, y) rtol = 1.0e-14
+        @test vs(Xa, ya) ≈ vs(X, y) rtol = 1.0e-14
+        @test mmds(Xa, ya) ≈ mmds(X, y) rtol = 1.0e-14
+        @test twes(Xa, ya; b = 3.0) ≈ twes(X, y; b = 3.0) rtol = 1.0e-14
+        @test owes(Xa, ya; weight_func = wf) ≈ owes(X, y; weight_func = wf) rtol = 1.0e-14
+        @test owvs(Xa, ya; weight_func = wf) ≈ owvs(X, y; weight_func = wf) rtol = 1.0e-14
+    end
+end
+
+@testitem "a NaN member or observation gives a NaN multivariate score" tags = [:sample] begin
+    using ScoringRules
+
+    # As in R: a missing value is not a distance of zero.
+    wf = weight_function(:norm_cdf; mu = 0.0, sigma = 2.0)
+    scores = (
+        (X, y) -> es(X, y), (X, y) -> vs(X, y), (X, y) -> mmds(X, y),
+        (X, y) -> twes(X, y; b = 3.0), (X, y) -> owes(X, y; weight_func = wf),
+    )
+    for f in scores
+        @test isnan(f([1.0 NaN 3.0; 2.0 2.0 0.0], [0.5, 1.0]))
+        @test isnan(f([1.0 1.0; 2.0 2.0], [NaN, 1.0]))
+    end
+    # Including in a dimension whose pairs all carry zero weight, as R has it.
+    X = [1.0 2.0 0.5; 2.0 0.0 1.0; 0.3 0.7 1.1]
+    W = [0 0 0; 0 1 1; 0 1 1.0]
+    @test isnan(vs(X, [NaN, 1.0, 0.5]; w_vs = W))
+    @test isnan(owvs(X, [NaN, 1.0, 0.5]; weight_func = wf, w_vs = W))
+    @test isnan(twvs(X, [NaN, 1.0, 0.5]; b = 3.0, w_vs = W))
+    Xn = copy(X)
+    Xn[1, 1] = NaN
+    @test isnan(vs(Xn, [0.2, 1.0, 0.5]; w_vs = W))
+end
+
+@testitem "the variogram score skips zero-weight pairs that hold no NaN" tags = [:sample] begin
+    using ScoringRules
+    using Random: Xoshiro
+
+    # A banded `w_vs` is a common choice, and evaluating every pair of it is
+    # the full O(d²m) work for a few nonzero bands. Only a pair touching a
+    # dimension with a NaN has to be evaluated whatever its weight.
+    rng = Xoshiro(3)
+    d, m = 300, 1000
+    X = randn(rng, d, m)
+    y = randn(rng, d)
+    W = [abs(k - l) <= 2 ? 1.0 : 0.0 for k in 1:d, l in 1:d]
+    vs(X, y; w_vs = W)
+    @test (@elapsed vs(X, y; w_vs = W)) < 0.5
+    y[10] = NaN
+    @test isnan(vs(X, y; w_vs = W))
+end
+
+@testitem "the energy score of a Float32 ensemble does not overflow its squares" tags = [:sample] begin
+    using ScoringRules
+
+    # Squares of Float32 values past about 1.8e19 overflow in Float32; the
+    # distances are summed in at least Float64.
+    X = Float32[3.0f19 0 1.0f19; 0 2.0f19 0]
+    y = Float32[0, 0]
+    @test es(X, y) ≈ es(Float64.(X), Float64.(y)) rtol = 1.0e-6
+    @test isfinite(twes(X, y; b = 1.0f20))
+end
+
+@testitem "the variogram score refuses a negative order" tags = [:sample] begin
+    using ScoringRules
+
+    # Every diagonal pair evaluates `0^p`, which is `Inf` for a negative order,
+    # and the score came out NaN for any input. R stops with an error there,
+    # and at an order of zero returns 0.
+    X = randn(2, 5)
+    y = [0.0, 1.0]
+    wf = weight_function(:norm_cdf; mu = 0.0, sigma = 2.0)
+    for p in (-1.0, -0.5)
+        @test_throws ArgumentError vs(X, y; p = p)
+        @test_throws ArgumentError owvs(X, y; weight_func = wf, p = p)
+        @test_throws ArgumentError twvs(X, y; b = 3.0, p = p)
+    end
+    @test vs(X, y; p = 0.0) == 0
+    @test isfinite(vs(X, y; p = 0.5))
+end

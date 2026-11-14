@@ -7,6 +7,13 @@
 #
 #     Rscript test/references/generate_references.R
 #
+# One caveat on regenerating: `crps_gev` at shape exactly 0 uses
+# `gsl::expint_Ei` when the `gsl` package is installed and falls back to
+# `integrate` with a warning when it is not. Over the shape = 0 rows of
+# gev.csv the fallback is a median 1.3e-10 and at worst 1.9e-8 relative from
+# the exact Gumbel CRPS, so those rows differ between machines by that much.
+# Both sit far inside the 1e-6 the GEV test allows.
+#
 # Each family writes one CSV under test/references/data/ whose columns are the
 # natural parameters of that family plus the observation `y` and one column per
 # scoring rule (crps/logs/dss) that scoringRules provides for it.
@@ -31,7 +38,9 @@ grid <- function(...) expand.grid(..., KEEP.OUT.ATTRS = FALSE,
                                   stringsAsFactors = FALSE)
 
 ## ---- normal ---------------------------------------------------------------
-g <- grid(mean = c(-3, 0, 2.5), sd = c(0.5, 1, 4),
+# sd = 0 is the point forecast at the mean, where the closed form has to be
+# taken to its limit rather than evaluated.
+g <- grid(mean = c(-3, 0, 2.5), sd = c(0, 0.5, 1, 4),
           y = c(-6, -1, 0, 0.7, 3, 8))
 g$crps <- crps_norm(g$y, mean = g$mean, sd = g$sd)
 g$logs <- logs_norm(g$y, mean = g$mean, sd = g$sd)
@@ -74,8 +83,10 @@ g$crps <- crps_gtcnorm(g$y, location = g$location, scale = g$scale,
 write_ref("gtcnorm", g)
 
 ## ---- logistic -------------------------------------------------------------
-g <- grid(location = c(-2, 0, 3), scale = c(0.5, 1, 3),
-          y = c(-5, -1, 0, 1, 5, 10))
+# A scale near zero, and observations far enough out that `log F(z)` underflows
+# (z below about -745).
+g <- grid(location = c(-2, 0, 3), scale = c(1e-8, 1e-3, 0.5, 1, 3),
+          y = c(-1e6, -1000, -5, -1, 0, 1, 5, 10, 1000))
 g$crps <- crps_logis(g$y, location = g$location, scale = g$scale)
 g$logs <- logs_logis(g$y, location = g$location, scale = g$scale)
 g$dss  <- dss_logis(g$y, location = g$location, scale = g$scale)
@@ -116,17 +127,20 @@ g$crps <- crps_gtclogis(g$y, location = g$location, scale = g$scale,
 write_ref("gtclogis", g)
 
 ## ---- Student-t ------------------------------------------------------------
-g <- grid(df = c(2, 3, 10, 30), location = c(-1, 0, 2), scale = c(0.5, 1, 3),
-          y = c(-5, -1, 0, 1, 5))
+g <- grid(df = c(1.5, 2, 3, 10, 30, 200), location = c(-1, 0, 2),
+          scale = c(0.5, 1, 3),
+          y = c(-500, -5, -1, 0, 1, 5, 500))
 g$crps <- crps_t(g$y, df = g$df, location = g$location, scale = g$scale)
 g$logs <- logs_t(g$y, df = g$df, location = g$location, scale = g$scale)
 g$dss  <- dss_t(g$y, df = g$df, location = g$location, scale = g$scale)
 write_ref("student_t", g)
 
 ## ---- truncated Student-t --------------------------------------------------
-g <- grid(df = c(3, 10), location = c(-1, 0, 2), scale = c(0.5, 2),
-          lower = c(-Inf, -1, 0), upper = c(Inf, 1, 5),
-          y = c(-2, 0, 0.5, 3))
+# The far bounds matter: the truncation normaliser is F(upper) - F(lower), and
+# a tail probability that underflows to zero made the score divide by zero.
+g <- grid(df = c(2.5, 3, 10, 20), location = c(-1, 0, 2), scale = c(0.5, 2),
+          lower = c(-Inf, -1, 0, 100), upper = c(Inf, 1, 5, -50, -200, -1000),
+          y = c(-1001, -201, -51, -2, 0, 0.5, 3, 101))
 g <- g[g$lower < g$upper, ]
 g$crps <- crps_tt(g$y, df = g$df, location = g$location, scale = g$scale,
                   lower = g$lower, upper = g$upper)
@@ -135,9 +149,9 @@ g$logs <- logs_tt(g$y, df = g$df, location = g$location, scale = g$scale,
 write_ref("tt", g)
 
 ## ---- censored Student-t ---------------------------------------------------
-g <- grid(df = c(3, 10), location = c(-1, 0, 2), scale = c(0.5, 2),
-          lower = c(-Inf, -1, 0), upper = c(Inf, 1, 5),
-          y = c(-2, 0, 0.5, 3))
+g <- grid(df = c(2.5, 3, 10, 20), location = c(-1, 0, 2), scale = c(0.5, 2),
+          lower = c(-Inf, -1, 0, 100), upper = c(Inf, 1, 5, -50, -200),
+          y = c(-201, -51, -2, 0, 0.5, 3, 101))
 g <- g[g$lower < g$upper, ]
 g$crps <- crps_ct(g$y, df = g$df, location = g$location, scale = g$scale,
                   lower = g$lower, upper = g$upper)
@@ -224,10 +238,14 @@ write_ref("lnorm", g)
 
 ## ---- GEV ------------------------------------------------------------------
 # shape < 1 required; cover negative (Weibull), zero (Gumbel ~0), positive (Frechet)
-g <- grid(shape = c(-0.5, -0.1, 0.0, 0.1, 0.5, 0.9),
+# Shapes down to 1e-3 either side of zero, where the general closed form and
+# the Gumbel limit have to meet. Below 1e-3 R's own expressions lose accuracy
+# faster than ours do, so those shapes are checked against exact limits in
+# test/crps/extreme_arguments.jl rather than against R.
+g <- grid(shape = c(-0.5, -0.1, -0.01, -0.001, 0.0, 0.001, 0.01, 0.1, 0.5, 0.9),
           location = c(-1, 0, 2), scale = c(0.5, 1, 2),
           y = c(-3, -1, 0, 1, 3, 8))
-# shape=0 exactly triggers Gumbel limit; use very small value near 0 for robustness
+# shape = 0 takes the Gumbel branch; the neighbouring shapes take the general one
 g$crps <- crps_gev(g$y, shape = g$shape, location = g$location, scale = g$scale)
 g$logs <- logs_gev(g$y, shape = g$shape, location = g$location, scale = g$scale)
 g$dss  <- dss_gev(g$y, shape = g$shape, location = g$location, scale = g$scale)
@@ -236,7 +254,7 @@ write_ref("gev", g)
 ## ---- GPD ------------------------------------------------------------------
 # Includes observations below the support with positive shape (y < location),
 # which the closed form now handles exactly as R does.
-g <- grid(shape = c(-0.5, 0.0, 0.5, 0.9),
+g <- grid(shape = c(-0.5, -0.01, -0.001, 0.0, 0.001, 0.01, 0.5, 0.9),
           location = c(0, 1), scale = c(0.5, 1, 2),
           y = c(-2, -0.5, 0, 0.5, 1, 2, 5))
 g$crps <- crps_gpd(g$y, shape = g$shape, location = g$location, scale = g$scale)
@@ -306,24 +324,31 @@ mixnorm_df <- rbind(rows2, rows3)
 write_ref("mixnorm", mixnorm_df)
 
 ## ---- Poisson --------------------------------------------------------------
-g <- grid(lambda = c(0.5, 1, 3, 10),
-          y = c(0, 1, 2, 5, 15))
+# lambda past 350, where `besselI(2*lambda, 0)` overflows unless taken
+# exponentially scaled, and an observation below the support.
+g <- grid(lambda = c(0.5, 1, 3, 10, 50, 350, 400, 5000),
+          y = c(-2, 0, 1, 2, 5, 15, 400, 5010))
 g$crps <- crps_pois(g$y, lambda = g$lambda)
 g$logs <- logs_pois(g$y, lambda = g$lambda)
 g$dss  <- dss_pois(g$y, lambda = g$lambda)
 write_ref("pois", g)
 
 ## ---- Negative binomial ----------------------------------------------------
-g <- grid(size = c(1, 3, 10), prob = c(0.3, 0.5, 0.8),
-          y = c(0, 1, 3, 10, 20))
+# size past 40, where the Gauss series for the hypergeometric factor starts to
+# lose digits, and a small success probability, which pushes its argument out.
+# Half-integer sizes are left out: R returns -Inf for some of them (2.5 and 5.5
+# at prob = 0.3, 10.5 at prob = 0.7), so those are checked by brute-force
+# summation in test/crps/extreme_arguments.jl instead.
+g <- grid(size = c(1, 3, 10, 40, 100, 200, 1000), prob = c(0.05, 0.3, 0.5, 0.8),
+          y = c(0, 1, 3, 10, 20, 100))
 g$crps <- crps_nbinom(g$y, size = g$size, prob = g$prob)
 g$logs <- logs_nbinom(g$y, size = g$size, prob = g$prob)
 g$dss  <- dss_nbinom(g$y, size = g$size, prob = g$prob)
 write_ref("nbinom", g)
 
 ## ---- Binomial -------------------------------------------------------------
-g <- grid(size = c(5, 10, 20), prob = c(0.2, 0.5, 0.8),
-          y = c(0, 2, 5, 10, 20))
+g <- grid(size = c(5, 10, 20, 200), prob = c(0.02, 0.2, 0.5, 0.8),
+          y = c(-3, 0, 2, 5, 10, 20, 150))
 g <- g[g$y <= g$size, ]
 g$crps <- crps_binom(g$y, size = g$size, prob = g$prob)
 g$logs <- logs_binom(g$y, size = g$size, prob = g$prob)
@@ -750,7 +775,10 @@ write_ref("ess", g)
 
 # LogLogistic: R uses (locationlog, scalelog); Julia uses LogLogistic(α, β)
 #   with α = exp(locationlog), β = 1/scalelog.
-# dss_llogis is NOT compared (known NaN issue in R).
+# dss_llogis is NOT compared: R's expression drops a pair of parentheses
+# (`ell^2 * 2 * b/sin(2 * b) - b^2/sb^2`, where `ell^2` should multiply both
+# terms), so it is wrong for every nonzero locationlog, not only where the
+# resulting negative variance turns into NaN. See the Differences from R page.
 g <- grid(locationlog = c(-1, 0, 1),
           scalelog    = c(0.3, 0.5, 0.7),
           y           = c(0.1, 0.5, 1, 2, 5))
@@ -798,11 +826,57 @@ gn <- expand.grid(location = c(-1, 0, 1, 2), scale = c(0.5, 1, 2),
 g_norm  <- gradcrps_norm(gn$y, gn$location, gn$scale)
 g_logis <- gradcrps_logis(gn$y, gn$location, gn$scale)
 write.csv(cbind(gn, dloc = g_norm[, 1],  dscale = g_norm[, 2]),
-          "test/references/data/grad_norm.csv",  row.names = FALSE)
+          file.path(outdir, "grad_norm.csv"),  row.names = FALSE)
 write.csv(cbind(gn, dloc = g_logis[, 1], dscale = g_logis[, 2]),
-          "test/references/data/grad_logis.csv", row.names = FALSE)
+          file.path(outdir, "grad_logis.csv"), row.names = FALSE)
 gt <- expand.grid(df = c(2, 5, 20), location = c(0, 1), scale = c(1, 2),
                   y = c(-1.5, 0.3, 1.2, 3))
 g_t <- gradcrps_t(gt$y, gt$df, gt$location, gt$scale)
 write.csv(cbind(gt, dloc = g_t[, 1], dscale = g_t[, 2]),
-          "test/references/data/grad_t.csv", row.names = FALSE)
+          file.path(outdir, "grad_t.csv"), row.names = FALSE)
+
+## ---- smooth weight and chaining functions (get_weight_func) ----
+## R's `get_weight_func` builds the normal and logistic weight functions of
+## Allen (2024) and their matching chaining functions. The Julia counterparts
+## are `weight_function` and `chaining_function`.
+set.seed(2718)
+wf_dat <- rnorm(200)
+wf_y <- 0.3
+wf_X <- matrix(rnorm(4 * 120), nrow = 4)
+wf_yv <- rnorm(4)
+rows <- list()
+for (nm in c("norm_cdf", "norm_surv", "norm_pdf",
+             "logis_cdf", "logis_surv", "logis_pdf")) {
+  for (mu in c(-0.5, 0, 1.2)) for (sg in c(0.4, 1, 2.5)) {
+    rows[[length(rows) + 1]] <- data.frame(
+      name = nm, mu = mu, sigma = sg,
+      ow = owcrps_sample(y = wf_y, dat = wf_dat,
+                         weight_func = get_weight_func(nm, mu, sg, weight = TRUE)),
+      tw = twcrps_sample(y = wf_y, dat = wf_dat,
+                         chain_func = get_weight_func(nm, mu, sg, weight = FALSE)))
+  }
+}
+write_ref("weight_func_univ", do.call(rbind, rows))
+write_ref("weight_func_univ_dat", data.frame(dat = wf_dat, y = wf_y))
+
+## Multivariate: R allows only the normal shapes, since the logistic chaining
+## function has no product form.
+rows <- list()
+for (nm in c("norm_cdf", "norm_surv", "norm_pdf")) {
+  for (mu in c(0, 0.8)) for (sg in c(0.7, 1.5)) {
+    # Different in every dimension, so that a weight applying one dimension's
+    # parameters to all of them cannot match. The test rebuilds the same
+    # vectors from the base `mu` and `sigma` written to the table.
+    muv <- mu + c(0, 0.4, -0.3, 0.8); sgv <- sg * c(1, 0.7, 1.3, 0.9)
+    rows[[length(rows) + 1]] <- data.frame(
+      name = nm, mu = mu, sigma = sg,
+      ow = owes_sample(y = wf_yv, dat = wf_X,
+                       weight_func = get_weight_func(nm, muv, sgv, weight = TRUE)),
+      tw = twes_sample(y = wf_yv, dat = wf_X,
+                       chain_func = get_weight_func(nm, muv, sgv, weight = FALSE)))
+  }
+}
+write_ref("weight_func_mv", do.call(rbind, rows))
+write_ref("weight_func_mv_dat",
+          cbind(as.data.frame(t(wf_X)), y = NA)[, seq_len(4)])
+write_ref("weight_func_mv_obs", data.frame(y = wf_yv))
