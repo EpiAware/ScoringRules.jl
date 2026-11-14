@@ -540,6 +540,11 @@ end
     end
     # An infinite observation is still an infinite score.
     @test crps(NegativeBinomial(5.0, 0.3), Inf) == Inf
+    # A `prob` of one is a point mass at zero, whose score is the distance to
+    # it, exactly zero when it is right.
+    for y in (0.0, 2.0, -1.5)
+        @test crps(NegativeBinomial(5.0, 1.0), y) == abs(y)
+    end
 end
 
 @testitem "the negative binomial CRPS holds for a nearly degenerate forecast" tags = [:crps] setup = [DefinitionOracle] begin

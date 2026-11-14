@@ -159,6 +159,9 @@ CRPS of a `NegativeBinomial(size, prob)` forecast, in closed form.
 """
 function _crps_nbinom(y::Real, size::Real, prob::Real)
     nan = oftype(float(y) * float(size) * float(prob), NaN)
+    # A `prob` of one is a point mass at zero. Its score is the distance to
+    # zero, exactly zero at `y = 0`, where the bound below would divide by it.
+    prob == 1 && return abs(y) + zero(nan)
     # Where both the size and the forecast's location pass 1e10 the closed
     # form cannot be checked against an exact sum, and against the normal
     # limit it was quietly wrong: 2e-4 out at 10^11.5, negative at 1e16, as
