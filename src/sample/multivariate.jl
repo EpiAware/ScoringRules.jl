@@ -232,8 +232,9 @@ function _vs_core(
     T = _float_type(X, y)
     @inbounds for k in 1:d
         for l in k:d
+            # A pair with zero weight is still evaluated: a NaN in either
+            # dimension has to reach the sum, as in R.
             wkl = w_vs === nothing ? 1.0 : w_vs[k, l]
-            wkl == 0 && continue
             vdat = 0.0
             if w === nothing
                 for i in 1:m

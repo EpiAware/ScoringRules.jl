@@ -347,4 +347,13 @@ end
         @test isnan(f([1.0 NaN 3.0; 2.0 2.0 0.0], [0.5, 1.0]))
         @test isnan(f([1.0 1.0; 2.0 2.0], [NaN, 1.0]))
     end
+    # Including in a dimension whose pairs all carry zero weight, as R has it.
+    X = [1.0 2.0 0.5; 2.0 0.0 1.0; 0.3 0.7 1.1]
+    W = [0 0 0; 0 1 1; 0 1 1.0]
+    @test isnan(vs(X, [NaN, 1.0, 0.5]; w_vs = W))
+    @test isnan(owvs(X, [NaN, 1.0, 0.5]; weight_func = wf, w_vs = W))
+    @test isnan(twvs(X, [NaN, 1.0, 0.5]; b = 3.0, w_vs = W))
+    Xn = copy(X)
+    Xn[1, 1] = NaN
+    @test isnan(vs(Xn, [0.2, 1.0, 0.5]; w_vs = W))
 end
