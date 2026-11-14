@@ -166,3 +166,29 @@ end
     @test interval_score(1.0, 1.0, 1.0, 0.8) ≈ 0.0
     @test interval_score(-1.64, 1.64, 0.5, 0.9) > 0
 end
+
+@testitem "the sample quantile does not depend on the ensemble's axes" tags = [:sample] begin
+    using ScoringRules
+
+    # The quantile is read from the sorted members by position; `sort` keeps
+    # the axes it is given, so with an offset ensemble the positions pointed
+    # at other members or past the end.
+    struct OffsetVec{T} <: AbstractVector{T}
+        parent::Vector{T}
+        off::Int
+    end
+    Base.size(a::OffsetVec) = size(a.parent)
+    Base.axes(a::OffsetVec) = (a.off .+ axes(a.parent, 1),)
+    Base.getindex(a::OffsetVec, i::Int) = a.parent[i - a.off]
+    Base.setindex!(a::OffsetVec, v, i::Int) = (a.parent[i - a.off] = v)
+    Base.similar(a::OffsetVec, ::Type{T}, dims::Dims{1}) where {T} =
+        OffsetVec(Vector{T}(undef, dims), a.off)
+
+    d = [0.3, -1.2, 2.1, 0.8, -0.5, 1.4, 0.0]
+    for off in (-3, 4), alpha in (0.1, 0.3, 0.5, 0.9)
+        @test quantile_score(OffsetVec(d, off), 0.6; alpha = alpha) ≈
+            quantile_score(d, 0.6; alpha = alpha) rtol = 1.0e-14
+    end
+    @test interval_score(OffsetVec(d, 2), 0.6; level = 0.6) ≈
+        interval_score(d, 0.6; level = 0.6) rtol = 1.0e-14
+end
