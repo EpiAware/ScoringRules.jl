@@ -82,3 +82,20 @@ end
         @test dss(d, 2.0) ≈ (2.0 - m)^2 / v + log(v) rtol = 1.0e-10
     end
 end
+
+@testitem "a wrapped discrete forecast off the integers is scored on its own support" tags = [:crps] begin
+    using ScoringRules
+    using Distributions
+
+    # `support` of a truncated or censored discrete forecast assumes the
+    # integers, `round(minimum):round(maximum)`, which for a forecast on
+    # non-integer points lists none of them. Truncated, an equally weighted
+    # forecast is the ensemble of the members it keeps.
+    x = [-1.0, -0.3, 0.1, 0.4, 0.9, 1.5, 2.0]
+    d = DiscreteNonParametric(x, fill(1 / 7, 7))
+    t = truncated(d; lower = -0.5, upper = 1.2)
+    for y in (-2.0, 0.3, 1.0, 3.0)
+        @test crps(t, y) ≈ crps([-0.3, 0.1, 0.4, 0.9], y) rtol = 1.0e-12
+    end
+    @test dss(t, 0.3) ≈ dss([-0.3, 0.1, 0.4, 0.9], 0.3) rtol = 1.0e-12
+end

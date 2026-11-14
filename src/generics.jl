@@ -654,14 +654,8 @@ end
 
 function _crps_lattice_nodes(d::DiscreteUnivariateDistribution)
     lo, hi = minimum(d), maximum(d)
-    if isfinite(lo) && isfinite(hi)
-        s = support(d)
-        if length(s) <= _CRPS_DISCRETE_MAXNODES
-            # `support` is an `AbstractVector` for every family in
-            # Distributions.jl but `Dirac`, whose is a one-element tuple.
-            return s isa AbstractVector ? s : collect(s)
-        end
-    end
+    s = _finite_support(d)
+    s === nothing || return s
     tol = _CRPS_DISCRETE_TOL
     klo = _first_true(k -> cdf(d, k) > tol)
     khi = _first_true(k -> ccdf(d, k) <= tol)
@@ -675,6 +669,36 @@ function _crps_lattice_nodes(d::DiscreteUnivariateDistribution)
         )
     )
     return klo:khi
+end
+
+# The support points of a finite discrete forecast, or `nothing` where the
+# support is unbounded or too large to list.
+function _finite_support(d::DiscreteUnivariateDistribution)
+    (isfinite(minimum(d)) && isfinite(maximum(d))) || return nothing
+    s = support(d)
+    length(s) <= _CRPS_DISCRETE_MAXNODES || return nothing
+    # `support` is an `AbstractVector` for every family in Distributions.jl
+    # but `Dirac`, whose is a one-element tuple.
+    return s isa AbstractVector ? s : collect(s)
+end
+
+# A truncated or censored discrete forecast inherits `support` from the
+# generic method, which assumes the integers: for a forecast on non-integer
+# points it is `round(minimum):round(maximum)` and lists none of them. Its
+# points are the base's, inside its bounds.
+const _WrappedDiscrete = Union{
+    Truncated{<:DiscreteUnivariateDistribution},
+    Distributions.Censored{<:DiscreteUnivariateDistribution},
+}
+
+_wrapped_base(d::Truncated) = d.untruncated
+_wrapped_base(d::Distributions.Censored) = d.uncensored
+
+function _finite_support(d::_WrappedDiscrete)
+    s = _finite_support(_wrapped_base(d))
+    s === nothing && return nothing
+    lo, hi = minimum(d), maximum(d)
+    return filter(x -> lo <= x <= hi, s)
 end
 
 # A forecast censored between the integers piles the mass beyond each bound
