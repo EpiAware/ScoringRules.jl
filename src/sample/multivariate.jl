@@ -224,6 +224,9 @@ end
 function _vs_core(
         y::AbstractVector, X::AbstractMatrix, w_vs, w, p::Real
     )
+    # Every diagonal pair raises zero to the order, which is `Inf` for a
+    # negative one, so the score would be NaN whatever the forecast. R stops.
+    p > 0 || throw(ArgumentError("the order p must be positive, got $p"))
     out = 0.0
     d = length(y)
     m = size(X, 2)

@@ -386,3 +386,19 @@ end
     @test es(X, y) ≈ es(Float64.(X), Float64.(y)) rtol = 1.0e-6
     @test isfinite(twes(X, y; b = 1.0f20))
 end
+
+@testitem "the variogram score refuses an order that is not positive" tags = [:sample] begin
+    using ScoringRules
+
+    # Every diagonal pair evaluates `0^p`, which is `Inf` for a negative order,
+    # and the score came out NaN for any input. R stops with an error.
+    X = randn(2, 5)
+    y = [0.0, 1.0]
+    wf = weight_function(:norm_cdf; mu = 0.0, sigma = 2.0)
+    for p in (-1.0, 0.0)
+        @test_throws ArgumentError vs(X, y; p = p)
+        @test_throws ArgumentError owvs(X, y; weight_func = wf, p = p)
+        @test_throws ArgumentError twvs(X, y; b = 3.0, p = p)
+    end
+    @test isfinite(vs(X, y; p = 0.5))
+end
