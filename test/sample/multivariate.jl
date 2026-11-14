@@ -357,3 +357,21 @@ end
     Xn[1, 1] = NaN
     @test isnan(vs(Xn, [0.2, 1.0, 0.5]; w_vs = W))
 end
+
+@testitem "the variogram score skips zero-weight pairs that hold no NaN" tags = [:sample] begin
+    using ScoringRules
+    using Random: Xoshiro
+
+    # A banded `w_vs` is a common choice, and evaluating every pair of it is
+    # the full O(d²m) work for a few nonzero bands. Only a pair touching a
+    # dimension with a NaN has to be evaluated whatever its weight.
+    rng = Xoshiro(3)
+    d, m = 300, 1000
+    X = randn(rng, d, m)
+    y = randn(rng, d)
+    W = [abs(k - l) <= 2 ? 1.0 : 0.0 for k in 1:d, l in 1:d]
+    vs(X, y; w_vs = W)
+    @test (@elapsed vs(X, y; w_vs = W)) < 0.5
+    y[10] = NaN
+    @test isnan(vs(X, y; w_vs = W))
+end
