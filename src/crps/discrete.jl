@@ -158,6 +158,12 @@ end
 CRPS of a `NegativeBinomial(size, prob)` forecast, in closed form.
 """
 function _crps_nbinom(y::Real, size::Real, prob::Real)
+    # Past a size of 1e10 the closed form cannot be checked against an exact
+    # sum, and where it was checked against the normal limit it was quietly
+    # wrong: 2e-4 out at 10^11.5, negative at 1e16, as the CDF itself loses
+    # accuracy at such parameters in ways no error bound here follows. A
+    # forecast that size is a Poisson in all but name.
+    isfinite(y) && size > 1.0e10 && return oftype(float(y) * float(size) * float(prob), NaN)
     c1 = y * (2 * cdf(NegativeBinomial(size, prob), y) - 1)
     c2 = (1 - prob) / prob^2
     # pnbinom(y-1, size+1, prob) is the CDF of NB(size+1, prob) at y-1
@@ -167,11 +173,11 @@ function _crps_nbinom(y::Real, size::Real, prob::Real)
     # Each `2F − 1` is a difference of two probabilities, good to about one
     # `eps` absolute however small it comes out, and the closed form multiplies
     # those errors by `y` and by `size * c2 ≈ size/prob`. Where the score is
-    # small beside that, the result keeps few digits: at a huge size, where
-    # the score grows only like `√size/prob`; at a nearly degenerate forecast
-    # observed at zero, where the score is of order `size·(1 − prob)`; and
-    # below `prob ≈ 1e-154`, where `c2` overflows outright. The bound below is
-    # within a few times of the error measured against lattice sums.
+    # small beside that, the result keeps few digits: at a nearly degenerate
+    # forecast observed at zero, where the score is of order
+    # `size·(1 − prob)`, and below `prob ≈ 1e-154`, where `c2` overflows
+    # outright. The bound below is within a few times of the error measured
+    # against lattice sums at sizes up to 1e10.
     #
     # A forecast compact enough to sum is summed exactly wherever the closed
     # form falls short of 1e-10. One too wide to sum keeps the closed form to

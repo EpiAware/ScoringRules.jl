@@ -525,6 +525,12 @@ end
     @test isnan(crps(NegativeBinomial(5.0, 1.0e-160), 3.0))
     @test isnan(crps(NegativeBinomial(3.0e307, 0.5), 3.0e307))
     @test isnan(crps(NegativeBinomial(1.0e300, 0.3), 1.0e300 * 0.7 / 0.3))
+    # Between those and the sizes an exact sum can check, the closed form was
+    # quietly wrong: 2e-4 out at 10^11.5, negative at 1e16. Past a size of
+    # 1e10 it is not trusted at all.
+    for (r, p) in ((10.0^11.5, 0.5), (1.0e16, 0.5), (1.0e16, 0.3), (10.0^17.5, 0.95), (10.0^15.5, 0.05))
+        @test isnan(crps(NegativeBinomial(r, p), round(r * (1 - p) / p)))
+    end
     # An infinite observation is still an infinite score.
     @test crps(NegativeBinomial(5.0, 0.3), Inf) == Inf
 end
