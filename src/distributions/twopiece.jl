@@ -97,12 +97,12 @@ function Distributions.quantile(d::TwoPieceNormal, p::Real)
     p_split = d.scale1 / S
     if p <= p_split
         # p = 2σ₁/S * Φ(q/σ₁) → q = σ₁ * Φ⁻¹(p*S/(2σ₁))
-        return d.location + d.scale1 * Distributions.norminvcdf(p * S / (2 * d.scale1))
+        return d.location + d.scale1 * _norm_invcdf(p * S / (2 * d.scale1))
     else
         # p = σ₁/S + 2σ₂/S*(Φ(q/σ₂) - 1/2)
         # (p - σ₁/S)*S/(2σ₂) + 1/2 = Φ(q/σ₂)
         arg = (p - p_split) * S / (2 * d.scale2) + oftype(float(p), 0.5)
-        return d.location + d.scale2 * Distributions.norminvcdf(arg)
+        return d.location + d.scale2 * _norm_invcdf(arg)
     end
 end
 
@@ -121,10 +121,10 @@ function Distributions.rand(rng::AbstractRNG, d::TwoPieceNormal)
     u = rand(rng)
     p_split = d.scale1 / S
     if u <= p_split
-        return d.location + d.scale1 * Distributions.norminvcdf(u * S / (2 * d.scale1))
+        return d.location + d.scale1 * _norm_invcdf(u * S / (2 * d.scale1))
     else
         arg = (u - p_split) * S / (2 * d.scale2) + oftype(float(u), 0.5)
-        return d.location + d.scale2 * Distributions.norminvcdf(arg)
+        return d.location + d.scale2 * _norm_invcdf(arg)
     end
 end
 

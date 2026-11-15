@@ -48,3 +48,16 @@
         end
     end
 end
+
+@testitem "an infinite observation scores Inf under every extreme-value shape" tags = [:crps] begin
+    using ScoringRules
+    using Distributions
+
+    # Wherever these scores are defined (shape below 1) the forecast has a
+    # finite mean, so an observation at infinity is infinitely far from it.
+    # The shape-zero limits used to form `0 * Inf` or `-Inf + Inf` there.
+    for ξ in (0.0, 1.0e-12, 1.0e-9, 0.2, -0.3), y in (Inf, -Inf)
+        @test crps(GeneralizedExtremeValue(0.5, 2.0, ξ), y) == Inf
+        @test crps(GeneralizedPareto(0.5, 2.0, ξ), y) == Inf
+    end
+end

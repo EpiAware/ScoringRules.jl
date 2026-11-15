@@ -375,3 +375,18 @@ end
         )
     end
 end
+
+@testitem "twcrps weights an ensemble with offset axes as crps does" tags = [:sample] begin
+    using ScoringRules
+    using OffsetArrays: OffsetArray
+
+    # Member weights reach the univariate score's own check, which wants the
+    # weights on the ensemble's axes; a one-based check meant for the
+    # multivariate loops used to refuse them first.
+    d = [0.3, -1.2, 0.8, 2.0]
+    w = [1.0, 2.0, 1.0, 0.5]
+    for off in (-3, 2)
+        @test twcrps(OffsetArray(d, off), 0.1; a = -1.0, w = OffsetArray(w, off)) ≈
+            twcrps(d, 0.1; a = -1.0, w = w) rtol = 1.0e-14
+    end
+end
