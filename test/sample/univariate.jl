@@ -141,3 +141,58 @@ end
     @test_throws ArgumentError clogs(dat, 0.0; a = 1.0, b = 1.0)
     @test_throws ArgumentError clogs(dat, 0.0; a = 2.0, b = 1.0)
 end
+
+@testitem "ensemble scores reject an empty ensemble" tags = [:sample] begin
+    using ScoringRules
+
+    # R raises "Incompatible input vector lengths"; without the check `crps`
+    # returned a silent NaN.
+    empty = Float64[]
+    @test_throws ArgumentError crps(empty, 0.5)
+    @test_throws ArgumentError crps(empty, 0.5; method = :kde)
+    @test_throws ArgumentError logs(empty, 0.5)
+    @test_throws ArgumentError dss(empty, 0.5)
+    @test_throws ArgumentError clogs(empty, 0.5)
+    @test_throws ArgumentError twcrps(empty, 0.5; a = 0.0)
+    @test_throws ArgumentError owcrps(empty, 0.5; a = 0.0)
+    @test_throws ArgumentError quantile_score(empty, 0.5; alpha = 0.9)
+    @test_throws ArgumentError interval_score(empty, 0.5; level = 0.9)
+end
+
+@testitem "crps warns when bw is passed to the EDF method" tags = [:sample] begin
+    using ScoringRules
+
+    dat = collect(range(-2.0, 2.0; length = 51))
+    # `bw` belongs to the kernel-density route; the empirical distribution
+    # function has no bandwidth, and silently dropping it hides the mistake.
+    scored = @test_logs (:warn, r"bw.*ignored") crps(dat, 0.5; bw = 0.3)
+    @test scored == crps(dat, 0.5)
+    # The mirror-image warning for `w` on the kernel route already existed.
+    @test_logs (:warn, r"w.*ignored") crps(dat, 0.5; method = :kde, w = ones(51))
+end
+
+@testitem "the ensemble CRPS does not depend on the ensemble's axes" tags = [:sample] begin
+    using ScoringRules
+
+    # The empirical CRPS ranks the sorted members, and used to take the rank
+    # from the index. With axes other than `1:n` that gave a wrong score,
+    # here a negative one.
+    struct OffsetVec{T} <: AbstractVector{T}
+        parent::Vector{T}
+        off::Int
+    end
+    Base.size(a::OffsetVec) = size(a.parent)
+    Base.axes(a::OffsetVec) = (a.off .+ axes(a.parent, 1),)
+    Base.getindex(a::OffsetVec, i::Int) = a.parent[i - a.off]
+    Base.setindex!(a::OffsetVec, v, i::Int) = (a.parent[i - a.off] = v)
+    Base.similar(a::OffsetVec, ::Type{T}, dims::Dims{1}) where {T} =
+        OffsetVec(Vector{T}(undef, dims), a.off)
+
+    # `twcrps` ranks through the same code after its chaining function, but
+    # mapping over this type needs more of the array interface than it is
+    # worth building here; it is the same loop either way.
+    d = [0.1, -0.5, 1.2, 0.7, -1.0]
+    for off in (-10, 3), y in (0.3, -2.0, 5.0)
+        @test crps(OffsetVec(d, off), y) ≈ crps(d, y) rtol = 1.0e-14
+    end
+end

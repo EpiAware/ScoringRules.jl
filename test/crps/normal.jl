@@ -24,7 +24,13 @@
             y = c["y"][i]
             @test crps(d, y) ≈ c["crps"][i] atol = atol rtol = rtol
             @test logs(d, y) ≈ c["logs"][i] atol = atol rtol = rtol
-            @test dss(d, y) ≈ c["dss"][i] atol = atol rtol = rtol
+            # sd = 0 leaves the DSS undefined; R returns NaN and so do we, and
+            # `≈` is false for a pair of NaNs.
+            if isnan(c["dss"][i])
+                @test isnan(dss(d, y))
+            else
+                @test dss(d, y) ≈ c["dss"][i] atol = atol rtol = rtol
+            end
         end
     end
 

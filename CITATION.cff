@@ -18,6 +18,7 @@ authors:
   - name: "contributors"
 repository-code: "https://github.com/EpiAware/ScoringRules.jl"
 url: "https://github.com/EpiAware/ScoringRules.jl"
+version: "1.0.0"
 license: GPL-2.0-or-later
 references:
   - type: article

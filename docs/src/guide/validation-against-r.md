@@ -54,7 +54,11 @@ end
 The differences are at the level of floating-point round-off, so the two
 implementations agree for practical purposes. The full test suite checks
 `logs`/`dss`, the ensemble scores and the weighted/multivariate scores the same
-way, at `atol = 1e-9, rtol = 1e-7`.
+way. Most of those comparisons run at `atol = 1e-9` with `rtol` between `1e-6`
+and `1e-9`, the looser end being the ensemble scores and the GEV near its
+Gumbel limit, where R itself integrates numerically.
+
+Two things about the table above are worth knowing. It skips any row where either value is not finite. That means a family R scores as `NaN` or `Inf` contributes nothing to the maximum, and so does one this package scores that way, which is the side that would hide a regression here; the `NaN`/`Inf` conventions are checked in the test suite instead. The reference grids were also widened in 1.0.0 to reach the parameters where the closed forms misbehave: a Poisson mean past 350, a negative binomial size past 40, a shape within `1e-3` of the Gumbel limit, a truncation bound 1000 standard units into the tail. The table counts the widened Poisson and negative binomial rows; it has no GEV or truncated Student's ``t`` rows, and those two grids are compared in the test suite.
 
 ## Gradients via automatic differentiation
 
@@ -83,7 +87,17 @@ println(grad_parity("norm",
 println(grad_parity("logis",
     (r, h) -> ForwardDiff.gradient(p -> crps(Logistic(p[1], p[2]), r[col(h, "y")]),
         [r[col(h, "location")], r[col(h, "scale")]])))
+println(grad_parity("t",
+    (r, h) -> ForwardDiff.gradient(
+        p -> crps(p[1] + p[2] * TDist(r[col(h, "df")]), r[col(h, "y")]),
+        [r[col(h, "location")], r[col(h, "scale")]])))
 ```
+
+R's `gradcrps_t` agrees with central differences of its own `crps_t` at every
+degree of freedom, location and scale tried, which makes it a usable reference.
+Its truncated counterpart `gradcrps_tt` does not, which is why only the
+untruncated families appear here (see
+[Differences from R](@ref differences-from-r)).
 
 ## Which families are AD-differentiable
 
@@ -132,8 +146,6 @@ method for a dual element type, which stops `d/dy` wherever the CRPS falls back
 to numerical integration. Closing these is tracked as future work. R provides
 analytic gradients for the Normal, Logistic and Student-t families only.
 
-## Intentional divergences
+## Divergences
 
-Three families deliberately differ from R (a corrected log-logistic DSS, the GEV
-Gumbel limit, and the ensemble population variance). These are documented on the
-[Differences from R](@ref differences-from-r) page.
+Several scores return a different number from R because the R value is wrong against an independent reference, and a few more differ by design. The [Differences from R](@ref differences-from-r) page lists every one, with the numbers. The ensemble DSS is **not** among them: like R it uses the population variance, and the two agree.
