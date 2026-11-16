@@ -62,6 +62,7 @@ The following parameter conventions differ from R's function arguments:
 | `NegativeBinomial` | `size, prob` (success prob) | `NegativeBinomial(r, p)` — same meaning |
 | `Hypergeometric` | `m, n, k` (white, black, draws) | `Hypergeometric(s, f, n)` (successes, failures, draws) — s=m, f=n, n=k |
 | `TwoPieceNormal` | `location, scale1, scale2` | `TwoPieceNormal(location, scale1, scale2)` — same |
+| smooth weights | `get_weight_func(name, mu, sigma, weight)` | [`weight_function`](@ref) and [`chaining_function`](@ref) |
 
 ## Reporting discrepancies
 

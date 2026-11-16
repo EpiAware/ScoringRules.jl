@@ -41,6 +41,15 @@ Lerch and Allen). See the README for attribution and provenance.
   probability score `rps`, and the moment-based `dss_moments` and `ess_moments`
   (error-spread score of Christensen, Moroz and Palmer 2015).
 - `quantile_score` over a vector of quantile levels returns the mean pinball loss, the same scalar shape every other score in the package returns. Pass `reduce = identity` for one score per level, or another reduction such as `sum`.
+- Smooth weight and chaining functions for the weighted scores,
+  `weight_function(name; mu, sigma)` and `chaining_function(name; mu, sigma)`,
+  covering the six shapes of R's `get_weight_func`: `:norm_cdf`, `:norm_surv`,
+  `:norm_pdf`, `:logis_cdf`, `:logis_surv` and `:logis_pdf`. Each chaining
+  function is the antiderivative of the weight of the same name, and the pairing
+  keeps the threshold-weighted score proper. Scalar `mu`/`sigma` give a
+  univariate function; length-`d` vectors give the product weight and the
+  element-wise chaining function of a `d`-dimensional forecast. As in R, both
+  constructors reject the logistic shapes for a multivariate forecast.
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
   suite. Problems found in R while porting were reported upstream, and where R
   has fixed one since 1.1.3, as with the variance in the log-logistic DSS, the
