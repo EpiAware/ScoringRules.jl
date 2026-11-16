@@ -88,17 +88,15 @@ end
     ys = [-2.0, -0.5, 0.0, 0.7, 1.5, 3.0]
 
     @testset "zero masses reduce to truncation" begin
-        # `Truncated` CRPS is closed-form for the first three bases and generic
-        # quadrature for the last two, hence the per-base tolerance.
-        for (base, l, u, rt) in [
-                (Normal(0.5, 1.2), -1.0, 2.0, 1.0e-12),
-                (Logistic(0.0, 0.8), -1.5, 1.5, 1.0e-12),
-                (TDist(5), -1.0, 2.0, 1.0e-12),
+        for (base, l, u) in [
+                (Normal(0.5, 1.2), -1.0, 2.0),
+                (Logistic(0.0, 0.8), -1.5, 1.5),
+                (TDist(5), -1.0, 2.0),
             ]
             w = BoundaryMass(base; lower = l, upper = u)
             t = truncated(base; lower = l, upper = isfinite(u) ? u : nothing)
             for y in ys
-                @test crps(w, y) ≈ crps(t, y) rtol = rt atol = 1.0e-9
+                @test crps(w, y) ≈ crps(t, y) rtol = 1.0e-12 atol = 1.0e-9
             end
         end
     end
