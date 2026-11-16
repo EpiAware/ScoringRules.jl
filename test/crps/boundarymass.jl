@@ -188,5 +188,11 @@ end
             umass = ccdf(Exponential(1.0), 2.0)
         )
         @test_throws ArgumentError crps(we, 1.0)
+        # R's crps_unif takes masses only at the uniform's own endpoints, and
+        # crps_gpd a mass only at the location.
+        wu = BoundaryMass(Uniform(0.0, 1.0); lower = -1.0, upper = 1.0, lmass = 0.1)
+        @test_throws ArgumentError crps(wu, 0.5)
+        wp = BoundaryMass(GeneralizedPareto(0.0, 1.0, 0.2); upper = 3.0, umass = 0.1)
+        @test_throws ArgumentError crps(wp, 1.0)
     end
 end
