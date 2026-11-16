@@ -174,6 +174,7 @@ function quantile_score(
             "q_levels and q_forecasts must have the same length"
         )
     )
+    isempty(q_levels) && throw(ArgumentError("q_levels must not be empty"))
     all(a -> 0 < a < 1, q_levels) ||
         throw(ArgumentError("all quantile levels must lie strictly in (0, 1)"))
     per_level = [
@@ -220,6 +221,7 @@ function quantile_score(
         dat::AbstractVector, y::Real;
         alpha::Real, type::Int = 7
     )
+    _check_nonempty(dat)
     0 < alpha < 1 || throw(ArgumentError("alpha must lie strictly in (0, 1), got $alpha"))
     q_hat = _quantile_hf(dat, alpha, type)
     return _qs_quantile(y, q_hat, alpha)
@@ -264,6 +266,8 @@ interval_score(-1.64, 1.64, 0.5, 0.9)
 """
 function interval_score(lower::Real, upper::Real, y::Real, level::Real)
     0 < level < 1 || throw(ArgumentError("level must lie strictly in (0, 1), got $level"))
+    lower <= upper ||
+        throw(ArgumentError("lower must not exceed upper, got lower=$lower, upper=$upper"))
     return _ints_quantile(y, lower, upper, level)
 end
 
@@ -296,6 +300,7 @@ function interval_score(
         dat::AbstractVector, y::Real;
         level::Real, type::Int = 7
     )
+    _check_nonempty(dat)
     0 < level < 1 || throw(ArgumentError("level must lie strictly in (0, 1), got $level"))
     alpha1 = 0.5 * (1 - level)
     alpha2 = 1 - alpha1

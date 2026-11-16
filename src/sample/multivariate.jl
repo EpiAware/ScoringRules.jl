@@ -139,6 +139,14 @@ end
 # ---------------------------------------------------------------------------
 
 # No-weight path: Σ_{k≤l} 2 (|y_k − y_l|^p − mean_i |X_{k,i} − X_{l,i}|^p)^2
+# Every diagonal pair raises zero to the order, which is `Inf` for a negative
+# one, so the score would be NaN whatever the forecast. R stops there; at an
+# order of zero it returns 0, as this does.
+function _check_vs_order(p::Real)
+    p < 0 && throw(ArgumentError("the order p must not be negative, got $p"))
+    return nothing
+end
+
 function _vsC(y::AbstractVector, X::AbstractMatrix, p::Real)
     out = 0.0
     d = length(y)
@@ -236,6 +244,7 @@ function vs(
         p::Real = 0.5, w = nothing, w_vs = nothing
     )
     _check_multiv(X, y)
+    _check_vs_order(p)
     d = length(y)
     w_vs === nothing || _check_w_vs(w_vs, d)
     if w === nothing

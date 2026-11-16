@@ -49,7 +49,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    rps(p, y)
+    rps(p, y; tol = eps(Float64))
 
 Ranked Probability Score (RPS; Epstein 1969) for a categorical / ordinal
 forecast.
@@ -59,6 +59,9 @@ forecast.
         categories.  Must be non-negative and sum to 1.
 - `y` — observed outcome category as an `Integer` in `{1, …, K}`, where
         `y = 1` is the smallest and `y = K` is the largest category.
+- `tol` — how far the sum of `p` may lie from 1, as in R's `rps_probs`.
+        Negative probabilities, a sum further from 1 and fewer than two
+        categories throw an `ArgumentError`, as R stops on them.
 
 # Returns
 A scalar `Float64` score.  Lower values indicate better forecasts.
@@ -84,7 +87,14 @@ p = [0.3, 0.2, 0.5]
 rps(p, 2)
 ```
 """
-function rps(p::AbstractVector, y::Integer)
+function rps(p::AbstractVector, y::Integer; tol::Real = eps(Float64))
+    length(p) >= 2 ||
+        throw(ArgumentError("need at least 2 outcome categories, got $(length(p))"))
+    tol >= 0 || throw(ArgumentError("tol must be non-negative, got $tol"))
+    any(<(0), p) && throw(ArgumentError("probabilities in p must be non-negative"))
+    abs(sum(p) - 1) <= tol || throw(
+        ArgumentError("probabilities in p must sum to one within tol = $tol, got $(sum(p))")
+    )
     1 <= y <= length(p) ||
         throw(ArgumentError("observed category y must satisfy 1 ≤ y ≤ length(p) = $(length(p)), got $y"))
     return _rps0(p, y)
