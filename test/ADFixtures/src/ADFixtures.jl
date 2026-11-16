@@ -275,7 +275,7 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
     # #11 (fixed): `_crps_pois` now goes through `ccdf_ad_safe` rather than a
     # direct `cdf(Poisson(lambda), y)` call, which routed through
     # `StatsFuns.gammaccdf`'s shared-type-parameter promotion and was not
-    # dual-safe in `lambda` — not the `besseli` calls elsewhere in
+    # dual-safe in `lambda` — not the `besselix` calls elsewhere in
     # `_crps_pois`, which are fine. The negative observation guards the
     # empty-support branch (`y < 0` ⇒ CDF 0), which an earlier `Gamma(0, 1)`
     # construction turned into a `DomainError`.

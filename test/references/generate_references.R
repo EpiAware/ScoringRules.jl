@@ -318,8 +318,10 @@ mixnorm_df <- rbind(rows2, rows3)
 write_ref("mixnorm", mixnorm_df)
 
 ## ---- Poisson --------------------------------------------------------------
-g <- grid(lambda = c(0.5, 1, 3, 10),
-          y = c(0, 1, 2, 5, 15))
+# lambda past 350, where `besselI(2*lambda, 0)` overflows unless taken
+# exponentially scaled, and an observation below the support.
+g <- grid(lambda = c(0.5, 1, 3, 10, 50, 350, 400, 5000),
+          y = c(-2, 0, 1, 2, 5, 15, 400, 5010))
 g$crps <- crps_pois(g$y, lambda = g$lambda)
 g$logs <- logs_pois(g$y, lambda = g$lambda)
 g$dss  <- dss_pois(g$y, lambda = g$lambda)
