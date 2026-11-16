@@ -134,9 +134,11 @@ g$dss  <- dss_t(g$y, df = g$df, location = g$location, scale = g$scale)
 write_ref("student_t", g)
 
 ## ---- truncated Student-t --------------------------------------------------
-g <- grid(df = c(3, 10), location = c(-1, 0, 2), scale = c(0.5, 2),
-          lower = c(-Inf, -1, 0), upper = c(Inf, 1, 5),
-          y = c(-2, 0, 0.5, 3))
+# The far bounds matter: the truncation normaliser is F(upper) - F(lower), and
+# a tail probability that underflows to zero made the score divide by zero.
+g <- grid(df = c(2.5, 3, 10, 20), location = c(-1, 0, 2), scale = c(0.5, 2),
+          lower = c(-Inf, -1, 0, 100), upper = c(Inf, 1, 5, -50, -200, -1000),
+          y = c(-1001, -201, -51, -2, 0, 0.5, 3, 101))
 g <- g[g$lower < g$upper, ]
 g$crps <- crps_tt(g$y, df = g$df, location = g$location, scale = g$scale,
                   lower = g$lower, upper = g$upper)

@@ -9,19 +9,32 @@
 # antiderivative of the t CDF up to a sign; named G in the R source.
 @inline _t_G(z::Real, df::Real) = -(df + z^2) / (df - 1) * pdf(TDist(df), z)
 
-# AD-safe Student-t CDF, differentiable in `df` (#6): the stock `cdf(::TDist)`
-# reaches `beta_inc`, which has no method for a Dual shape argument. Rebuilt from
-#   F(z; df) = 1/2 + 1/2 * sign(z) * I_w(1/2, df/2),  w = z²/(z²+df),
-# through `cdf_ad_safe`. Short-circuited at z == 0 (w ≡ 0, so ∂F/∂df = 0, but the
-# beta density diverges as w → 0 and IEEE `Inf * 0.0` returns NaN, not the true
-# limit; `z` is always an observation-derived constant here, never a
-# differentiated parameter, so this is exact) and at infinite z (from
-# `_crps_gtct_unit`'s point-mass bookkeeping, where `w` would be `Inf / Inf`).
+# AD-safe Student-t CDF, differentiable in `df`: the stock `cdf(::TDist)`
+# reaches `beta_inc`, which has no method for a Dual shape argument. Built on
+# `cdf_ad_safe` and `ccdf_ad_safe` from the identity, for z < 0,
+#   F(z; df) = ½·(1 − I_w(½, df/2)) = ½·I_v(df/2, ½),
+#   w = z²/(z² + df),  v = df/(z² + df) = 1 − w,
+# and its reflection for z > 0. The two forms fail in opposite places. The
+# first is accurate to about one `eps` absolute, `eps/F` relative, and cancels
+# away the far tail: at df = 10 and upper = −200 a
+# truncation normaliser built from it is zero. The second has a relative error
+# of about `eps·(1 + df)`, set by `v`, which rounds towards one in the body of
+# a large-`df` forecast: at df = 1e7 a truncation bound of 2e-5 vanishes. The
+# first form serves where `F ≥ 1/(1 + df)`. Its error is the smaller of the two
+# there. The second serves everywhere else.
+# At z == 0 the result is exactly ½. There v = 1, the beta density diverges, and
+# IEEE `Inf * 0.0` would make ∂F/∂df NaN. `z` always comes from the
+# observation, never a differentiated parameter. An infinite z, from
+# `_crps_gtct_unit`'s point-mass bookkeeping, returns its limit directly; `v`
+# would be `df / Inf`.
 @inline function _t_cdf(df::Real, z::Real)
     isinf(z) && return oftype(float(df) * one(z), z > 0 ? 1.0 : 0.0)
     z == 0 && return oftype(float(df) * one(z), 0.5)
-    w = z^2 / (z^2 + df)
-    return 0.5 + 0.5 * sign(z) * cdf_ad_safe(Beta(0.5, df / 2), w)
+    tail = 0.5 * ccdf_ad_safe(Beta(0.5, df / 2), z^2 / (z^2 + df))
+    if tail < 1 / (1 + df)
+        tail = 0.5 * cdf_ad_safe(Beta(df / 2, 0.5), df / (z^2 + df))
+    end
+    return z < 0 ? tail : 1 - tail
 end
 
 # `_Phi_t2(x, df)`: the t-family analogue of normal.jl's `_Phi_root2`.
@@ -97,7 +110,9 @@ function _crps_tt_unit(y::Real, df::Real, l::Real, u::Real)
     l == u && return abs(y - z)
     a = p_u - p_l
     b = out_u - out_l
-    b == 0 && return oftype(float(y), NaN)
+    # A truncation window holding no representable probability leaves the
+    # score undefined: NaN.
+    (a <= 0 || b == 0) && return oftype(float(y), NaN)
     G_z = _t_G(z, df)
     out_z = z * (2 * _t_cdf(df, z) - p_l - p_u) - 2 * G_z
     out = (out_z - b / a * _t_bfrac(df)) / a
