@@ -11,4 +11,3 @@
 # its elements decide.
 _float_type(A::AbstractArray{<:Number}) = float(eltype(A))
 _float_type(A::AbstractArray) = float(mapreduce(typeof, promote_type, A; init = Bool))
-_float_type(A, B) = promote_type(_float_type(A), _float_type(B))
