@@ -6,13 +6,13 @@
 # by Alexander I. Jordan, Fabian Krüger, Sebastian Lerch and Sam Allen.
 #
 # Module-level imports required (in addition to those already in ScoringRules.jl):
-#   using SpecialFunctions: besseli      (for Poisson)
+#   using SpecialFunctions: besselix     (for Poisson)
 #   using HypergeometricFunctions: _₂F₁ (for NegativeBinomial; already imported)
 
 # ── Poisson ────────────────────────────────────────────────────────────────
 # Formula from Jordan et al. (2019), translating crps_pois in scores_pois.R.
-# R's `besselI(x, nu, expon.scaled = TRUE)` equals `exp(-x) * besseli(nu, x)`.
-# The two calls share the same argument x = 2λ, so we factor out exp(-2λ).
+# R's `besselI(x, nu, expon.scaled = TRUE)` is `besselix(nu, x)`, the scaled
+# form; the unscaled `besseli` overflows from x = 2λ ≈ 700.
 """
 CRPS of a `Poisson(λ)` forecast, in closed form.
 
@@ -27,8 +27,7 @@ function _crps_pois(y::Real, lambda::Real)
     poiscdf = k <= 0 ? oftype(float(lambda), 0) : ccdf_ad_safe(Gamma(k, 1.0), lambda)
     c1 = (y - lambda) * (2 * poiscdf - 1)
     x = 2 * lambda
-    c2 = 2 * pdf(Poisson(lambda), floor(Int, y)) -
-        exp(-x) * (besseli(0, x) + besseli(1, x))
+    c2 = 2 * pdf(Poisson(lambda), floor(Int, y)) - (besselix(0, x) + besselix(1, x))
     return c1 + lambda * c2
 end
 
