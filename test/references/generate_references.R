@@ -86,8 +86,10 @@ g$crps <- crps_gtcnorm(g$y, location = g$location, scale = g$scale,
 write_ref("gtcnorm", g)
 
 ## ---- logistic -------------------------------------------------------------
-g <- grid(location = c(-2, 0, 3), scale = c(0.5, 1, 3),
-          y = c(-5, -1, 0, 1, 5, 10))
+# A scale near zero, and observations far enough out that `log F(z)` underflows
+# (z below about -745).
+g <- grid(location = c(-2, 0, 3), scale = c(1e-8, 1e-3, 0.5, 1, 3),
+          y = c(-1e6, -1000, -5, -1, 0, 1, 5, 10, 1000))
 g$crps <- crps_logis(g$y, location = g$location, scale = g$scale)
 g$logs <- logs_logis(g$y, location = g$location, scale = g$scale)
 g$dss  <- dss_logis(g$y, location = g$location, scale = g$scale)
