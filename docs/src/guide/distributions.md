@@ -44,7 +44,7 @@ valid; outside these constraints the function returns `NaN`.
 | Censored Student-t | `censored(LocationScale(μ, σ, TDist(ν)); ...)` | — |
 | Laplace | `Laplace(μ, θ)` | — |
 | Exponential | `Exponential(θ)` | — |
-| Shifted exponential | `location + Exponential(θ)` | positive scale |
+| Shifted exponential | `location + Exponential(θ)` | positive scale (a negative one throws an `ArgumentError`) |
 | Gamma | `Gamma(α, θ)` | α > 0, θ > 0 |
 | Beta | `Beta(α, β)` | — |
 | Beta on an interval | `lower + (upper - lower) * Beta(α, β)` | — |
