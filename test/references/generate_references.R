@@ -1,6 +1,12 @@
 #!/usr/bin/env Rscript
 # Generate reference score values from the R `scoringRules` package.
 #
+# The reference is the GitHub master of FK83/scoringRules at commit 4d2f12f,
+# which carries fixes made after the CRAN release of 1.1.3 (its DESCRIPTION
+# still reads 1.1.3). Install that commit before regenerating:
+#
+#     remotes::install_github("FK83/scoringRules@4d2f12f2097243a8447db037745395f5d5cf43da")
+#
 # The Julia test suite compares its output against these committed CSVs so that
 # CI needs no R installation, while the values are anchored to the real
 # reference implementation. Regenerate after touching a scored family:
@@ -12,6 +18,10 @@
 # scoring rule (crps/logs/dss) that scoringRules provides for it.
 
 suppressMessages(library(scoringRules))
+sha <- packageDescription("scoringRules")$RemoteSha
+if (is.null(sha) || !startsWith(sha, "4d2f12f")) {
+  stop("install scoringRules from GitHub at commit 4d2f12f; see the header")
+}
 
 # Locate this script's directory so it can be run from anywhere.
 script_path <- sub("^--file=", "",
@@ -750,12 +760,13 @@ write_ref("ess", g)
 
 # LogLogistic: R uses (locationlog, scalelog); Julia uses LogLogistic(α, β)
 #   with α = exp(locationlog), β = 1/scalelog.
-# dss_llogis is NOT compared (known NaN issue in R).
+# dss_llogis is NaN where the variance does not exist (scalelog >= 0.5).
 g <- grid(locationlog = c(-1, 0, 1),
           scalelog    = c(0.3, 0.5, 0.7),
           y           = c(0.1, 0.5, 1, 2, 5))
 g$crps <- crps_llogis(g$y, locationlog = g$locationlog, scalelog = g$scalelog)
 g$logs <- logs_llogis(g$y, locationlog = g$locationlog, scalelog = g$scalelog)
+g$dss  <- dss_llogis(g$y, locationlog = g$locationlog, scalelog = g$scalelog)
 write_ref("llogis", g)
 
 # LogLaplace: R uses (locationlog, scalelog); Julia uses LogLaplace(μ, σ)

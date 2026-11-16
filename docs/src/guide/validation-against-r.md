@@ -5,7 +5,9 @@ match the original. This page recomputes that agreement **live on every docs
 build**: it loads reference values generated from R `scoringRules` 1.1.3
 (committed under `test/references/data/`, produced by
 `test/references/generate_references.R`), computes the same quantities in Julia,
-and reports the difference. Nothing here is hand-copied.
+and reports the difference. Where R has fixed a problem reported while porting
+since 1.1.3, the values come from the fixed version. Nothing here is
+hand-copied.
 
 ## Score values
 
@@ -134,6 +136,6 @@ analytic gradients for the Normal, Logistic and Student-t families only.
 
 ## Intentional divergences
 
-Three families deliberately differ from R (a corrected log-logistic DSS, the GEV
-Gumbel limit, and the ensemble population variance). These are documented on the
-[Differences from R](@ref differences-from-r) page.
+The GEV CRPS near the Gumbel limit deliberately differs from R. The
+[Differences from R](@ref differences-from-r) page documents it with every other
+difference.
