@@ -1,7 +1,8 @@
 # [Differences from R](@id differences-from-r)
 
 ScoringRules.jl is a port of the R package
-[`scoringRules`](https://github.com/FK83/scoringRules) (version 1.1.3). In
+[`scoringRules`](https://github.com/FK83/scoringRules), checked against its
+GitHub master at commit `4d2f12f` (after version 1.1.3). In
 most cases the two packages produce identical numerical results, but there are
 known divergences that users coming from R should be aware of.
 
