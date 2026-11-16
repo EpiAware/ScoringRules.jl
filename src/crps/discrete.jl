@@ -76,14 +76,19 @@ function _f21_half_two(a::Real, Z::Real)
     # a `prob` below about 1e-154, and a step of exactly zero never grows.
     # An infinite `Z` leaves nothing to integrate, the integrand being zero
     # for every θ > 0.
+    #
+    # Each segment is integrated on its own and the results added: splatting a
+    # run-time number of split points into one `quadgk` call cannot be
+    # inferred, and the whole CRPS then returns `Any`.
     isinf(Z) && return zero(float(a) * float(Z))
-    segments = Float64[]
+    val = zero(float(a) * float(Z))
+    lo = 0.0
     step = 1 / (8 * max(sqrt(a) * sqrt(Z), 1.0))
     while step < hi
-        push!(segments, step)
-        step *= 4
+        val += first(quadgk(integrand, lo, step; rtol = 1.0e-13))
+        lo, step = step, 4 * step
     end
-    val, _ = quadgk(integrand, 0.0, segments..., hi; rtol = 1.0e-13)
+    val += first(quadgk(integrand, lo, hi; rtol = 1.0e-13))
     return 4 * val / π
 end
 
