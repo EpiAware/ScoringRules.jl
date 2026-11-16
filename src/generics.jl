@@ -17,9 +17,8 @@ const _ExpLocScale = Distributions.LocationScale{<:Real, Continuous, <:Exponenti
 const _LogsForecast = Union{
     Normal, Truncated{<:Normal}, TDist, _TDistLocScale, Truncated{<:TDist},
     Truncated{<:_TDistLocScale}, Logistic, Truncated{<:Logistic}, Laplace,
-    LogLaplace, Exponential, _ExpLocScale, Gamma, Beta, _BetaLocScale, Uniform,
-    LogNormal, LogLogistic, GeneralizedExtremeValue, GeneralizedPareto,
-    TwoPieceNormal,
+    LogLaplace, Exponential, Gamma, Beta, _BetaLocScale, Uniform, LogNormal,
+    LogLogistic, GeneralizedExtremeValue, GeneralizedPareto, TwoPieceNormal,
     TwoPieceExponential, _NormalMixture, Poisson, NegativeBinomial, Binomial,
     Hypergeometric,
 }
@@ -57,6 +56,15 @@ logs(Normal(0, 1), 0.5)
 ```
 """
 logs(d::_LogsForecast, y::Real) = -logpdf(d, y)
+
+# R's shifted exponential (`logs_exp2`, `crps_expM`) increases from its
+# location; a negative scale would make it decrease, which R has no form for.
+function _check_exp_scale(d::_ExpLocScale)
+    d.σ > 0 || throw(ArgumentError("R scoringRules has no exponential with a negative scale"))
+    return d
+end
+
+logs(d::_ExpLocScale, y::Real) = -logpdf(_check_exp_scale(d), y)
 
 """
     dss(d, y)

@@ -21,6 +21,7 @@
     @test crps(ex, 2.0) ≈ 0.426122638850534 rtol = 1.0e-12
     @test logs(ex, 2.0) ≈ 1.19314718055995 rtol = 1.0e-12
     @test_throws ArgumentError crps(1 + (-1) * Exponential(2.0), 0.0)
+    @test_throws ArgumentError logs(1 + (-1) * Exponential(2.0), 0.0)
 
     # R has no score for these.
     @test_throws MethodError crps(Cauchy(), 0.3)
