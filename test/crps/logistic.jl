@@ -50,4 +50,11 @@
             @test crps(d, y) ≈ ref_crps atol = atol rtol = rtol
         end
     end
+
+    @testset "coincident bounds leave a point mass" begin
+        # R scoringRules: crps_clogis(0.5, 0, 1, lower = 1, upper = 1) and
+        # crps_tlogis with the same arguments both return 0.5.
+        @test crps(censored(Logistic(0.0, 1.0), 1.0, 1.0), 0.5) ≈ 0.5
+        @test crps(truncated(Logistic(0.0, 1.0), 1.0, 1.0), 0.5) ≈ 0.5
+    end
 end
