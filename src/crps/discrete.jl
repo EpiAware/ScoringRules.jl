@@ -54,10 +54,10 @@ crps(d::Poisson, y::Real) = _crps_pois(y, d.λ)
 #
 #   ₂F₁(a, ½; 2; −Z) = (4/π) ∫₀^{π/2} cos²θ · (1 + Z sin²θ)^{−a} dθ.
 #
-# For `Z ≥ 0` the integrand is smooth and bounded by 1, so the quadrature is
-# accurate for every `a > 0`. The Gauss series that `HypergeometricFunctions`
-# sums instead returns `NaN` from `a ≈ 100` at the `Z ≈ 31` of a `prob = 0.3`
-# forecast, where R's `hypergeo` series is still finite.
+# For `Z ≥ 0` the integrand is smooth and bounded by 1, and the quadrature is
+# accurate for every `a > 0`. The Gauss series in `HypergeometricFunctions`
+# returns `NaN` from `a ≈ 100` at the `Z ≈ 31` of a `prob = 0.3` forecast,
+# where R's `hypergeo` series is still finite.
 function _f21_half_two(a::Real, Z::Real)
     (Z < 0 || isnan(Z) || isnan(a)) && return oftype(float(a) * float(Z), NaN)
     hi = Float64(π) / 2
@@ -67,9 +67,9 @@ function _f21_half_two(a::Real, Z::Real)
     # places its lowest node at θ ≈ 0.0067, and once `a·log1p(Z·sin²θ)` passes
     # 745 there the integrand underflows to zero at every node it looks at: the
     # estimate and its error are both zero, the tolerance test passes, and the
-    # function returns 0 having subdivided nothing. That made
-    # `crps(NegativeBinomial(724, 0.01), 71680)` 2136 instead of 626, with the
-    # knife edge one unit of `size` away. Splitting at geometric multiples of
+    # function returns 0 having subdivided nothing. Unsplit,
+    # `crps(NegativeBinomial(724, 0.01), 71680)` comes out at 2136 where the
+    # score is 626, with the knife edge one unit of `size` away. Splitting at geometric multiples of
     # the half-width puts nodes where the mass is, whatever the parameters.
     #
     # The half-width is taken as `1/(√a·√Z)`: the product `a·Z` overflows for
