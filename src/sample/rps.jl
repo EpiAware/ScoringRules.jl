@@ -60,9 +60,9 @@ function _accurate_sum(p::AbstractVector)
     return s + c
 end
 
-# R's default `tol` is one `eps` of its double precision. A narrower type gets
-# its own `eps`, since a `Float32` vector cannot sum to one within a `Float64`
-# one; a wider type keeps R's, which values widened from `Float64` meet.
+# R's default `tol` is one `eps` of its double precision. A `Float32` vector
+# cannot sum to one within that, and a narrower type gets its own `eps`; a
+# wider type keeps R's, which values widened from `Float64` meet.
 _rps_default_tol(::AbstractVector{T}) where {T <: AbstractFloat} = max(eps(T), eps(Float64))
 _rps_default_tol(::AbstractVector) = eps(Float64)
 
