@@ -46,8 +46,9 @@ end
 
 # The sum of `p` for the check against one. R accumulates its sum in extended
 # precision, and a normalised vector then sums to one within `eps`; a plain
-# `Float64` sum can land a few `eps` away. Neumaier's compensated sum is as
-# close as R's.
+# `Float64` sum can land a few `eps` away. Neumaier's compensated sum is at
+# least as accurate as R's, and the two decide alike except for vectors of
+# thousands of categories whose exact sum lies within half an `eps` of `tol`.
 function _accurate_sum(p::AbstractVector)
     s = float(zero(first(p)))
     c = zero(s)
