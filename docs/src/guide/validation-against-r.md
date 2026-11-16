@@ -135,6 +135,6 @@ analytic gradients for the Normal, Logistic and Student-t families only.
 
 ## Intentional divergences
 
-Three families deliberately differ from R (a corrected log-logistic DSS, the GEV
-Gumbel limit, and the ensemble population variance). These are documented on the
-[Differences from R](@ref differences-from-r) page.
+The GEV CRPS near the Gumbel limit deliberately differs from R. The
+[Differences from R](@ref differences-from-r) page documents it with every other
+difference.
