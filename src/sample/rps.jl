@@ -44,6 +44,21 @@ function _rps0(p::AbstractVector, y::Integer)
     return s
 end
 
+# The sum of `p` for the check against one. R accumulates its sum in extended
+# precision, and a normalised vector then sums to one within `eps`; a plain
+# `Float64` sum can land a few `eps` away. Neumaier's compensated sum is as
+# close as R's.
+function _accurate_sum(p::AbstractVector)
+    s = float(zero(first(p)))
+    c = zero(s)
+    for x in p
+        t = s + x
+        c += abs(s) >= abs(x) ? (s - t) + x : (x - t) + s
+        s = t
+    end
+    return s + c
+end
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -92,8 +107,9 @@ function rps(p::AbstractVector, y::Integer; tol::Real = eps(Float64))
         throw(ArgumentError("need at least 2 outcome categories, got $(length(p))"))
     tol >= 0 || throw(ArgumentError("tol must be non-negative, got $tol"))
     any(<(0), p) && throw(ArgumentError("probabilities in p must be non-negative"))
-    abs(sum(p) - 1) <= tol || throw(
-        ArgumentError("probabilities in p must sum to one within tol = $tol, got $(sum(p))")
+    total = _accurate_sum(p)
+    abs(total - 1) <= tol || throw(
+        ArgumentError("probabilities in p must sum to one within tol = $tol, got $total")
     )
     1 <= y <= length(p) ||
         throw(ArgumentError("observed category y must satisfy 1 ≤ y ≤ length(p) = $(length(p)), got $y"))

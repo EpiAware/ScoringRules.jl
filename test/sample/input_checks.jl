@@ -9,6 +9,16 @@
     @test rps([0.5, 0.5 + 1.0e-12], 1; tol = 1.0e-10) ≈ 0.25
     @test_throws ArgumentError rps([1.0], 1)
     @test_throws ArgumentError rps([0.5, 0.5], 1; tol = -1.0)
+    # A normalised vector passes the default `tol`, as in R, even where its
+    # plain Float64 sum is a few eps from one.
+    @test rps(fill(1 / 14, 14), 1) ≈ 4.178571428571429  # R: rps_probs(1, rep(1/14, 14))
+    @test all(K -> isfinite(rps(fill(1 / K, K), 1)), 2:60)
+    # Vectors of 2 to 50 categories from a golden-ratio sequence, normalised as
+    # R's `p / sum(p)` does, with the sum taken to extended precision.
+    @test all(1:2000) do i
+        p = [mod(i * k * 0.6180339887498949, 1) + 0.01 for k in 1:(2 + i % 49)]
+        isfinite(rps(p ./ Float64(sum(big, p)), 1))
+    end
 
     # crps_sample, logs_sample, dss_sample, clogs_sample, twcrps_sample,
     # owcrps_sample, qs_sample and ints_sample stop on an empty ensemble.
