@@ -17,8 +17,9 @@ end
 
 crps(d::Exponential, y::Real) = _crps_exp(y, 1 / scale(d))
 
-# `location + Exponential(θ)` is R's `crps_expM` with no point mass. R has no
-# exponential that decreases from its location, so a negative scale throws.
+# `location + Exponential(θ)` is R's `crps_expM` with no point mass. A negative
+# scale would make the exponential decrease from its location, which R has no
+# form for; it throws.
 function crps(d::Distributions.LocationScale{<:Real, Continuous, <:Exponential}, y::Real)
     d.σ > 0 || throw(ArgumentError("R scoringRules has no exponential with a negative scale"))
     return _crps_expM(y, d.μ, d.σ * scale(d.ρ), zero(float(y)))
