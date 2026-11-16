@@ -88,8 +88,7 @@ println(grad_parity("logis",
 ## Which families are AD-differentiable
 
 Not every closed form is differentiable by ForwardDiff. Some route through
-special functions or a numerical-integration fallback that do not propagate dual
-numbers. The live support map for `crps`, differentiating with respect to the
+special functions that do not propagate dual numbers. The live support map for `crps`, differentiating with respect to the
 distribution parameters and with respect to the observation `y`:
 
 ```@example validation
@@ -107,8 +106,6 @@ cases = [
     ("LogLogistic", θ -> LogLogistic(θ[1], θ[2]), [1.0, 3.0], 1.2),
     ("Poisson", θ -> Poisson(θ[1]), [3.0], 2.0),
     ("GEV", θ -> GeneralizedExtremeValue(θ[1], θ[2], 0.2), [0.0, 1.0], 0.7),
-    ("Weibull", θ -> Weibull(θ[1], θ[2]), [2.0, 1.5], 1.2),
-    ("Chisq", θ -> Chisq(θ[1]), [3.0], 2.0),
     ("Binomial", θ -> Binomial(10, θ[1]), [0.4], 3.0),
     ("NegBinomial", θ -> NegativeBinomial(θ[1], 0.3), [4.0], 3.0),
 ]
@@ -125,11 +122,9 @@ for (name, D, θ0, y0) in cases
 end
 ```
 
-Three blockers account for the remaining gaps. `_beta_inc` has no method for
-fully dual arguments, which stops the parameter gradient for `Binomial` and
-`NegativeBinomial`; `_gamma_inc` likewise for `Chisq`. QuadGK's `kronrod` has no
-method for a dual element type, which stops `d/dy` wherever the CRPS falls back
-to numerical integration. Closing these is tracked as future work. R provides
+`_beta_inc` has no method for fully dual arguments, which stops the parameter
+gradient for `Binomial` and `NegativeBinomial`. Closing this is tracked as
+future work. R provides
 analytic gradients for the Normal, Logistic and Student-t families only.
 
 ## Intentional divergences

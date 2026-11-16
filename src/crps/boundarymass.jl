@@ -1,11 +1,13 @@
 # Closed-form CRPS routes for `BoundaryMass` wrappers. Each method forwards to
-# the validated internal ported from R scoringRules; combinations without a
-# closed form fall back to the generic quadrature over the wrapper's CDF.
-
-# Generic fallback: the quadrature method for continuous distributions handles
-# the jump discontinuities of a mixed CDF through adaptive refinement.
-function _crps_boundarymass_quad(d::BoundaryMass, y::Real)
-    return invoke(crps, Tuple{ContinuousUnivariateDistribution, Real}, d, y)
+# the validated internal ported from R scoringRules; a bound and mass
+# combination that R's function does not take throws.
+function _crps_boundarymass_unsupported(d::BoundaryMass)
+    throw(
+        ArgumentError(
+            "R scoringRules has no CRPS for a $(nameof(typeof(d.dist))) base with " *
+                "these bounds and masses"
+        )
+    )
 end
 
 # --- generalised truncated/censored normal, logistic, Student-t -------------
@@ -49,7 +51,7 @@ function crps(d::BoundaryMass{<:Real, <:Uniform}, y::Real)
     if mn < mx && (d.lmass == 0 || d.lower >= a) && (d.umass == 0 || d.upper <= b)
         return _crps_unif(y, mn, mx, d.lmass, d.umass)
     end
-    return _crps_boundarymass_quad(d, y)
+    return _crps_boundarymass_unsupported(d)
 end
 
 # --- exponential with a point mass at its lower end -------------------------
@@ -60,7 +62,7 @@ function crps(d::BoundaryMass{<:Real, <:Exponential}, y::Real)
     if d.umass == 0 && !isfinite(d.upper) && (d.lmass == 0 || d.lower >= 0)
         return _crps_expM(y, max(d.lower, zero(d.lower)), scale(d.dist), d.lmass)
     end
-    return _crps_boundarymass_quad(d, y)
+    return _crps_boundarymass_unsupported(d)
 end
 
 # --- generalised Pareto with a point mass at its location -------------------
@@ -72,5 +74,5 @@ function crps(d::BoundaryMass{<:Real, <:GeneralizedPareto}, y::Real)
             (d.lower == μ || (d.lmass == 0 && d.lower <= μ))
         return _crps_gpd(y, ξ, μ, σ, d.lmass)
     end
-    return _crps_boundarymass_quad(d, y)
+    return _crps_boundarymass_unsupported(d)
 end
