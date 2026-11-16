@@ -43,6 +43,14 @@
     @test_throws ArgumentError interval_score(empty, 1.0; level = 0.8)
     @test_throws ArgumentError quantile_score(Float64[], Float64[], 1.0)
 
+    # crps_sample (kde), logs_sample and clogs_sample stop on a negative
+    # bandwidth; a bandwidth of zero is accepted.
+    d = [0.1, 0.5, 0.9]
+    @test_throws ArgumentError crps(d, 0.3; method = :kde, bw = -0.5)
+    @test_throws ArgumentError logs(d, 0.3; bw = -0.5)
+    @test_throws ArgumentError clogs(d, 0.3; bw = -0.5)
+    @test crps(d, 0.3; method = :kde, bw = 0) ≈ 0.1555556 rtol = 1.0e-6  # R: crps_sample(0.3, d, "kde", bw = 0)
+
     # ints_quantiles stops when the lower end is above the upper one.
     @test_throws ArgumentError interval_score(2.0, 1.0, 1.5, 0.8)
     @test interval_score(1.0, 1.0, 1.5, 0.8) ≈ 5.0  # R: ints_quantiles(1.5, 1, 1, 0.8)

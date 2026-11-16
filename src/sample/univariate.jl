@@ -119,6 +119,13 @@ function _check_nonempty(dat::AbstractVector)
     return nothing
 end
 
+# R stops on a negative kernel bandwidth; zero is allowed.
+function _check_bw(bw)
+    bw === nothing || bw >= 0 ||
+        throw(ArgumentError("the bandwidth bw must not be negative, got $bw"))
+    return nothing
+end
+
 """
     crps(dat::AbstractVector{<:Real}, y::Real; method=:edf, w=nothing, bw=nothing)
 
@@ -175,6 +182,7 @@ function crps(
     elseif method === :kde
         w === nothing ||
             @warn "the `w` argument is ignored for method = :kde" maxlog = 1
+        _check_bw(bw)
         return _crps_kde(y, dat, bw)
     else
         throw(ArgumentError("method must be :edf or :kde, got :$method"))
@@ -214,6 +222,7 @@ logs(dat, 0.5)
 """
 function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing)
     _check_nonempty(dat)
+    _check_bw(bw)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     n = length(dat)
     den = 0.0
@@ -276,6 +285,7 @@ function clogs(
         a::Real = -Inf, b::Real = Inf, bw = nothing, cens::Bool = true
     )
     _check_nonempty(dat)
+    _check_bw(bw)
     a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     n = length(dat)
