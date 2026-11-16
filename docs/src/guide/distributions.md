@@ -7,14 +7,25 @@ distribution types are provided by this package itself.
 
 ## Logarithmic and Dawid–Sebastiani scores
 
-`logs` and `dss` work for **any** `UnivariateDistribution` in Distributions.jl.
-`logs` evaluates `-logpdf(d, y)` directly; `dss` needs only `mean(d)` and
-`var(d)`. No closed-form CRPS is required for these two scores.
+`logs` and `dss` cover the families R scoringRules has `logs_*` and `dss_*`
+functions for. `logs` evaluates `-logpdf(d, y)`, and `dss` needs only
+`mean(d)` and `var(d)`.
+
+- `logs`: normal, Student-t (location-scale) and logistic, each also truncated;
+  Laplace, `LogLaplace`, exponential (also shifted, `location + Exponential(θ)`),
+  gamma, beta (also on an interval, `lower + (upper - lower) * Beta(a, b)`),
+  uniform, log-normal, log-logistic, GEV, GPD, `TwoPieceNormal`, `TwoPieceExponential`, a mixture of
+  normals, Poisson, negative binomial, binomial and hypergeometric.
+- `dss`: normal, Student-t (location-scale), logistic, Laplace, `LogLaplace`,
+  exponential, gamma, beta (also on an interval), uniform, log-normal, log-logistic, GEV, GPD, a
+  mixture of normals, Poisson and negative binomial.
+
+Any other family throws a `MethodError`.
 
 ## Families with a closed-form CRPS
 
-The table below lists every distribution family for which `crps` uses a
-closed-form expression rather than numerical quadrature or summation. The
+The table below lists every distribution family `crps` scores, each with a
+closed-form expression. The
 column "Restrictions" notes parameter constraints under which the formula is
 valid; outside these constraints the function returns `NaN`.
 
@@ -33,8 +44,10 @@ valid; outside these constraints the function returns `NaN`.
 | Censored Student-t | `censored(LocationScale(μ, σ, TDist(ν)); ...)` | — |
 | Laplace | `Laplace(μ, θ)` | — |
 | Exponential | `Exponential(θ)` | — |
+| Shifted exponential | `location + Exponential(θ)` | positive scale (a negative one throws an `ArgumentError`) |
 | Gamma | `Gamma(α, θ)` | α > 0, θ > 0 |
 | Beta | `Beta(α, β)` | — |
+| Beta on an interval | `lower + (upper - lower) * Beta(α, β)` | — |
 | Uniform | `Uniform(a, b)` | — |
 | Log-Normal | `LogNormal(μ, σ)` | — |
 | Log-Logistic (Fisk) | `LogLogistic(α, β)` | β > 1 (i.e. scale < 1) |
@@ -96,19 +109,10 @@ Closed-form CRPS is used for these bases:
 | `Exponential` | `crps_expM` | mass at the lower end, no upper bound |
 | `GeneralizedPareto` | `crps_gpd` with `mass` | mass at the location, no upper bound, ξ < 1 |
 
-Any other base (or an unrouted bound/mass combination) falls back to the
-generic quadrature over the wrapper's CDF. `logs` and `dss` work through the
-generic density and moment methods; R has no logs/dss counterparts for these
-forms.
-
-## Quadrature fallback
-
-For any continuous distribution not in the table above, `crps` falls back to
-adaptive Gauss–Kronrod quadrature (via
-[QuadGK.jl](https://github.com/JuliaMath/QuadGK.jl)). The fallback is
-correct but slower and less numerically precise for some distributions. If you
-encounter a distribution family that should have a closed form but does not,
-please open an issue.
+A bound and mass combination outside these conditions throws an
+`ArgumentError`, and any other base a `MethodError`. As in R, `logs` and `dss`
+do not take these forms. A family not in the tables above also throws a
+`MethodError` from `crps`; if you need one scored, please open an issue.
 
 ## Example: using package-provided types
 

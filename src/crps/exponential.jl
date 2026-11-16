@@ -17,6 +17,12 @@ end
 
 crps(d::Exponential, y::Real) = _crps_exp(y, 1 / scale(d))
 
+# `location + Exponential(θ)` is R's `crps_expM` with no point mass.
+function crps(d::_ExpLocScale, y::Real)
+    _check_exp_scale(d)
+    return _crps_expM(y, d.μ, d.σ * scale(d.ρ), zero(float(y)))
+end
+
 """
     _crps_expM(y, location, scale, mass)
 

@@ -44,3 +44,11 @@ function _crps_beta(y::Real, shape1::Real, shape2::Real, lower::Real, upper::Rea
 end
 
 crps(d::Beta, y::Real) = _crps_beta(y, d.α, d.β, zero(float(y)), one(float(y)))
+
+# `lower + (upper - lower) * Beta(a, b)` is R's beta on [lower, upper]. A
+# negative scale mirrors it: `μ + σB` with σ < 0 is Beta(b, a) on [μ + σ, μ].
+function crps(d::Distributions.LocationScale{<:Real, Continuous, <:Beta}, y::Real)
+    a, b = params(d.ρ)
+    d.σ > 0 && return _crps_beta(y, a, b, d.μ, d.μ + d.σ)
+    return _crps_beta(y, b, a, d.μ + d.σ, d.μ)
+end

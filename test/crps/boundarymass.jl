@@ -88,19 +88,15 @@ end
     ys = [-2.0, -0.5, 0.0, 0.7, 1.5, 3.0]
 
     @testset "zero masses reduce to truncation" begin
-        # `Truncated` CRPS is closed-form for the first three bases and generic
-        # quadrature for the last two, hence the per-base tolerance.
-        for (base, l, u, rt) in [
-                (Normal(0.5, 1.2), -1.0, 2.0, 1.0e-12),
-                (Logistic(0.0, 0.8), -1.5, 1.5, 1.0e-12),
-                (TDist(5), -1.0, 2.0, 1.0e-12),
-                (Uniform(-1.0, 2.0), -0.5, 1.5, 1.0e-8),
-                (Exponential(2.0), 0.5, Inf, 1.0e-8),
+        for (base, l, u) in [
+                (Normal(0.5, 1.2), -1.0, 2.0),
+                (Logistic(0.0, 0.8), -1.5, 1.5),
+                (TDist(5), -1.0, 2.0),
             ]
             w = BoundaryMass(base; lower = l, upper = u)
             t = truncated(base; lower = l, upper = isfinite(u) ? u : nothing)
             for y in ys
-                @test crps(w, y) ≈ crps(t, y) rtol = rt atol = 1.0e-9
+                @test crps(w, y) ≈ crps(t, y) rtol = 1.0e-12 atol = 1.0e-9
             end
         end
     end
@@ -122,17 +118,6 @@ end
         end
     end
 
-    @testset "closed forms agree with the quadrature fallback" begin
-        w = BoundaryMass(
-            Normal(0, 1); lower = -1, upper = 2,
-            lmass = 0.1, umass = 0.2
-        )
-        for y in ys
-            quad = invoke(crps, Tuple{ContinuousUnivariateDistribution, Real}, w, y)
-            @test crps(w, y) ≈ quad rtol = 1.0e-6
-        end
-    end
-
     @testset "logistic closed form stays finite for far-out bounds" begin
         # logistic(z) rounds to 1 for z ≳ 37, where a naive log(1 - p) is -Inf
         w = BoundaryMass(
@@ -140,9 +125,7 @@ end
             lmass = 0.1, umass = 0.1
         )
         for y in (-10.0, 0.0, 50.0, 200.0)
-            quad = invoke(crps, Tuple{ContinuousUnivariateDistribution, Real}, w, y)
             @test isfinite(crps(w, y))
-            @test crps(w, y) ≈ quad rtol = 1.0e-6
         end
     end
 
@@ -172,10 +155,9 @@ end
         ex2 = 0.1 * 1 + 0.2 * 4 + 0.7 * (var(int) + mean(int)^2)
         @test var(w) ≈ ex2 - m^2 atol = 1.0e-12
 
-        # logs/dss flow through the generic density and moment methods
-        @test logs(w, 0.5) ≈ -logpdf(w, 0.5)
-        @test logs(w, -1) ≈ -log(0.1)
-        @test dss(w, 0.5) ≈ (0.5 - mean(w))^2 / var(w) + log(var(w))
+        # As in R, logs and dss do not take the wrapper.
+        @test_throws MethodError logs(w, 0.5)
+        @test_throws MethodError dss(w, 0.5)
 
         draws = rand(w, 2000)
         @test all(-1 .<= draws .<= 2)
@@ -194,20 +176,23 @@ end
         )
     end
 
-    @testset "unrouted combinations fall back to quadrature" begin
-        # No closed form exists for these; the generic CDF quadrature applies.
+    @testset "combinations R does not score throw" begin
         wg = BoundaryMass(
             Gamma(2.0, 1.0); lower = 0.5, upper = 3.0,
             lmass = 0.1, umass = 0.05
         )
-        @test isfinite(crps(wg, 1.0)) && crps(wg, 1.0) > 0
-        # Upper-censored exponential: the fallback quadrature should agree with
-        # the closed-form censored-exponential CRPS via Distributions.censored.
+        @test_throws MethodError crps(wg, 1.0)
+        # R's crps_expM takes a mass at the lower end only.
         we = BoundaryMass(
             Exponential(1.0); upper = 2.0,
             umass = ccdf(Exponential(1.0), 2.0)
         )
-        ce = censored(Exponential(1.0); upper = 2.0)
-        @test crps(we, 1.0) ≈ crps(ce, 1.0) rtol = 1.0e-6
+        @test_throws ArgumentError crps(we, 1.0)
+        # R's crps_unif takes masses only at the uniform's own endpoints, and
+        # crps_gpd a mass only at the location.
+        wu = BoundaryMass(Uniform(0.0, 1.0); lower = -1.0, upper = 1.0, lmass = 0.1)
+        @test_throws ArgumentError crps(wu, 0.5)
+        wp = BoundaryMass(GeneralizedPareto(0.0, 1.0, 0.2); upper = 3.0, umass = 0.1)
+        @test_throws ArgumentError crps(wp, 1.0)
     end
 end

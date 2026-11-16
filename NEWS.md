@@ -4,9 +4,10 @@ First working version: a port of the R
 [`scoringRules`](https://github.com/FK83/scoringRules) package (Jordan, Krüger,
 Lerch and Allen). See the README for attribution and provenance.
 
-- Three univariate scores via multiple dispatch: `crps`, `logs`, `dss`. `logs`
-  and `dss` work for any `Distributions.jl` univariate type; `crps` has a
-  closed form for each supported family and a quadrature fallback otherwise.
+- Three univariate scores via multiple dispatch: `crps`, `logs`, `dss`, for the
+  forecast families R scoringRules scores with each. `crps` has a closed form
+  for each family; `logs` and `dss` take the density and the first two
+  moments from `Distributions.jl`.
 - Closed-form CRPS for the normal (plus truncated, censored and generalised
   truncated/censored), logistic, Student-t, Laplace, exponential, gamma, beta,
   uniform, log-normal, log-logistic, log-Laplace, GEV, GPD, two-piece normal,
@@ -17,8 +18,8 @@ Lerch and Allen). See the README for attribution and provenance.
 - `BoundaryMass(dist; lower, upper, lmass, umass)` distribution wrapper for
   forecasts with free point masses at the truncation bounds, with closed-form
   `crps` for normal, logistic and (location–scale) Student-t bases and for the
-  point-mass exponential, uniform and generalised Pareto forms; `logs` and
-  `dss` also work on the wrapper (R exposes no logs/dss counterparts).
+  point-mass exponential, uniform and generalised Pareto forms. As in R, `logs`
+  and `dss` do not take the wrapper.
 - Sample/ensemble forecasts: `crps` (empirical and kernel-density), `logs`,
   `dss` on vectors; the energy score `es`, variogram score `vs` and
   maximum-mean-discrepancy score `mmds` on multivariate ensembles. The sample

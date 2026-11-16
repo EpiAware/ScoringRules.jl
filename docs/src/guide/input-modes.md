@@ -6,10 +6,11 @@ argument, so you rarely need to think about which method you are calling.
 
 ## Parametric forecasts (Distributions.jl)
 
-Pass any `UnivariateDistribution` from
+Pass a distribution from
 [Distributions.jl](https://github.com/JuliaStats/Distributions.jl) as the
-first argument. The package uses a closed-form CRPS where one exists; it falls
-back to adaptive quadrature otherwise.
+first argument. Each family R scoringRules scores has a closed form; see
+[Supported distributions](@ref supported-distributions) for which families
+each score takes.
 
 ```@example modes
 using ScoringRules, Distributions
