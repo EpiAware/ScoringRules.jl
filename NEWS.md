@@ -40,9 +40,10 @@ Lerch and Allen). See the README for attribution and provenance.
   probability score `rps`, and the moment-based `dss_moments` and `ess_moments`
   (error-spread score of Christensen, Moroz and Palmer 2015).
 - `quantile_score` over a vector of quantile levels returns the mean pinball loss, the same scalar shape every other score in the package returns. Pass `reduce = identity` for one score per level, or another reduction such as `sum`.
-- Every scoring function is checked against R `scoringRules` in the test
-  suite, at commit `4d2f12f` of its GitHub master, which fixes the log-logistic
-  DSS of the 1.1.3 release.
+- Every scoring function is checked against R `scoringRules` 1.1.3 in the test
+  suite. Problems found in R while porting were reported upstream, and where R
+  has fixed one since 1.1.3, as with the variance in the log-logistic DSS, the
+  tests check against the fix.
 - `dss` returns `NaN` whenever the forecast variance is not finite and
   positive (for example t with `df ≤ 2`, GEV/GPD with `shape ≥ 1/2`,
   log-Laplace with `σ ≥ 1/2`, log-logistic with `β ≤ 2`), matching R.

@@ -2,8 +2,7 @@
 
 ScoringRules.jl is a port of the R `scoringRules` package, so its numbers should
 match the original. This page recomputes that agreement **live on every docs
-build**: it loads reference values generated from R `scoringRules` at commit
-`4d2f12f` of its GitHub master, which adds fixes made after the 1.1.3 release
+build**: it loads reference values generated from R `scoringRules` 1.1.3
 (committed under `test/references/data/`, produced by
 `test/references/generate_references.R`), computes the same quantities in Julia,
 and reports the difference. Nothing here is hand-copied.
