@@ -13,6 +13,13 @@
     # plain Float64 sum is a few eps from one.
     @test rps(fill(1 / 14, 14), 1) ≈ 4.178571428571429  # R: rps_probs(1, rep(1/14, 14))
     @test all(K -> isfinite(rps(fill(1 / K, K), 1)), 2:60)
+    # The default tolerance is one eps of the forecast's own precision.
+    @test rps(Float32[0.3, 0.3, 0.4], 2) ≈ rps([0.3, 0.3, 0.4], 2) rtol = 1.0e-6
+    @test_throws ArgumentError rps(Float32[0.5, 0.5 + 2 * eps(Float32)], 1)
+    @test all(1:2000) do i
+        p = Float32[mod(i * k * 0.6180339887498949, 1) + 0.01 for k in 1:(2 + i % 49)]
+        isfinite(rps(p ./ Float32(sum(big, p)), 1))
+    end
     # Vectors of 2 to 50 categories from a golden-ratio sequence, normalised as
     # R's `p / sum(p)` does, with the sum taken to extended precision.
     @test all(1:2000) do i

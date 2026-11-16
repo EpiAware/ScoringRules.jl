@@ -60,12 +60,18 @@ function _accurate_sum(p::AbstractVector)
     return s + c
 end
 
+# R's default `tol` is one `eps` of its double precision. The same tolerance in
+# the forecast's own precision: a `Float32` vector cannot sum to one within a
+# `Float64` `eps`.
+_rps_default_tol(::AbstractVector{T}) where {T <: AbstractFloat} = eps(T)
+_rps_default_tol(::AbstractVector) = eps(Float64)
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 """
-    rps(p, y; tol = eps(Float64))
+    rps(p, y; tol = eps(eltype(p)))
 
 Ranked Probability Score (RPS; Epstein 1969) for a categorical / ordinal
 forecast.
@@ -75,7 +81,9 @@ forecast.
         categories.  Must be non-negative and sum to 1.
 - `y` — observed outcome category as an `Integer` in `{1, …, K}`, where
         `y = 1` is the smallest and `y = K` is the largest category.
-- `tol` — how far the sum of `p` may lie from 1, as in R's `rps_probs`.
+- `tol` — how far the sum of `p` may lie from 1, as in R's `rps_probs`;
+        one `eps` of the element type of `p` by default (of `Float64` for an
+        integer or rational `p`).
         Negative probabilities, a sum further from 1 and fewer than two
         categories throw an `ArgumentError`, as R stops on them.
 
@@ -103,7 +111,7 @@ p = [0.3, 0.2, 0.5]
 rps(p, 2)
 ```
 """
-function rps(p::AbstractVector, y::Integer; tol::Real = eps(Float64))
+function rps(p::AbstractVector, y::Integer; tol::Real = _rps_default_tol(p))
     length(p) >= 2 ||
         throw(ArgumentError("need at least 2 outcome categories, got $(length(p))"))
     tol >= 0 || throw(ArgumentError("tol must be non-negative, got $tol"))
