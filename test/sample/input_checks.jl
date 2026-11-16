@@ -16,6 +16,8 @@
     # The default tolerance is one eps of the forecast's own precision.
     @test rps(Float32[0.3, 0.3, 0.4], 2) ≈ rps([0.3, 0.3, 0.4], 2) rtol = 1.0e-6
     @test_throws ArgumentError rps(Float32[0.5, 0.5 + 2 * eps(Float32)], 1)
+    # A wider type keeps R's tolerance.
+    @test rps(big.([0.1, 0.2, 0.7]), 2) ≈ rps([0.1, 0.2, 0.7], 2)
     @test all(1:2000) do i
         p = Float32[mod(i * k * 0.6180339887498949, 1) + 0.01 for k in 1:(2 + i % 49)]
         isfinite(rps(p ./ Float32(sum(big, p)), 1))

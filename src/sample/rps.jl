@@ -60,10 +60,10 @@ function _accurate_sum(p::AbstractVector)
     return s + c
 end
 
-# R's default `tol` is one `eps` of its double precision. The same tolerance in
-# the forecast's own precision: a `Float32` vector cannot sum to one within a
-# `Float64` `eps`.
-_rps_default_tol(::AbstractVector{T}) where {T <: AbstractFloat} = eps(T)
+# R's default `tol` is one `eps` of its double precision. A narrower type gets
+# its own `eps`, since a `Float32` vector cannot sum to one within a `Float64`
+# one; a wider type keeps R's, which values widened from `Float64` meet.
+_rps_default_tol(::AbstractVector{T}) where {T <: AbstractFloat} = max(eps(T), eps(Float64))
 _rps_default_tol(::AbstractVector) = eps(Float64)
 
 # ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ _rps_default_tol(::AbstractVector) = eps(Float64)
 # ---------------------------------------------------------------------------
 
 """
-    rps(p, y; tol = eps(eltype(p)))
+    rps(p, y; tol = max(eps(eltype(p)), eps(Float64)))
 
 Ranked Probability Score (RPS; Epstein 1969) for a categorical / ordinal
 forecast.
@@ -82,8 +82,8 @@ forecast.
 - `y` — observed outcome category as an `Integer` in `{1, …, K}`, where
         `y = 1` is the smallest and `y = K` is the largest category.
 - `tol` — how far the sum of `p` may lie from 1, as in R's `rps_probs`;
-        one `eps` of the element type of `p` by default (of `Float64` for an
-        integer or rational `p`).
+        by default one `eps` of `Float64`, as in R, or the element type's own
+        `eps` where that is larger, as for `Float32`.
         Negative probabilities, a sum further from 1 and fewer than two
         categories throw an `ArgumentError`, as R stops on them.
 
