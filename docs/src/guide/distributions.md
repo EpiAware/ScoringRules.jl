@@ -12,11 +12,12 @@ functions for. `logs` evaluates `-logpdf(d, y)`, and `dss` needs only
 `mean(d)` and `var(d)`.
 
 - `logs`: normal, Student-t (location-scale) and logistic, each also truncated;
-  Laplace, `LogLaplace`, exponential, gamma, beta, uniform, log-normal,
-  log-logistic, GEV, GPD, `TwoPieceNormal`, `TwoPieceExponential`, a mixture of
+  Laplace, `LogLaplace`, exponential (also shifted, `location + Exponential(θ)`),
+  gamma, beta (also on an interval, `lower + (upper - lower) * Beta(a, b)`),
+  uniform, log-normal, log-logistic, GEV, GPD, `TwoPieceNormal`, `TwoPieceExponential`, a mixture of
   normals, Poisson, negative binomial, binomial and hypergeometric.
 - `dss`: normal, Student-t (location-scale), logistic, Laplace, `LogLaplace`,
-  exponential, gamma, beta, uniform, log-normal, log-logistic, GEV, GPD, a
+  exponential, gamma, beta (also on an interval), uniform, log-normal, log-logistic, GEV, GPD, a
   mixture of normals, Poisson and negative binomial.
 
 Any other family throws a `MethodError`.
@@ -43,8 +44,10 @@ valid; outside these constraints the function returns `NaN`.
 | Censored Student-t | `censored(LocationScale(μ, σ, TDist(ν)); ...)` | — |
 | Laplace | `Laplace(μ, θ)` | — |
 | Exponential | `Exponential(θ)` | — |
+| Shifted exponential | `location + Exponential(θ)` | positive scale |
 | Gamma | `Gamma(α, θ)` | α > 0, θ > 0 |
 | Beta | `Beta(α, β)` | — |
+| Beta on an interval | `lower + (upper - lower) * Beta(α, β)` | — |
 | Uniform | `Uniform(a, b)` | — |
 | Log-Normal | `LogNormal(μ, σ)` | — |
 | Log-Logistic (Fisk) | `LogLogistic(α, β)` | β > 1 (i.e. scale < 1) |

@@ -12,11 +12,14 @@
 # Forecast families R scoringRules has a `logs_*` function for.
 const _TDistLocScale = Distributions.LocationScale{<:Real, Continuous, <:TDist}
 const _NormalMixture = MixtureModel{Univariate, Continuous, <:Normal}
+const _BetaLocScale = Distributions.LocationScale{<:Real, Continuous, <:Beta}
+const _ExpLocScale = Distributions.LocationScale{<:Real, Continuous, <:Exponential}
 const _LogsForecast = Union{
     Normal, Truncated{<:Normal}, TDist, _TDistLocScale, Truncated{<:TDist},
     Truncated{<:_TDistLocScale}, Logistic, Truncated{<:Logistic}, Laplace,
-    LogLaplace, Exponential, Gamma, Beta, Uniform, LogNormal, LogLogistic,
-    GeneralizedExtremeValue, GeneralizedPareto, TwoPieceNormal,
+    LogLaplace, Exponential, _ExpLocScale, Gamma, Beta, _BetaLocScale, Uniform,
+    LogNormal, LogLogistic, GeneralizedExtremeValue, GeneralizedPareto,
+    TwoPieceNormal,
     TwoPieceExponential, _NormalMixture, Poisson, NegativeBinomial, Binomial,
     Hypergeometric,
 }
@@ -24,7 +27,8 @@ const _LogsForecast = Union{
 # Forecast families R scoringRules has a `dss_*` function for.
 const _DssForecast = Union{
     Normal, TDist, _TDistLocScale, Logistic, Laplace, LogLaplace, Exponential,
-    Gamma, Beta, Uniform, LogNormal, LogLogistic, GeneralizedExtremeValue,
+    Gamma, Beta, _BetaLocScale, Uniform, LogNormal, LogLogistic,
+    GeneralizedExtremeValue,
     GeneralizedPareto, _NormalMixture, Poisson, NegativeBinomial,
 }
 
@@ -39,8 +43,8 @@ equal to the negative log-likelihood `-logpdf(d, y)` (or `-logpmf` for discrete
 
   - `d`: forecast distribution, from a family R scoringRules has a `logs_*`
     function for: normal, Student-t (location-scale), logistic and their
-    truncations, Laplace, [`LogLaplace`](@ref), exponential, gamma, beta,
-    uniform, log-normal, log-logistic, GEV, GPD, [`TwoPieceNormal`](@ref),
+    truncations, Laplace, [`LogLaplace`](@ref), exponential (also shifted),
+    gamma, beta (also on an interval), uniform, log-normal, log-logistic, GEV, GPD, [`TwoPieceNormal`](@ref),
     [`TwoPieceExponential`](@ref), a mixture of normals, Poisson, negative
     binomial, binomial and hypergeometric.
   - `y`: scalar observation.
@@ -75,8 +79,9 @@ the `dss_*` functions in R scoringRules.
 
   - `d`: forecast distribution, from a family R scoringRules has a `dss_*`
     function for: normal, Student-t (location-scale), logistic, Laplace,
-    [`LogLaplace`](@ref), exponential, gamma, beta, uniform, log-normal,
-    log-logistic, GEV, GPD, a mixture of normals, Poisson and negative binomial.
+    [`LogLaplace`](@ref), exponential, gamma, beta (also on an interval),
+    uniform, log-normal, log-logistic, GEV, GPD, a mixture of normals, Poisson
+    and negative binomial.
   - `y`: scalar observation.
 
 # Example
