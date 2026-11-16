@@ -324,8 +324,12 @@ g$dss  <- dss_pois(g$y, lambda = g$lambda)
 write_ref("pois", g)
 
 ## ---- Negative binomial ----------------------------------------------------
-g <- grid(size = c(1, 3, 10), prob = c(0.3, 0.5, 0.8),
-          y = c(0, 1, 3, 10, 20))
+# size past 40, where the Gauss series for the hypergeometric factor starts to
+# lose digits, and a small success probability, which pushes its argument out.
+# Half-integer sizes are left out: R returns -Inf for some of them (2.5 and 5.5
+# at prob = 0.3, 10.5 at prob = 0.7).
+g <- grid(size = c(1, 3, 10, 40, 100, 200, 1000), prob = c(0.05, 0.3, 0.5, 0.8),
+          y = c(0, 1, 3, 10, 20, 100))
 g$crps <- crps_nbinom(g$y, size = g$size, prob = g$prob)
 g$logs <- logs_nbinom(g$y, size = g$size, prob = g$prob)
 g$dss  <- dss_nbinom(g$y, size = g$size, prob = g$prob)

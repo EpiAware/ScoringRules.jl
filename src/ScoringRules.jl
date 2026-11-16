@@ -41,7 +41,7 @@ using SpecialFunctions: erfc, gamma, digamma, logbeta,
     besseli, expinti
 using EpiAwareADTools: cdf_ad_safe, ccdf_ad_safe
 using LogExpFunctions: log1pexp, logistic
-using HypergeometricFunctions: _₂F₁
+using QuadGK: quadgk
 using Statistics: mean, var, std, quantile
 using LinearAlgebra: norm
 using Random: AbstractRNG

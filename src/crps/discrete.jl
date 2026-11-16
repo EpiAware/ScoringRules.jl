@@ -7,7 +7,7 @@
 #
 # Module-level imports required (in addition to those already in ScoringRules.jl):
 #   using SpecialFunctions: besseli      (for Poisson)
-#   using HypergeometricFunctions: _₂F₁ (for NegativeBinomial; already imported)
+#   using QuadGK: quadgk                 (for the NegativeBinomial ₂F₁)
 
 # ── Poisson ────────────────────────────────────────────────────────────────
 # Formula from Jordan et al. (2019), translating crps_pois in scores_pois.R.
@@ -43,7 +43,50 @@ crps(d::Poisson, y::Real) = _crps_pois(y, d.λ)
 #   Distributions.NegativeBinomial(r, p): r = size (number of successes),
 #   p = prob (success probability); mean = r*(1-p)/p.
 #
-# The hypergeometric function call is `_₂F₁(size+1, 0.5, 2, -4*c2)`.
+# The hypergeometric factor is `₂F₁(size+1, ½; 2; −4·c2)`, evaluated through
+# `_f21_half_two` below.
+
+# `₂F₁(a, ½; 2; −Z)` for `Z ≥ 0`, from the Euler integral
+#
+#   ₂F₁(a, b; c; z) = B(b, c−b)⁻¹ ∫₀¹ t^{b−1} (1−t)^{c−b−1} (1−zt)^{−a} dt,
+#
+# with `t = sin²θ` clearing the `t^{−1/2}` endpoint singularity:
+#
+#   ₂F₁(a, ½; 2; −Z) = (4/π) ∫₀^{π/2} cos²θ · (1 + Z sin²θ)^{−a} dθ.
+#
+# For `Z ≥ 0` the integrand is smooth and bounded by 1, so the quadrature is
+# accurate for every `a > 0`. The Gauss series that `HypergeometricFunctions`
+# sums instead returns `NaN` from `a ≈ 100` at the `Z ≈ 31` of a `prob = 0.3`
+# forecast, where R's `hypergeo` series is still finite.
+function _f21_half_two(a::Real, Z::Real)
+    (Z < 0 || isnan(Z) || isnan(a)) && return oftype(float(a) * float(Z), NaN)
+    hi = Float64(π) / 2
+    integrand = θ -> cos(θ)^2 * exp(-a * log1p(Z * sin(θ)^2))
+    # The integrand is a peak at θ = 0 whose half-width is about 1/√(aZ).
+    # Left to choose its own first panel over the whole interval, `quadgk`
+    # places its lowest node at θ ≈ 0.0067, and once `a·log1p(Z·sin²θ)` passes
+    # 745 there the integrand underflows to zero at every node it looks at: the
+    # estimate and its error are both zero, the tolerance test passes, and the
+    # function returns 0 having subdivided nothing. That made
+    # `crps(NegativeBinomial(724, 0.01), 71680)` 2136 instead of 626, with the
+    # knife edge one unit of `size` away. Splitting at geometric multiples of
+    # the half-width puts nodes where the mass is, whatever the parameters.
+    #
+    # The half-width is taken as `1/(√a·√Z)`: the product `a·Z` overflows for
+    # a `prob` below about 1e-154, and a step of exactly zero never grows.
+    # An infinite `Z` leaves nothing to integrate, the integrand being zero
+    # for every θ > 0.
+    isinf(Z) && return zero(float(a) * float(Z))
+    segments = Float64[]
+    step = 1 / (8 * max(sqrt(a) * sqrt(Z), 1.0))
+    while step < hi
+        push!(segments, step)
+        step *= 4
+    end
+    val, _ = quadgk(integrand, 0.0, segments..., hi; rtol = 1.0e-13)
+    return 4 * val / π
+end
+
 """
 CRPS of a `NegativeBinomial(size, prob)` forecast, in closed form.
 """
@@ -54,7 +97,7 @@ function _crps_nbinom(y::Real, size::Real, prob::Real)
     c3 = (
         prob * (2 * cdf(NegativeBinomial(size + 1, prob), y - 1) - 1)
             +
-            _₂F₁(size + 1, 0.5, 2.0, -4 * c2)
+            _f21_half_two(size + 1, 4 * c2)
     )
     return c1 - size * c2 * c3
 end
