@@ -41,7 +41,9 @@ grid <- function(...) expand.grid(..., KEEP.OUT.ATTRS = FALSE,
                                   stringsAsFactors = FALSE)
 
 ## ---- normal ---------------------------------------------------------------
-g <- grid(mean = c(-3, 0, 2.5), sd = c(0.5, 1, 4),
+# sd = 0 is the point forecast at the mean, where the closed form has to be
+# taken to its limit rather than evaluated.
+g <- grid(mean = c(-3, 0, 2.5), sd = c(0, 0.5, 1, 4),
           y = c(-6, -1, 0, 0.7, 3, 8))
 g$crps <- crps_norm(g$y, mean = g$mean, sd = g$sd)
 g$logs <- logs_norm(g$y, mean = g$mean, sd = g$sd)
