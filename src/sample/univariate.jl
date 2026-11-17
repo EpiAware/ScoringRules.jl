@@ -237,7 +237,7 @@ function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing, w = nothing)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     if bw_val == 0
         hit = any(i -> dat[i] == y && (w === nothing || w[i] > 0), eachindex(dat))
-        return hit ? -Inf : Inf
+        return hit ? -Inf : isnan(y) ? NaN : Inf
     end
     # KDE density at y: Σ_i wᵢ φ_{bw}(y − datᵢ) / Σ_i wᵢ
     # log score = −log density
@@ -323,10 +323,16 @@ function clogs(
         den /= n
     end
     inside = a < y < b
-    if cens
-        return inside ? -log(den) : -log1p(-mass)
+    ls = -log(den)
+    # R forms the score as w(y)·ls + log(P^w(y)), less log(P^w(y)) again when
+    # censored. An infinite ls outside the window then gives 0·Inf, and a
+    # censored score inside an empty window log(0) − log(0): NaN either way.
+    if inside
+        cens && iszero(mass) && return NaN
+        return cens ? ls : log(mass) + ls
     else
-        return inside ? log(mass) - log(den) : 0.0
+        isfinite(ls) || return NaN
+        return cens ? -log1p(-mass) : 0.0
     end
 end
 

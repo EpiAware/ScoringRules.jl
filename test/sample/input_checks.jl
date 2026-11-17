@@ -67,17 +67,15 @@
         @test clogs(d0, 0.5; a = 0.2, b = 2.0, bw = 0, cens) == Inf
         @test clogs(d0, 5.0; bw = 0, cens) == Inf
     end
-    # With y outside the window, R's clogs_sample returns NaN at bw = 0, from
-    # 0 * Inf. The censored score is -log(1 - P), with the window mass P from
-    # R: pmixnC(c(0, 1, 1, 3), rep(0, 4), b) - pmixnC(..., a).
-    @test clogs(d0, 5.0; a = 0.2, b = 2.0, bw = 0) ≈ -log(1 - 0.5)
-    @test clogs(d0, 1.0; a = 0.0, b = 1.0, bw = 0) ≈ -log(1 - 0.5)
-    # A window holding no member: the conditional score is NaN, as in R; the
-    # censored score is the -log of a zero density, where R adds and takes
-    # away log(0) and gets NaN.
-    @test isnan(clogs(d0, 5.0; a = 4.0, b = 6.0, bw = 0, cens = false))
-    @test clogs(d0, 5.0; a = 4.0, b = 6.0, bw = 0) == Inf
-    @test clogs(d0, 5.0; a = 0.2, b = 2.0, bw = 0, cens = false) == 0
+    # R gives NaN with y outside the window, and for the censored score in a
+    # window holding no member.
+    for cens in (true, false)
+        @test isnan(clogs(d0, 5.0; a = 0.2, b = 2.0, bw = 0, cens))
+        @test isnan(clogs(d0, 1.0; a = 0.0, b = 1.0, bw = 0, cens))
+        @test isnan(clogs(d0, 0.5; a = 4.0, b = 6.0, bw = 0, cens))
+        @test isnan(clogs(d0, 5.0; a = 4.0, b = 6.0, bw = 0, cens))
+    end
+    @test isnan(logs(d0, NaN; bw = 0))
 
     # ints_quantiles stops when the lower end is above the upper one.
     @test_throws ArgumentError interval_score(2.0, 1.0, 1.5, 0.8)
