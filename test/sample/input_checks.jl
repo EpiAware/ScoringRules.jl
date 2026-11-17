@@ -51,6 +51,34 @@
     @test_throws ArgumentError clogs(d, 0.3; bw = -0.5)
     @test crps(d, 0.3; method = :kde, bw = 0) ≈ 0.1555556 rtol = 1.0e-6  # R: crps_sample(0.3, d, "kde", bw = 0)
 
+    # At bw = 0 the log scores see point masses at the members.
+    # R: logs_sample(y, c(0, 1, 1, 3), bw = 0).
+    d0 = [0.0, 1.0, 1.0, 3.0]
+    @test logs(d0, 1.0; bw = 0) == -Inf
+    @test logs(d0, 0.5; bw = 0) == Inf
+    @test logs(d0, 5.0; bw = 0) == Inf
+    # R: clogs_sample(y, c(0, 1, 1, 3), a, b, bw = 0, cens), y inside (a, b).
+    for cens in (true, false)
+        @test clogs(d0, 1.0; bw = 0, cens) == -Inf
+        @test clogs(d0, 1.0; a = 0.2, b = 2.0, bw = 0, cens) == -Inf
+        @test clogs(d0, 1.0; a = -1.0, b = 2.0, bw = 0, cens) == -Inf
+        @test clogs(d0, 0.5; bw = 0, cens) == Inf
+        @test clogs(d0, 0.5; a = 0.0, b = 1.0, bw = 0, cens) == Inf
+        @test clogs(d0, 0.5; a = 0.2, b = 2.0, bw = 0, cens) == Inf
+        @test clogs(d0, 5.0; bw = 0, cens) == Inf
+    end
+    # With y outside the window, R's clogs_sample returns NaN at bw = 0, from
+    # 0 * Inf. The censored score is -log(1 - P), with the window mass P from
+    # R: pmixnC(c(0, 1, 1, 3), rep(0, 4), b) - pmixnC(..., a).
+    @test clogs(d0, 5.0; a = 0.2, b = 2.0, bw = 0) ≈ -log(1 - 0.5)
+    @test clogs(d0, 1.0; a = 0.0, b = 1.0, bw = 0) ≈ -log(1 - 0.5)
+    # A window holding no member: the conditional score is NaN, as in R; the
+    # censored score is the -log of a zero density, where R adds and takes
+    # away log(0) and gets NaN.
+    @test isnan(clogs(d0, 5.0; a = 4.0, b = 6.0, bw = 0, cens = false))
+    @test clogs(d0, 5.0; a = 4.0, b = 6.0, bw = 0) == Inf
+    @test clogs(d0, 5.0; a = 0.2, b = 2.0, bw = 0, cens = false) == 0
+
     # ints_quantiles stops when the lower end is above the upper one.
     @test_throws ArgumentError interval_score(2.0, 1.0, 1.5, 0.8)
     @test interval_score(1.0, 1.0, 1.5, 0.8) ≈ 5.0  # R: ints_quantiles(1.5, 1, 1, 0.8)

@@ -119,7 +119,12 @@ function _check_nonempty(dat::AbstractVector)
     return nothing
 end
 
-# R stops on a negative kernel bandwidth; zero is allowed.
+# R stops on a negative kernel bandwidth; zero is allowed. A zero bandwidth
+# makes the kernel density estimate the ensemble itself, point masses at the
+# members, where the kernel formula would divide zero by zero. The log scores
+# then follow R: the density is infinite at a member and zero elsewhere, and
+# the window mass in `clogs` is the share of members in `(a, b]`, from R's
+# right-continuous step CDF.
 function _check_bw(bw)
     bw === nothing || bw >= 0 ||
         throw(ArgumentError("the bandwidth bw must not be negative, got $bw"))
@@ -230,6 +235,10 @@ function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing, w = nothing)
     w === nothing || _check_member_weights(dat, w)
     _check_bw(bw)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
+    if bw_val == 0
+        hit = any(i -> dat[i] == y && (w === nothing || w[i] > 0), eachindex(dat))
+        return hit ? -Inf : Inf
+    end
     # KDE density at y: Σ_i wᵢ φ_{bw}(y − datᵢ) / Σ_i wᵢ
     # log score = −log density
     den = 0.0
@@ -300,14 +309,19 @@ function clogs(
     n = length(dat)
     # KDE mass in the window, P = F̂(b) − F̂(a), and KDE density at y; the KDE
     # is an equally weighted normal mixture with the bandwidth as common sd.
-    mass = 0.0
-    den = 0.0
-    @inbounds for x in dat
-        mass += _norm_cdf((b - x) / bw_val) - _norm_cdf((a - x) / bw_val)
-        den += _norm_pdf((y - x) / bw_val) / bw_val
+    if bw_val == 0
+        mass = count(x -> a < x <= b, dat) / n
+        den = any(==(y), dat) ? Inf : 0.0
+    else
+        mass = 0.0
+        den = 0.0
+        @inbounds for x in dat
+            mass += _norm_cdf((b - x) / bw_val) - _norm_cdf((a - x) / bw_val)
+            den += _norm_pdf((y - x) / bw_val) / bw_val
+        end
+        mass /= n
+        den /= n
     end
-    mass /= n
-    den /= n
     inside = a < y < b
     if cens
         return inside ? -log(den) : -log1p(-mass)
