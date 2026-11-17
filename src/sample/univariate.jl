@@ -112,6 +112,20 @@ end
 # Public methods on AbstractVector (ensemble forecasts)
 # ---------------------------------------------------------------------------
 
+# R's sample scores reject an ensemble with no members; an empty mean or sum
+# would otherwise give NaN, or an error from deep inside the computation.
+function _check_nonempty(dat::AbstractVector)
+    isempty(dat) && throw(ArgumentError("the ensemble `dat` must not be empty"))
+    return nothing
+end
+
+# R stops on a negative kernel bandwidth; zero is allowed.
+function _check_bw(bw)
+    bw === nothing || bw >= 0 ||
+        throw(ArgumentError("the bandwidth bw must not be negative, got $bw"))
+    return nothing
+end
+
 """
     crps(dat::AbstractVector{<:Real}, y::Real; method=:edf, w=nothing, bw=nothing)
 
@@ -158,6 +172,7 @@ function crps(
         dat::AbstractVector{<:Real}, y::Real;
         method::Symbol = :edf, w = nothing, bw = nothing
     )
+    _check_nonempty(dat)
     if method === :edf
         if w === nothing
             return _crps_edf_unweighted(y, dat)
@@ -167,6 +182,7 @@ function crps(
     elseif method === :kde
         w === nothing ||
             @warn "the `w` argument is ignored for method = :kde" maxlog = 1
+        _check_bw(bw)
         return _crps_kde(y, dat, bw)
     else
         throw(ArgumentError("method must be :edf or :kde, got :$method"))
@@ -205,6 +221,8 @@ logs(dat, 0.5)
 ```
 """
 function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing)
+    _check_nonempty(dat)
+    _check_bw(bw)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     n = length(dat)
     den = 0.0
@@ -266,6 +284,8 @@ function clogs(
         dat::AbstractVector{<:Real}, y::Real;
         a::Real = -Inf, b::Real = Inf, bw = nothing, cens::Bool = true
     )
+    _check_nonempty(dat)
+    _check_bw(bw)
     a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     n = length(dat)
@@ -327,6 +347,7 @@ dss(dat, 0.5)
 ```
 """
 function dss(dat::AbstractVector{<:Real}, y::Real; w = nothing)
+    _check_nonempty(dat)
     if w === nothing
         m = mean(dat)
         # Population variance: mean(dat.^2) - mean(dat).^2  (matches R dss_edf)
