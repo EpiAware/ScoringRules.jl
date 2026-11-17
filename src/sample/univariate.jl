@@ -190,16 +190,13 @@ function crps(
 end
 
 """
-    logs(dat::AbstractVector{<:Real}, y::Real; bw=nothing, w=nothing)
+    logs(dat::AbstractVector{<:Real}, y::Real; bw=nothing)
 
 Logarithmic score of an ensemble forecast `dat` (a vector of `m` simulation
 draws) at observation `y` using Gaussian kernel density estimation.
 
 If `bw` is `nothing`, Silverman's rule-of-thumb bandwidth is used (matching
-R's `bw.nrd`).  Optional finite, non-negative member weights `w` (length `m`) are
-normalised to sum to one internally, so the KDE density becomes
-``\\sum_i w_i \\varphi_{bw}(y - dat_i) / \\sum_i w_i``.  The rule-of-thumb
-bandwidth is computed from `dat` alone and does not use `w`.  Lower is better.
+R's `bw.nrd`).  Lower is better.
 
 # Arguments
 
@@ -209,13 +206,11 @@ bandwidth is computed from `dat` alone and does not use `w`.  Lower is better.
 # Keyword Arguments
 
   - `bw`: optional bandwidth; defaults to Silverman's rule-of-thumb.
-  - `w`: optional finite, non-negative member weight vector (length `m`) with a positive sum.
 
 # Provenance
 
 Ported from `logs_sample` / `lsmixnC` in R scoringRules (scores_sample_univ.R;
-mixn.cpp; Jordan, Krüger, Lerch, Allen).  The `w` keyword extends the R
-interface, which has no member weights for `logs_sample`.
+mixn.cpp; Jordan, Krüger, Lerch, Allen).
 
 # Example
 
@@ -225,21 +220,16 @@ dat = randn(100)
 logs(dat, 0.5)
 ```
 """
-function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing, w = nothing)
+function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing)
     _check_nonempty(dat)
-    w === nothing || _check_member_weights(dat, w)
     _check_bw(bw)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
-    # KDE density at y: Σ_i wᵢ φ_{bw}(y − datᵢ) / Σ_i wᵢ
-    # log score = −log density
+    # KDE density at y: the mean of φ_{bw}(y − datᵢ); log score = −log density
     den = 0.0
-    wsum = 0.0
-    @inbounds for i in eachindex(dat)
-        wi = w === nothing ? 1.0 : w[i]
-        wsum += wi
-        den += wi * _norm_pdf((y - dat[i]) / bw_val) / bw_val
+    @inbounds for x in dat
+        den += _norm_pdf((y - x) / bw_val) / bw_val
     end
-    return -log(den / wsum)
+    return -log(den / length(dat))
 end
 
 """
