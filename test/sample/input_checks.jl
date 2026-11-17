@@ -51,6 +51,32 @@
     @test_throws ArgumentError clogs(d, 0.3; bw = -0.5)
     @test crps(d, 0.3; method = :kde, bw = 0) ≈ 0.1555556 rtol = 1.0e-6  # R: crps_sample(0.3, d, "kde", bw = 0)
 
+    # At bw = 0 the log scores see point masses at the members.
+    # R: logs_sample(y, c(0, 1, 1, 3), bw = 0).
+    d0 = [0.0, 1.0, 1.0, 3.0]
+    @test logs(d0, 1.0; bw = 0) == -Inf
+    @test logs(d0, 0.5; bw = 0) == Inf
+    @test logs(d0, 5.0; bw = 0) == Inf
+    # R: clogs_sample(y, c(0, 1, 1, 3), a, b, bw = 0, cens), y inside (a, b).
+    for cens in (true, false)
+        @test clogs(d0, 1.0; bw = 0, cens) == -Inf
+        @test clogs(d0, 1.0; a = 0.2, b = 2.0, bw = 0, cens) == -Inf
+        @test clogs(d0, 1.0; a = -1.0, b = 2.0, bw = 0, cens) == -Inf
+        @test clogs(d0, 0.5; bw = 0, cens) == Inf
+        @test clogs(d0, 0.5; a = 0.0, b = 1.0, bw = 0, cens) == Inf
+        @test clogs(d0, 0.5; a = 0.2, b = 2.0, bw = 0, cens) == Inf
+        @test clogs(d0, 5.0; bw = 0, cens) == Inf
+    end
+    # R gives NaN with y outside the window, and for the censored score in a
+    # window holding no member.
+    for cens in (true, false)
+        @test isnan(clogs(d0, 5.0; a = 0.2, b = 2.0, bw = 0, cens))
+        @test isnan(clogs(d0, 1.0; a = 0.0, b = 1.0, bw = 0, cens))
+        @test isnan(clogs(d0, 0.5; a = 4.0, b = 6.0, bw = 0, cens))
+        @test isnan(clogs(d0, 5.0; a = 4.0, b = 6.0, bw = 0, cens))
+    end
+    @test isnan(logs(d0, NaN; bw = 0))
+
     # ints_quantiles stops when the lower end is above the upper one.
     @test_throws ArgumentError interval_score(2.0, 1.0, 1.5, 0.8)
     @test interval_score(1.0, 1.0, 1.5, 0.8) ≈ 5.0  # R: ints_quantiles(1.5, 1, 1, 0.8)
