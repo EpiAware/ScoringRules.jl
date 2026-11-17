@@ -87,6 +87,14 @@ end
         @test_throws ArgumentError score([0.1, bad, 0.9, 1.3], 0.4)
     end
 
+    # The kernel bandwidth goes through the same check. R: crps_sample(0.4, d,
+    # method = "kde", bw = Inf), logs_sample and clogs_sample likewise.
+    for bw in (Inf, NaN)
+        @test_throws ArgumentError crps(d, 0.4; method = :kde, bw)
+        @test_throws ArgumentError logs(d, 0.4; bw)
+        @test_throws ArgumentError clogs(d, 0.4; a = 0.0, b = 1.0, bw)
+    end
+
     # twcrps_sample checks the chained values instead, so an infinite value the
     # default chaining clamps into (a, b) is scored. R: twcrps_sample(y, dat,
     # a = 0, b = 1).

@@ -129,10 +129,10 @@ function _check_finite_sample(dat::AbstractVector, y::Real)
     return nothing
 end
 
-# R stops on a negative kernel bandwidth; zero is allowed.
+# R stops on a negative, infinite or missing kernel bandwidth; zero is allowed.
 function _check_bw(bw)
-    bw === nothing || bw >= 0 ||
-        throw(ArgumentError("the bandwidth bw must not be negative, got $bw"))
+    bw === nothing || (isfinite(bw) && bw >= 0) ||
+        throw(ArgumentError("the bandwidth bw must be finite and non-negative, got $bw"))
     return nothing
 end
 
