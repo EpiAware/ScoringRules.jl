@@ -222,6 +222,7 @@ function quantile_score(
         alpha::Real, type::Int = 7
     )
     _check_nonempty(dat)
+    _check_finite_sample(dat, y)
     0 < alpha < 1 || throw(ArgumentError("alpha must lie strictly in (0, 1), got $alpha"))
     q_hat = _quantile_hf(dat, alpha, type)
     return _qs_quantile(y, q_hat, alpha)
@@ -301,6 +302,7 @@ function interval_score(
         level::Real, type::Int = 7
     )
     _check_nonempty(dat)
+    _check_finite_sample(dat, y)
     0 < level < 1 || throw(ArgumentError("level must lie strictly in (0, 1), got $level"))
     alpha1 = 0.5 * (1 - level)
     alpha2 = 1 - alpha1
