@@ -15,7 +15,7 @@
 
   <!-- hexagon frame -->
   <path d="M100 3 L8 60.75 L8 170.25 L100 228 L192 170.25 L192 60.75 Z"
-        fill="#1a1a2e" stroke="#e8e8f0" stroke-width="5" stroke-linejoin="round"/>
+        fill="#f7f7fb" stroke="#1a1a2e" stroke-width="5" stroke-linejoin="round"/>
 
   <!-- CRPS area between the CDF and the step: under the CDF left of the
        observation, over the CDF to its right -->
@@ -33,5 +33,5 @@
         stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- the observation y -->
-  <circle cx="100" cy="172" r="8" fill="#cb3c33" stroke="#1a1a2e" stroke-width="2.5"/>
+  <circle cx="100" cy="172" r="8" fill="#cb3c33" stroke="#f7f7fb" stroke-width="2.5"/>
 </svg>
