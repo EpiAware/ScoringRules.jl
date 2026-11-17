@@ -209,7 +209,8 @@ twcrps(dat, y1d; chain_func = v)
 The six shapes are `:norm_cdf`, `:norm_surv`, `:norm_pdf`, `:logis_cdf`,
 `:logis_surv` and `:logis_pdf`. Pass length-`d` `mu` and `sigma` for a
 multivariate forecast, where the weight becomes the product over dimensions and
-the chaining function applies element-wise:
+the chaining function applies element-wise. As in R, a weight built with scalar
+parameters is univariate only:
 
 ```@example ref
 wm = weight_function(:norm_surv; mu = zeros(d), sigma = ones(d))

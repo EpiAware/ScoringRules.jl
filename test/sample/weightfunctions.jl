@@ -94,19 +94,22 @@ end
     @test_throws DimensionMismatch chaining_function(:norm_cdf; mu = Float64[], sigma = Float64[])
     @test_throws DimensionMismatch weight_function(:logis_cdf; mu = Float64[], sigma = Float64[])
     # A length-d parameter applied to a forecast of another dimension.
-    w = weight_function(:norm_cdf; mu = [0.0, 1.0], sigma = 1.0)
+    w = weight_function(:norm_cdf; mu = [0.0, 1.0], sigma = [1.0, 1.0])
     @test_throws DimensionMismatch w([0.1, 0.2, 0.3])
+    # R's get_weight_func stops on mu and sigma of different lengths.
+    @test_throws DimensionMismatch weight_function(:norm_cdf; mu = [0.0, 1.0], sigma = 1.0)
+    @test_throws DimensionMismatch chaining_function(:norm_cdf; mu = 0.0, sigma = [1.0, 2.0])
     @test w([0.1, 0.2]) > 0
 
-    # A length-one vector is a scalar, and broadcasts like one rather than
-    # running off the end of itself.
+    # A length-one vector is a scalar: its weight is univariate and its chaining
+    # function applies in every dimension.
     for (mu, sigma) in (([0.5], [2.0]), (0.5, [2.0]), ([0.5], 2.0))
         wv = weight_function(:norm_cdf; mu = mu, sigma = sigma)
         cv = chaining_function(:norm_cdf; mu = mu, sigma = sigma)
         ws = weight_function(:norm_cdf; mu = 0.5, sigma = 2.0)
         cs = chaining_function(:norm_cdf; mu = 0.5, sigma = 2.0)
         @test wv(0.3) ≈ ws(0.3) rtol = 1.0e-14
-        @test wv([0.3, -0.2, 1.1]) ≈ ws(0.3) * ws(-0.2) * ws(1.1) rtol = 1.0e-13
+        @test_throws ArgumentError wv([0.3, -0.2, 1.1])
         @test cv([0.3, -0.2]) ≈ [cs(0.3), cs(-0.2)] rtol = 1.0e-14
     end
 
@@ -117,10 +120,18 @@ end
     @test_throws DimensionMismatch chaining_function(:norm_cdf; mu = [0.0, 10.0], sigma = [1.0, 1.0])(1.0)
     @test_throws DimensionMismatch owcrps(randn(50), 0.4; weight_func = wmv)
 
-    # Scalars broadcast across dimensions, and the product form is the
-    # per-dimension weights multiplied together.
-    ws = weight_function(:norm_cdf; mu = 0.5, sigma = 2.0)
-    @test ws([0.1, -0.4]) ≈ ws(0.1) * ws(-0.4) rtol = 1.0e-14
-    cs = chaining_function(:norm_surv; mu = 0.5, sigma = 2.0)
-    @test cs([0.1, -0.4]) ≈ [cs(0.1), cs(-0.4)] rtol = 1.0e-14
+    # As in R, a scalar-parameter weight does not score a multivariate forecast,
+    # for any shape, while a scalar-parameter chaining function applies in
+    # every dimension; a one-dimensional forecast takes either.
+    X = [0.1 0.4 -0.3; 1.2 0.8 1.0]
+    yv = [0.2, 1.1]
+    for name in (:norm_cdf, :logis_cdf)
+        ws = weight_function(name; mu = 0.5, sigma = 2.0)
+        @test_throws ArgumentError ws([0.1, -0.4])
+        @test_throws ArgumentError owes(X, yv; weight_func = ws)
+        @test ws([0.1]) ≈ ws(0.1) rtol = 1.0e-14
+        cs = chaining_function(name; mu = 0.5, sigma = 2.0)
+        @test cs([0.1, -0.4]) ≈ [cs(0.1), cs(-0.4)] rtol = 1.0e-14
+        @test isfinite(twes(X, yv; chain_func = cs))
+    end
 end

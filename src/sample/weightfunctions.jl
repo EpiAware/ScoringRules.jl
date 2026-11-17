@@ -61,8 +61,8 @@ end
 # --- the callables ---------------------------------------------------------
 
 _param_at(x::Real, ::Integer) = x
-# A length-one vector is a scalar written as a vector: it broadcasts across
-# dimensions, where indexing it would run past its own end.
+# A length-one vector is a scalar written as a vector, as in R; a chaining
+# function built from one applies it in every dimension.
 _param_at(x::AbstractVector, i::Integer) = length(x) == 1 ? first(x) : x[i]
 
 _param_len(::Real) = 1
@@ -71,10 +71,12 @@ _param_len(x::AbstractVector) = length(x)
 """
     SmoothWeight
 
-Weight function built by [`weight_function`](@ref). Call it on a `Real` for a
-univariate forecast, or on a length-`d` vector for a multivariate one, where it
-returns the product of the per-dimension weights (as R's `get_weight_func`
-does).
+Weight function built by [`weight_function`](@ref). Built with scalar `mu` and
+`sigma`, call it on a `Real` for a univariate forecast. Built with length-`d`
+`mu` and `sigma`, call it on a length-`d` vector for a multivariate forecast,
+where it returns the product of the per-dimension weights. As in R's
+`get_weight_func`, a weight built with scalar parameters does not score a
+multivariate forecast.
 """
 struct SmoothWeight{K, M, S} <: Function
     kernel::K
@@ -88,6 +90,15 @@ function (f::SmoothWeight)(z::Real)
 end
 
 function (f::SmoothWeight)(z::AbstractVector)
+    # R's scalar-parameter weight returns one value per dimension, which its
+    # outcome-weighted scores then refuse.
+    max(_param_len(f.mu), _param_len(f.sigma)) == 1 && length(z) > 1 && throw(
+        ArgumentError(
+            "this weight was built with scalar mu and sigma and is univariate; " *
+                "build it with length-$(length(z)) mu and sigma for a " *
+                "$(length(z))-dimensional forecast"
+        )
+    )
     _check_param_dim(f, length(z))
     out = one(_float_type(z))
     @inbounds for i in eachindex(z)
@@ -102,7 +113,7 @@ end
 Chaining function built by [`chaining_function`](@ref): the antiderivative of
 the weight function of the same name. Call it on a `Real` for a univariate
 forecast, or on a length-`d` vector for a multivariate one, where it applies
-element-wise.
+element-wise, with scalar `mu` and `sigma` used in every dimension as in R.
 """
 struct SmoothChain{K, M, S} <: Function
     kernel::K
@@ -159,18 +170,15 @@ function _check_weight_params(name::Symbol, mu, sigma)
     (lm == 0 || ls == 0) && throw(
         DimensionMismatch("mu and sigma must not be empty")
     )
-    (lm == ls || lm == 1 || ls == 1) || throw(
+    lm == ls || throw(
         DimensionMismatch("mu has length $lm and sigma has length $ls")
     )
     all(>(0), sigma) ||
         throw(DomainError(sigma, "sigma must be strictly positive"))
     all(isfinite, mu) && all(isfinite, sigma) ||
         throw(ArgumentError("mu and sigma must be finite"))
-    # R rejects the logistic shapes for a multivariate forecast whichever half
-    # of the pair it is asked for, and so must both constructors here: an
-    # element-wise logistic chaining function is the antiderivative of no
-    # product weight, which would leave the threshold-weighted score improper
-    # for the weight the caller believes they chose.
+    # R rejects the logistic shapes with vector parameters, for the weight and
+    # the chaining function alike.
     max(lm, ls) > 1 && name in _LOGIS_NAMES && throw(
         ArgumentError(
             "the logistic weight functions are univariate only; use " *
@@ -211,10 +219,10 @@ TRUE)` in R scoringRules.
 | `:logis_surv` | the logistic survival function              |
 | `:logis_pdf`  | the logistic density                        |
 
-Pass length-`d` vectors for `mu` and `sigma` (or scalars, which broadcast) to
-weight a `d`-dimensional forecast; the weight is then the product over
-dimensions. As in R, the logistic shapes are univariate only, because the
-matching chaining function has no product form.
+Pass length-`d` vectors for `mu` and `sigma`, of equal length, to weight a
+`d`-dimensional forecast; the weight is then the product over dimensions. As in
+R, a weight built with scalar `mu` and `sigma` is univariate only, and the
+logistic shapes take scalar parameters only.
 
 The paired [`chaining_function`](@ref) gives the chaining function the
 threshold-weighted scores need for the same weight.
