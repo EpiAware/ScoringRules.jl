@@ -79,7 +79,8 @@ end
     @test_throws ArgumentError chaining_function(:gumbel_cdf)
     @test_throws DomainError weight_function(:norm_cdf; sigma = 0.0)
     @test_throws DomainError weight_function(:norm_cdf; sigma = -1.0)
-    @test_throws ArgumentError weight_function(:norm_cdf; mu = Inf)
+    @test_throws ArgumentError weight_function(:norm_cdf; sigma = Inf)
+    @test_throws ArgumentError chaining_function(:norm_cdf; sigma = Inf)
     @test_throws DimensionMismatch weight_function(:norm_cdf; mu = [0.0, 1.0], sigma = [1.0, 2.0, 3.0])
     # As in R, the logistic shapes have no multivariate form. R applies the
     # same check whichever half of the pair it is asked for, and a chaining
@@ -133,5 +134,30 @@ end
         cs = chaining_function(name; mu = 0.5, sigma = 2.0)
         @test cs([0.1, -0.4]) ≈ [cs(0.1), cs(-0.4)] rtol = 1.0e-14
         @test isfinite(twes(X, yv; chain_func = cs))
+    end
+end
+
+@testitem "an infinite mu gives R's constant weights and chaining functions" tags = [:sample] begin
+    using ScoringRules
+
+    # R: get_weight_func(name, mu, 1) and get_weight_func(name, mu, 1,
+    # weight = FALSE) evaluated at x = c(-1, 0, 2). A NaN mu gives NaN, as in R.
+    x = [-1.0, 0.0, 2.0]
+    ref = Dict(
+        (:norm_cdf, Inf) => (0.0, NaN), (:norm_cdf, -Inf) => (1.0, Inf),
+        (:norm_surv, Inf) => (1.0, NaN), (:norm_surv, -Inf) => (0.0, -Inf),
+        (:norm_pdf, Inf) => (0.0, 0.0), (:norm_pdf, -Inf) => (0.0, 1.0),
+        (:logis_cdf, Inf) => (0.0, 0.0), (:logis_cdf, -Inf) => (1.0, Inf),
+        (:logis_surv, Inf) => (1.0, nothing), (:logis_surv, -Inf) => (0.0, -Inf),
+        (:logis_pdf, Inf) => (0.0, 0.0), (:logis_pdf, -Inf) => (0.0, 1.0),
+    )
+    for ((name, mu), (wr, cr)) in ref
+        w = weight_function(name; mu = mu)
+        c = chaining_function(name; mu = mu)
+        @test all(==(wr), w.(x))
+        # R's logis_surv chaining function at mu = Inf is the identity.
+        @test isequal(c.(x), cr === nothing ? x : fill(cr, 3))
+        @test all(isnan, weight_function(name; mu = NaN).(x))
+        @test all(isnan, chaining_function(name; mu = NaN).(x))
     end
 end
