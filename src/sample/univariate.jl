@@ -119,10 +119,25 @@ function _check_nonempty(dat::AbstractVector)
     return nothing
 end
 
-# R stops on a negative kernel bandwidth; zero is allowed.
+# R's univariate sample scores stop on a missing or infinite value in the
+# observation or the ensemble ("Input with missing values", "Input with
+# infinite values"). Its multivariate scores have no such check.
+function _check_finite_sample(dat::AbstractVector, y::Real)
+    isfinite(y) || throw(ArgumentError("the observation y must be finite, got $y"))
+    all(isfinite, dat) ||
+        throw(ArgumentError("the ensemble `dat` must not contain Inf or NaN"))
+    return nothing
+end
+
+# R stops on a negative, infinite or missing kernel bandwidth; zero is allowed.
+# A zero bandwidth makes the kernel density estimate the ensemble itself, point
+# masses at the members, where the kernel formula would divide zero by zero.
+# The log scores then follow R: the density is infinite at a member and zero
+# elsewhere, and the window mass in `clogs` is the share of members in
+# `(a, b]`, from R's right-continuous step CDF.
 function _check_bw(bw)
-    bw === nothing || bw >= 0 ||
-        throw(ArgumentError("the bandwidth bw must not be negative, got $bw"))
+    bw === nothing || (isfinite(bw) && bw >= 0) ||
+        throw(ArgumentError("the bandwidth bw must be finite and non-negative, got $bw"))
     return nothing
 end
 
@@ -173,6 +188,7 @@ function crps(
         method::Symbol = :edf, w = nothing, bw = nothing
     )
     _check_nonempty(dat)
+    _check_finite_sample(dat, y)
     if method === :edf
         if w === nothing
             return _crps_edf_unweighted(y, dat)
@@ -222,8 +238,10 @@ logs(dat, 0.5)
 """
 function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing)
     _check_nonempty(dat)
+    _check_finite_sample(dat, y)
     _check_bw(bw)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
+    bw_val == 0 && return any(==(y), dat) ? -Inf : Inf
     # KDE density at y: the mean of φ_{bw}(y − datᵢ); log score = −log density
     den = 0.0
     @inbounds for x in dat
@@ -284,25 +302,37 @@ function clogs(
         a::Real = -Inf, b::Real = Inf, bw = nothing, cens::Bool = true
     )
     _check_nonempty(dat)
+    _check_finite_sample(dat, y)
     _check_bw(bw)
     a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     n = length(dat)
     # KDE mass in the window, P = F̂(b) − F̂(a), and KDE density at y; the KDE
     # is an equally weighted normal mixture with the bandwidth as common sd.
-    mass = 0.0
-    den = 0.0
-    @inbounds for x in dat
-        mass += _norm_cdf((b - x) / bw_val) - _norm_cdf((a - x) / bw_val)
-        den += _norm_pdf((y - x) / bw_val) / bw_val
-    end
-    mass /= n
-    den /= n
-    inside = a < y < b
-    if cens
-        return inside ? -log(den) : -log1p(-mass)
+    if bw_val == 0
+        mass = count(x -> a < x <= b, dat) / n
+        den = any(==(y), dat) ? Inf : 0.0
     else
-        return inside ? log(mass) - log(den) : 0.0
+        mass = 0.0
+        den = 0.0
+        @inbounds for x in dat
+            mass += _norm_cdf((b - x) / bw_val) - _norm_cdf((a - x) / bw_val)
+            den += _norm_pdf((y - x) / bw_val) / bw_val
+        end
+        mass /= n
+        den /= n
+    end
+    inside = a < y < b
+    ls = -log(den)
+    # R forms the score as w(y)·ls + log(P^w(y)), less log(P^w(y)) again when
+    # censored. An infinite ls outside the window then gives 0·Inf, and a
+    # censored score inside an empty window log(0) − log(0): NaN either way.
+    if inside
+        cens && iszero(mass) && return NaN
+        return cens ? ls : log(mass) + ls
+    else
+        isfinite(ls) || return NaN
+        return cens ? -log1p(-mass) : 0.0
     end
 end
 
@@ -347,6 +377,7 @@ dss(dat, 0.5)
 """
 function dss(dat::AbstractVector{<:Real}, y::Real; w = nothing)
     _check_nonempty(dat)
+    _check_finite_sample(dat, y)
     if w === nothing
         m = mean(dat)
         # Population variance: mean(dat.^2) - mean(dat).^2  (matches R dss_edf)
