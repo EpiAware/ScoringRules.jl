@@ -175,8 +175,11 @@ function _check_weight_params(name::Symbol, mu, sigma)
     )
     all(>(0), sigma) ||
         throw(DomainError(sigma, "sigma must be strictly positive"))
-    all(isfinite, mu) && all(isfinite, sigma) ||
-        throw(ArgumentError("mu and sigma must be finite"))
+    # R accepts any `mu`: an infinite one makes the weight constant, 0 or 1,
+    # and the kernels give R's values for it. An infinite `sigma` is refused:
+    # its weight is flat and R's normal chaining functions return NaN for it.
+    all(isfinite, sigma) ||
+        throw(ArgumentError("sigma must be finite"))
     # R rejects the logistic shapes with vector parameters, for the weight and
     # the chaining function alike.
     max(lm, ls) > 1 && name in _LOGIS_NAMES && throw(
@@ -205,8 +208,8 @@ TRUE)` in R scoringRules.
 # Keyword Arguments
 
   - `mu`: location of the weight, a scalar or a length-`d` vector.
-  - `sigma`: scale of the weight, strictly positive, a scalar or a length-`d`
-    vector.
+  - `sigma`: scale of the weight, finite and strictly positive, a scalar or a
+    length-`d` vector.
 
 `name` selects the shape, with `mu` and `sigma` its location and scale:
 
@@ -256,8 +259,8 @@ FALSE)` in R scoringRules.
 # Keyword Arguments
 
   - `mu`: location of the weight, a scalar or a length-`d` vector.
-  - `sigma`: scale of the weight, strictly positive, a scalar or a length-`d`
-    vector.
+  - `sigma`: scale of the weight, finite and strictly positive, a scalar or a
+    length-`d` vector.
 
 `name`, `mu` and `sigma` are as in [`weight_function`](@ref), and the function
 returned is the antiderivative of the weight of the same name:
