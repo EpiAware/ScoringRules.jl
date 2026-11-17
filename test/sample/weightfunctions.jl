@@ -139,7 +139,7 @@ end
     using ScoringRules
 
     # R: get_weight_func(name, mu, 1) and get_weight_func(name, mu, 1,
-    # weight = FALSE) evaluated at x = c(-1, 0, 2). A NaN mu gives NaN, as in R.
+    # weight = FALSE) evaluated at x = c(-1, 0, 2).
     x = [-1.0, 0.0, 2.0]
     ref = Dict(
         (:norm_cdf, Inf) => (0.0, NaN), (:norm_cdf, -Inf) => (1.0, Inf),
@@ -155,8 +155,9 @@ end
         @test all(==(wr), w.(x))
         # R's logis_surv chaining function at mu = Inf is the identity.
         @test isequal(c.(x), cr === nothing ? x : fill(cr, 3))
-        @test all(isnan, weight_function(name; mu = NaN).(x))
-        @test all(isnan, chaining_function(name; mu = NaN).(x))
+        # R's weighted scores stop on the NaN weights a NaN mu gives.
+        @test_throws ArgumentError weight_function(name; mu = NaN)
+        @test_throws ArgumentError chaining_function(name; mu = NaN)
     end
 end
 
@@ -178,4 +179,27 @@ end
     #   weight_func = get_weight_func("norm_cdf", 0, Inf)).
     w = weight_function(:norm_cdf; sigma = Inf)
     @test owcrps([0.1, 0.5, 0.9], 0.4; weight_func = w) ≈ 0.06111111 rtol = 1.0e-6
+end
+
+@testitem "infinite mu and sigma together give R's normal limits" tags = [:sample] begin
+    using ScoringRules
+
+    # R: get_weight_func(name, mu, Inf) and get_weight_func(name, mu, Inf,
+    # weight = FALSE) evaluated at x = c(-1, 0.1, 2), where pnorm and dnorm
+    # return their limits.
+    x = [-1.0, 0.1, 2.0]
+    ref = Dict(
+        (:norm_cdf, -Inf) => (1.0, NaN), (:norm_cdf, Inf) => (0.0, NaN),
+        (:norm_surv, -Inf) => (0.0, NaN), (:norm_surv, Inf) => (1.0, NaN),
+        (:norm_pdf, -Inf) => (0.0, 1.0), (:norm_pdf, Inf) => (0.0, 0.0),
+    )
+    for ((name, mu), (wr, cr)) in ref
+        @test all(==(wr), weight_function(name; mu = mu, sigma = Inf).(x))
+        @test isequal(chaining_function(name; mu = mu, sigma = Inf).(x), fill(cr, 3))
+    end
+    # R: owvs_sample(c(0.4, 0.3), X, weight_func =
+    #   get_weight_func("norm_cdf", c(-Inf, 0), c(Inf, 1))).
+    X = [0.1 0.9 0.2 0.4; 0.5 1.3 0.3 0.8]
+    w = weight_function(:norm_cdf; mu = [-Inf, 0.0], sigma = [Inf, 1.0])
+    @test owvs(X, [0.4, 0.3]; weight_func = w) ≈ 0.07792619 rtol = 1.0e-6
 end

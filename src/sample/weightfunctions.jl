@@ -23,9 +23,35 @@ const _LOGIS_NAMES = (:logis_cdf, :logis_surv, :logis_pdf)
 # Each chaining kernel is the antiderivative of the weight kernel of the same
 # name: `d/dz chain(z) == weight(z)`.
 
-_wk_norm_cdf(z, μ, σ) = _norm_cdf((z - μ) / σ)
-_wk_norm_surv(z, μ, σ) = _norm_cdf(-(z - μ) / σ)
-_wk_norm_pdf(z, μ, σ) = _norm_pdf((z - μ) / σ) / σ
+# The normal CDF and density as R's `pnorm` and `dnorm` define them where the
+# standardised value is not finite, as with an infinite `mu` or `sigma`: the
+# CDF is then 0 below the mean and 1 above it, and the density is 0.
+function _r_pnorm(z, μ, σ)
+    (isnan(z) || isnan(μ) || isnan(σ)) && return z + μ + σ
+    isinf(z) && z == μ && return z - μ
+    u = (z - μ) / σ
+    isfinite(u) && return _norm_cdf(u)
+    return z < μ ? zero(u) : one(u)
+end
+
+function _r_pnorm_upper(z, μ, σ)
+    u = (z - μ) / σ
+    isfinite(u) && return _norm_cdf(-u)
+    return 1 - _r_pnorm(z, μ, σ)
+end
+
+function _r_dnorm(z, μ, σ)
+    (isnan(z) || isnan(μ) || isnan(σ)) && return z + μ + σ
+    isfinite(σ) || return zero(z - μ)
+    isinf(z) && z == μ && return z - μ
+    u = (z - μ) / σ
+    isfinite(u) || return zero(u)
+    return _norm_pdf(u) / σ
+end
+
+_wk_norm_cdf(z, μ, σ) = _r_pnorm(z, μ, σ)
+_wk_norm_surv(z, μ, σ) = _r_pnorm_upper(z, μ, σ)
+_wk_norm_pdf(z, μ, σ) = _r_dnorm(z, μ, σ)
 _wk_logis_cdf(z, μ, σ) = logistic((z - μ) / σ)
 _wk_logis_surv(z, μ, σ) = logistic(-(z - μ) / σ)
 function _wk_logis_pdf(z, μ, σ)
@@ -35,9 +61,9 @@ end
 
 # R writes the second term as σ² times the N(μ, σ²) density, which is NaN
 # rather than Inf at σ = Inf.
-_ck_norm_cdf(z, μ, σ) = (z - μ) * _norm_cdf((z - μ) / σ) + σ^2 * (_norm_pdf((z - μ) / σ) / σ)
+_ck_norm_cdf(z, μ, σ) = (z - μ) * _r_pnorm(z, μ, σ) + σ^2 * _r_dnorm(z, μ, σ)
 _ck_norm_surv(z, μ, σ) = z - _ck_norm_cdf(z, μ, σ)
-_ck_norm_pdf(z, μ, σ) = _norm_cdf((z - μ) / σ)
+_ck_norm_pdf(z, μ, σ) = _r_pnorm(z, μ, σ)
 _ck_logis_cdf(z, μ, σ) = σ * log1pexp((z - μ) / σ)
 _ck_logis_surv(z, μ, σ) = z - σ * log1pexp((z - μ) / σ)
 _ck_logis_pdf(z, μ, σ) = logistic((z - μ) / σ)
@@ -178,7 +204,9 @@ function _check_weight_params(name::Symbol, mu, sigma)
     all(>(0), sigma) ||
         throw(DomainError(sigma, "sigma must be strictly positive"))
     # As in R, `mu` and `sigma` may be infinite: an infinite `mu` makes the
-    # weight constant at 0 or 1, and an infinite `sigma` makes it flat.
+    # weight constant at 0 or 1, and an infinite `sigma` makes it flat. A NaN
+    # `mu` is refused: R builds the function, but its weighted scores then stop.
+    any(isnan, mu) && throw(ArgumentError("mu must not be NaN"))
     # R rejects the logistic shapes with vector parameters, for the weight and
     # the chaining function alike.
     max(lm, ls) > 1 && name in _LOGIS_NAMES && throw(
