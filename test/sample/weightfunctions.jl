@@ -156,7 +156,8 @@ end
         # R's logis_surv chaining function at mu = Inf is the identity.
         @test isequal(c.(x), cr === nothing ? x : fill(cr, 3))
         # Refused, as most of R's weighted scores stop on the NaN weights a
-        # NaN mu gives (R's twes_sample and twvs_sample return NaN instead).
+        # NaN mu gives (R's twes_sample, twvs_sample and twmmds_sample return
+        # NaN instead).
         @test_throws ArgumentError weight_function(name; mu = NaN)
         @test_throws ArgumentError chaining_function(name; mu = NaN)
     end

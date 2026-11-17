@@ -206,7 +206,8 @@ function _check_weight_params(name::Symbol, mu, sigma)
     # As in R, `mu` and `sigma` may be infinite: an infinite `mu` makes the
     # weight constant at 0 or 1, and an infinite `sigma` makes it flat. A NaN
     # `mu` is refused. R builds the function, and most of its weighted scores
-    # then stop; `twes_sample` and `twvs_sample` return NaN instead.
+    # then stop; its threshold-weighted multivariate scores (`twes_sample`,
+    # `twvs_sample`, `twmmds_sample`) return NaN instead.
     any(isnan, mu) && throw(ArgumentError("mu must not be NaN"))
     # R rejects the logistic shapes with vector parameters, for the weight and
     # the chaining function alike.
