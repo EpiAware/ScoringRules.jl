@@ -119,15 +119,25 @@ function _check_nonempty(dat::AbstractVector)
     return nothing
 end
 
-# R stops on a negative kernel bandwidth; zero is allowed. A zero bandwidth
-# makes the kernel density estimate the ensemble itself, point masses at the
-# members, where the kernel formula would divide zero by zero. The log scores
-# then follow R: the density is infinite at a member and zero elsewhere, and
-# the window mass in `clogs` is the share of members in `(a, b]`, from R's
-# right-continuous step CDF.
+# R's univariate sample scores stop on a missing or infinite value in the
+# observation or the ensemble ("Input with missing values", "Input with
+# infinite values"). Its multivariate scores have no such check.
+function _check_finite_sample(dat::AbstractVector, y::Real)
+    isfinite(y) || throw(ArgumentError("the observation y must be finite, got $y"))
+    all(isfinite, dat) ||
+        throw(ArgumentError("the ensemble `dat` must not contain Inf or NaN"))
+    return nothing
+end
+
+# R stops on a negative, infinite or missing kernel bandwidth; zero is allowed.
+# A zero bandwidth makes the kernel density estimate the ensemble itself, point
+# masses at the members, where the kernel formula would divide zero by zero.
+# The log scores then follow R: the density is infinite at a member and zero
+# elsewhere, and the window mass in `clogs` is the share of members in
+# `(a, b]`, from R's right-continuous step CDF.
 function _check_bw(bw)
-    bw === nothing || bw >= 0 ||
-        throw(ArgumentError("the bandwidth bw must not be negative, got $bw"))
+    bw === nothing || (isfinite(bw) && bw >= 0) ||
+        throw(ArgumentError("the bandwidth bw must be finite and non-negative, got $bw"))
     return nothing
 end
 
@@ -178,6 +188,7 @@ function crps(
         method::Symbol = :edf, w = nothing, bw = nothing
     )
     _check_nonempty(dat)
+    _check_finite_sample(dat, y)
     if method === :edf
         if w === nothing
             return _crps_edf_unweighted(y, dat)
@@ -232,12 +243,13 @@ logs(dat, 0.5)
 """
 function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing, w = nothing)
     _check_nonempty(dat)
+    _check_finite_sample(dat, y)
     w === nothing || _check_member_weights(dat, w)
     _check_bw(bw)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     if bw_val == 0
         hit = any(i -> dat[i] == y && (w === nothing || w[i] > 0), eachindex(dat))
-        return hit ? -Inf : isnan(y) ? NaN : Inf
+        return hit ? -Inf : Inf
     end
     # KDE density at y: Σ_i wᵢ φ_{bw}(y − datᵢ) / Σ_i wᵢ
     # log score = −log density
@@ -303,6 +315,7 @@ function clogs(
         a::Real = -Inf, b::Real = Inf, bw = nothing, cens::Bool = true
     )
     _check_nonempty(dat)
+    _check_finite_sample(dat, y)
     _check_bw(bw)
     a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
@@ -377,6 +390,7 @@ dss(dat, 0.5)
 """
 function dss(dat::AbstractVector{<:Real}, y::Real; w = nothing)
     _check_nonempty(dat)
+    _check_finite_sample(dat, y)
     if w === nothing
         m = mean(dat)
         # Population variance: mean(dat.^2) - mean(dat).^2  (matches R dss_edf)

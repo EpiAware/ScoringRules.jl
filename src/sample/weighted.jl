@@ -92,6 +92,9 @@ function twcrps(
     end
     v_y = v(y)
     v_dat = v.(dat)
+    # R checks the chained values, so an infinite member the default chaining
+    # clamps into (a, b) is scored, and NaN is not.
+    _check_finite_sample(v_dat, v_y)
     if w === nothing
         return _crps_edf_unweighted(v_y, v_dat)
     end
@@ -153,6 +156,7 @@ function owcrps(
         weight_func = nothing, w = nothing
     )
     _check_nonempty(dat)
+    _check_finite_sample(dat, y)
     if weight_func === nothing
         a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
         w_func = z -> Float64(a < z < b)

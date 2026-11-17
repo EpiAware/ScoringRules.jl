@@ -75,7 +75,7 @@
         @test isnan(clogs(d0, 0.5; a = 4.0, b = 6.0, bw = 0, cens))
         @test isnan(clogs(d0, 5.0; a = 4.0, b = 6.0, bw = 0, cens))
     end
-    @test isnan(logs(d0, NaN; bw = 0))
+    @test_throws ArgumentError logs(d0, NaN; bw = 0)
 
     # ints_quantiles stops when the lower end is above the upper one.
     @test_throws ArgumentError interval_score(2.0, 1.0, 1.5, 0.8)
@@ -89,4 +89,47 @@
     @test_throws ArgumentError twvs(X, y; p = -1)
     @test_throws ArgumentError owvs(X, y; p = -1)
     @test vs(X, y; p = 0) == 0
+end
+
+@testitem "univariate sample scores reject Inf and NaN as R does" tags = [:sample] begin
+    using ScoringRules
+
+    # R's crps_sample, logs_sample, dss_sample, clogs_sample, owcrps_sample,
+    # qs_sample and ints_sample stop on an infinite or missing value in y or
+    # dat.
+    d = [0.1, 0.5, 0.9, 1.3]
+    scores = (
+        (dat, y) -> crps(dat, y),
+        (dat, y) -> crps(dat, y; method = :kde),
+        (dat, y) -> logs(dat, y),
+        (dat, y) -> dss(dat, y),
+        (dat, y) -> clogs(dat, y; a = 0.0, b = 1.0),
+        (dat, y) -> owcrps(dat, y; a = 0.0, b = 1.0),
+        (dat, y) -> quantile_score(dat, y; alpha = 0.3),
+        (dat, y) -> interval_score(dat, y; level = 0.5),
+    )
+    for score in scores, bad in (Inf, -Inf, NaN)
+        @test_throws ArgumentError score(d, bad)
+        @test_throws ArgumentError score([0.1, bad, 0.9, 1.3], 0.4)
+    end
+
+    # The kernel bandwidth goes through the same check. R: crps_sample(0.4, d,
+    # method = "kde", bw = Inf), logs_sample and clogs_sample likewise.
+    for bw in (Inf, NaN)
+        @test_throws ArgumentError crps(d, 0.4; method = :kde, bw)
+        @test_throws ArgumentError logs(d, 0.4; bw)
+        @test_throws ArgumentError clogs(d, 0.4; a = 0.0, b = 1.0, bw)
+    end
+
+    # twcrps_sample checks the chained values instead, so an infinite value the
+    # default chaining clamps into (a, b) is scored. R: twcrps_sample(y, dat,
+    # a = 0, b = 1).
+    @test twcrps(d, Inf; a = 0.0, b = 1.0) ≈ 0.18125
+    @test twcrps(d, -Inf; a = 0.0, b = 1.0) ≈ 0.43125
+    @test twcrps([0.1, Inf, 0.9, 1.3], 0.4; a = 0.0, b = 1.0) ≈ 0.325
+    @test twcrps([0.1, -Inf, 0.9, 1.3], 0.4; a = 0.0, b = 1.0) ≈ 0.2125
+    @test_throws ArgumentError twcrps(d, NaN; a = 0.0, b = 1.0)
+    @test_throws ArgumentError twcrps([0.1, NaN, 0.9, 1.3], 0.4; a = 0.0, b = 1.0)
+    # A chaining function that is infinite everywhere, from an infinite mu.
+    @test_throws ArgumentError twcrps(d, 0.4; chain_func = chaining_function(:norm_cdf; mu = -Inf))
 end
