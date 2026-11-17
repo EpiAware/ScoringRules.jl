@@ -30,19 +30,18 @@ crps(Normal(0, 1), 0.5)
 module ScoringRules
 
 using Distributions: Distributions, Beta, Binomial, Censored, Continuous,
-    ContinuousUnivariateDistribution, DiscreteUnivariateDistribution,
+    ContinuousUnivariateDistribution,
     Exponential, Gamma, GeneralizedExtremeValue, GeneralizedPareto,
     Hypergeometric, Laplace, LogLogistic, LogNormal,
     Logistic, MixtureModel, NegativeBinomial, Normal, Poisson, TDist,
     Truncated, Uniform, Univariate, UnivariateDistribution,
-    ccdf, cdf, components, dof, location, logpdf, params, pdf, probs,
+    cdf, components, dof, location, logpdf, params, pdf, probs,
     scale, shape, truncated
 using SpecialFunctions: erfc, gamma, digamma, logbeta,
-    besseli, expinti
+    besselix, expinti
 using EpiAwareADTools: cdf_ad_safe, ccdf_ad_safe
 using LogExpFunctions: log1pexp, logistic
 using HypergeometricFunctions: _₂F₁
-using QuadGK: quadgk
 using Statistics: mean, var, std, quantile
 using LinearAlgebra: norm
 using Random: AbstractRNG
@@ -54,6 +53,8 @@ export crps, logs, dss, dss_moments, ess_moments
 export es, vs, mmds
 # Weighted (threshold- and outcome-weighted) ensemble scores
 export twcrps, owcrps, twes, owes, twvs, owvs, twmmds, owmmds
+# Smooth weight and chaining functions for the weighted scores
+export weight_function, chaining_function
 # Censored and conditional likelihood scores for ensembles
 export clogs
 # Quantile / interval scores and the ranked probability score
@@ -63,13 +64,15 @@ export LogLaplace, TwoPieceNormal, TwoPieceExponential, BoundaryMass
 
 include("docstrings.jl")
 include("utils.jl")
-include("generics.jl")
 
 # Extra distribution types, so they flow through crps/logs/dss dispatch
 # (log-logistic is Distributions.LogLogistic; only these are missing upstream)
 include("distributions/loglaplace.jl")
 include("distributions/twopiece.jl")
 include("distributions/boundarymass.jl")
+
+# The three univariate scores, restricted to the families R scoringRules scores
+include("generics.jl")
 
 # Closed-form CRPS per distribution family
 include("crps/normal.jl")
@@ -93,6 +96,7 @@ include("crps/boundarymass.jl")
 include("sample/univariate.jl")
 include("sample/multivariate.jl")
 include("sample/weighted.jl")
+include("sample/weightfunctions.jl")
 include("sample/quantiles.jl")
 include("sample/rps.jl")
 

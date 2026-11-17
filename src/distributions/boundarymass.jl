@@ -4,9 +4,9 @@
 # masses, censoring to masses equal to the tail probabilities, and anything in
 # between is a forecast that hedges between the two.
 #
-# Distributions.jl has no type for "distribution plus boundary point masses",
-# so this wrapper provides one and the crps/logs/dss generics dispatch on it
-# (see src/crps/boundarymass.jl for the closed-form CRPS routes).
+# Distributions.jl has no type for "distribution plus boundary point masses";
+# this wrapper provides one for `crps` to dispatch on (see
+# src/crps/boundarymass.jl for the closed-form routes).
 
 """
     BoundaryMass(dist; lower, upper, lmass, umass)
@@ -26,8 +26,8 @@ the probability mass itself.
 
 [`crps`](@ref) has closed forms for normal, logistic and (location–scale)
 Student-t bases, and for the boundary-mass exponential, uniform and
-generalised Pareto forms; other bases fall back to quadrature. [`logs`](@ref)
-and [`dss`](@ref) work through the generic density and moment methods.
+generalised Pareto forms, as R scoringRules does; other bases throw. As in R,
+[`logs`](@ref) and [`dss`](@ref) do not take this wrapper.
 
 # Example
 

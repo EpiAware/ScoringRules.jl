@@ -1,12 +1,13 @@
-## Unreleased
+## 1.0.0
 
 First working version: a port of the R
 [`scoringRules`](https://github.com/FK83/scoringRules) package (Jordan, Krüger,
 Lerch and Allen). See the README for attribution and provenance.
 
-- Three univariate scores via multiple dispatch: `crps`, `logs`, `dss`. `logs`
-  and `dss` work for any `Distributions.jl` univariate type; `crps` has a
-  closed form for each supported family and a quadrature fallback otherwise.
+- Three univariate scores via multiple dispatch: `crps`, `logs`, `dss`, for the
+  forecast families R scoringRules scores with each. `crps` has a closed form
+  for each family; `logs` and `dss` take the density and the first two
+  moments from `Distributions.jl`.
 - Closed-form CRPS for the normal (plus truncated, censored and generalised
   truncated/censored), logistic, Student-t, Laplace, exponential, gamma, beta,
   uniform, log-normal, log-logistic, log-Laplace, GEV, GPD, two-piece normal,
@@ -17,8 +18,8 @@ Lerch and Allen). See the README for attribution and provenance.
 - `BoundaryMass(dist; lower, upper, lmass, umass)` distribution wrapper for
   forecasts with free point masses at the truncation bounds, with closed-form
   `crps` for normal, logistic and (location–scale) Student-t bases and for the
-  point-mass exponential, uniform and generalised Pareto forms; `logs` and
-  `dss` also work on the wrapper (R exposes no logs/dss counterparts).
+  point-mass exponential, uniform and generalised Pareto forms. As in R, `logs`
+  and `dss` do not take the wrapper.
 - Sample/ensemble forecasts: `crps` (empirical and kernel-density), `logs`,
   `dss` on vectors; the energy score `es`, variogram score `vs` and
   maximum-mean-discrepancy score `mmds` on multivariate ensembles. The sample
@@ -41,8 +42,12 @@ Lerch and Allen). See the README for attribution and provenance.
 - Quantile and interval scores (`quantile_score`, `interval_score`), the ranked
   probability score `rps`, and the moment-based `dss_moments` and `ess_moments`
   (error-spread score of Christensen, Moroz and Palmer 2015).
+- `quantile_score` over a vector of quantile levels returns the mean pinball loss, the same scalar shape every other score in the package returns. Pass `reduce = identity` for one score per level, or another reduction such as `sum`.
+- Smooth weight and chaining functions for the weighted scores, `weight_function(name; mu, sigma)` and `chaining_function(name; mu, sigma)`, covering the six shapes of R's `get_weight_func`: `:norm_cdf`, `:norm_surv`, `:norm_pdf`, `:logis_cdf`, `:logis_surv` and `:logis_pdf`. Each chaining function is the antiderivative of the weight of the same name, and the pairing keeps the threshold-weighted score proper. Length-`d` `mu` and `sigma` give the product weight and the element-wise chaining function of a `d`-dimensional forecast. As in R, a weight built with scalar `mu` and `sigma` is univariate only, a chaining function built with them applies in every dimension, and the logistic shapes take scalar parameters only.
 - Every scoring function is checked against R `scoringRules` 1.1.3 in the test
-  suite.
+  suite. Problems found in R while porting were reported upstream, and where R
+  has fixed one since 1.1.3, as with the variance in the log-logistic DSS, the
+  tests check against the fix.
 - `dss` returns `NaN` whenever the forecast variance is not finite and
   positive (for example t with `df ≤ 2`, GEV/GPD with `shape ≥ 1/2`,
   log-Laplace with `σ ≥ 1/2`, log-logistic with `β ≤ 2`), matching R.

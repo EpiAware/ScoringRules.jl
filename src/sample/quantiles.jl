@@ -120,7 +120,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    quantile_score(q_levels, q_forecasts, y)
+    quantile_score(q_levels, q_forecasts, y; reduce = mean)
 
 Quantile score (pinball loss) for a vector of quantile levels and the
 corresponding quantile forecasts, evaluated at observation `y`.
@@ -131,9 +131,15 @@ corresponding quantile forecasts, evaluated at observation `y`.
                   values; must have the same length as `q_levels`.
 - `y`           — scalar observation.
 
+# Keywords
+- `reduce` — function applied to the per-level scores. Under the default
+             `mean` the result is the mean pinball loss. Pass `identity` for
+             the per-level vector, or another reduction such as `sum`.
+
 # Returns
-A `Vector{Float64}` of per-level scores, one entry per element of `q_levels`.
-To obtain a single summary value use `mean(quantile_score(...))`.
+`reduce` applied to the per-level scores: a scalar under the default `mean`,
+and a `Vector{Float64}` with one entry per element of `q_levels` under
+`identity`.
 
 The score at level α with forecast q and observation y is
 
@@ -150,10 +156,17 @@ levels = [0.1, 0.5, 0.9]
 q = [-1.28, 0.0, 1.28]
 quantile_score(levels, q, 1.0)
 ```
+
+```@example
+using ScoringRules
+levels = [0.1, 0.5, 0.9]
+q = [-1.28, 0.0, 1.28]
+quantile_score(levels, q, 1.0; reduce = identity)
+```
 """
 function quantile_score(
         q_levels::AbstractVector, q_forecasts::AbstractVector,
-        y::Real
+        y::Real; reduce = mean
     )
     length(q_levels) == length(q_forecasts) ||
         throw(
@@ -161,12 +174,14 @@ function quantile_score(
             "q_levels and q_forecasts must have the same length"
         )
     )
+    isempty(q_levels) && throw(ArgumentError("q_levels must not be empty"))
     all(a -> 0 < a < 1, q_levels) ||
         throw(ArgumentError("all quantile levels must lie strictly in (0, 1)"))
-    return [
+    per_level = [
         _qs_quantile(y, q_forecasts[i], q_levels[i])
             for i in eachindex(q_levels)
     ]
+    return reduce(per_level)
 end
 
 # ---------------------------------------------------------------------------
@@ -206,6 +221,7 @@ function quantile_score(
         dat::AbstractVector, y::Real;
         alpha::Real, type::Int = 7
     )
+    _check_nonempty(dat)
     0 < alpha < 1 || throw(ArgumentError("alpha must lie strictly in (0, 1), got $alpha"))
     q_hat = _quantile_hf(dat, alpha, type)
     return _qs_quantile(y, q_hat, alpha)
@@ -250,6 +266,8 @@ interval_score(-1.64, 1.64, 0.5, 0.9)
 """
 function interval_score(lower::Real, upper::Real, y::Real, level::Real)
     0 < level < 1 || throw(ArgumentError("level must lie strictly in (0, 1), got $level"))
+    lower <= upper ||
+        throw(ArgumentError("lower must not exceed upper, got lower=$lower, upper=$upper"))
     return _ints_quantile(y, lower, upper, level)
 end
 
@@ -282,6 +300,7 @@ function interval_score(
         dat::AbstractVector, y::Real;
         level::Real, type::Int = 7
     )
+    _check_nonempty(dat)
     0 < level < 1 || throw(ArgumentError("level must lie strictly in (0, 1), got $level"))
     alpha1 = 0.5 * (1 - level)
     alpha2 = 1 - alpha1

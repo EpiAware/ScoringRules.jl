@@ -1,6 +1,12 @@
 #!/usr/bin/env Rscript
 # Generate reference score values from the R `scoringRules` package.
 #
+# The reference is the GitHub master of FK83/scoringRules at commit 4d2f12f,
+# which carries fixes made after the CRAN release of 1.1.3 (its DESCRIPTION
+# still reads 1.1.3). Install that commit before regenerating:
+#
+#     remotes::install_github("FK83/scoringRules@4d2f12f2097243a8447db037745395f5d5cf43da")
+#
 # The Julia test suite compares its output against these committed CSVs so that
 # CI needs no R installation, while the values are anchored to the real
 # reference implementation. Regenerate after touching a scored family:
@@ -12,6 +18,10 @@
 # scoring rule (crps/logs/dss) that scoringRules provides for it.
 
 suppressMessages(library(scoringRules))
+sha <- packageDescription("scoringRules")$RemoteSha
+if (is.null(sha) || !startsWith(sha, "4d2f12f")) {
+  stop("install scoringRules from GitHub at commit 4d2f12f; see the header")
+}
 
 # Locate this script's directory so it can be run from anywhere.
 script_path <- sub("^--file=", "",
@@ -31,7 +41,9 @@ grid <- function(...) expand.grid(..., KEEP.OUT.ATTRS = FALSE,
                                   stringsAsFactors = FALSE)
 
 ## ---- normal ---------------------------------------------------------------
-g <- grid(mean = c(-3, 0, 2.5), sd = c(0.5, 1, 4),
+# sd = 0 is the point forecast at the mean, where the closed form has to be
+# taken to its limit rather than evaluated.
+g <- grid(mean = c(-3, 0, 2.5), sd = c(0, 0.5, 1, 4),
           y = c(-6, -1, 0, 0.7, 3, 8))
 g$crps <- crps_norm(g$y, mean = g$mean, sd = g$sd)
 g$logs <- logs_norm(g$y, mean = g$mean, sd = g$sd)
@@ -74,8 +86,10 @@ g$crps <- crps_gtcnorm(g$y, location = g$location, scale = g$scale,
 write_ref("gtcnorm", g)
 
 ## ---- logistic -------------------------------------------------------------
-g <- grid(location = c(-2, 0, 3), scale = c(0.5, 1, 3),
-          y = c(-5, -1, 0, 1, 5, 10))
+# A scale near zero, and observations far enough out that `log F(z)` underflows
+# (z below about -745).
+g <- grid(location = c(-2, 0, 3), scale = c(1e-8, 1e-3, 0.5, 1, 3),
+          y = c(-1e6, -1000, -5, -1, 0, 1, 5, 10, 1000))
 g$crps <- crps_logis(g$y, location = g$location, scale = g$scale)
 g$logs <- logs_logis(g$y, location = g$location, scale = g$scale)
 g$dss  <- dss_logis(g$y, location = g$location, scale = g$scale)
@@ -124,9 +138,11 @@ g$dss  <- dss_t(g$y, df = g$df, location = g$location, scale = g$scale)
 write_ref("student_t", g)
 
 ## ---- truncated Student-t --------------------------------------------------
-g <- grid(df = c(3, 10), location = c(-1, 0, 2), scale = c(0.5, 2),
-          lower = c(-Inf, -1, 0), upper = c(Inf, 1, 5),
-          y = c(-2, 0, 0.5, 3))
+# The far bounds matter: the truncation normaliser is F(upper) - F(lower), and
+# a tail probability that underflows to zero made the score divide by zero.
+g <- grid(df = c(2.5, 3, 10, 20), location = c(-1, 0, 2), scale = c(0.5, 2),
+          lower = c(-Inf, -1, 0, 100), upper = c(Inf, 1, 5, -50, -200, -1000),
+          y = c(-1001, -201, -51, -2, 0, 0.5, 3, 101))
 g <- g[g$lower < g$upper, ]
 g$crps <- crps_tt(g$y, df = g$df, location = g$location, scale = g$scale,
                   lower = g$lower, upper = g$upper)
@@ -306,8 +322,10 @@ mixnorm_df <- rbind(rows2, rows3)
 write_ref("mixnorm", mixnorm_df)
 
 ## ---- Poisson --------------------------------------------------------------
-g <- grid(lambda = c(0.5, 1, 3, 10),
-          y = c(0, 1, 2, 5, 15))
+# lambda past 350, where `besselI(2*lambda, 0)` overflows unless taken
+# exponentially scaled, and an observation below the support.
+g <- grid(lambda = c(0.5, 1, 3, 10, 50, 350, 400, 5000),
+          y = c(-2, 0, 1, 2, 5, 15, 400, 5010))
 g$crps <- crps_pois(g$y, lambda = g$lambda)
 g$logs <- logs_pois(g$y, lambda = g$lambda)
 g$dss  <- dss_pois(g$y, lambda = g$lambda)
@@ -754,12 +772,13 @@ write_ref("ess", g)
 
 # LogLogistic: R uses (locationlog, scalelog); Julia uses LogLogistic(α, β)
 #   with α = exp(locationlog), β = 1/scalelog.
-# dss_llogis is NOT compared (known NaN issue in R).
+# dss_llogis is NaN where the variance does not exist (scalelog >= 0.5).
 g <- grid(locationlog = c(-1, 0, 1),
           scalelog    = c(0.3, 0.5, 0.7),
           y           = c(0.1, 0.5, 1, 2, 5))
 g$crps <- crps_llogis(g$y, locationlog = g$locationlog, scalelog = g$scalelog)
 g$logs <- logs_llogis(g$y, locationlog = g$locationlog, scalelog = g$scalelog)
+g$dss  <- dss_llogis(g$y, locationlog = g$locationlog, scalelog = g$scalelog)
 write_ref("llogis", g)
 
 # LogLaplace: R uses (locationlog, scalelog); Julia uses LogLaplace(μ, σ)
@@ -810,3 +829,49 @@ gt <- expand.grid(df = c(2, 5, 20), location = c(0, 1), scale = c(1, 2),
 g_t <- gradcrps_t(gt$y, gt$df, gt$location, gt$scale)
 write.csv(cbind(gt, dloc = g_t[, 1], dscale = g_t[, 2]),
           "test/references/data/grad_t.csv", row.names = FALSE)
+
+## ---- smooth weight and chaining functions (get_weight_func) ----
+## R's `get_weight_func` builds the normal and logistic weight functions of
+## Allen (2024) and their matching chaining functions. The Julia counterparts
+## are `weight_function` and `chaining_function`.
+set.seed(2718)
+wf_dat <- rnorm(200)
+wf_y <- 0.3
+wf_X <- matrix(rnorm(4 * 120), nrow = 4)
+wf_yv <- rnorm(4)
+rows <- list()
+for (nm in c("norm_cdf", "norm_surv", "norm_pdf",
+             "logis_cdf", "logis_surv", "logis_pdf")) {
+  for (mu in c(-0.5, 0, 1.2)) for (sg in c(0.4, 1, 2.5)) {
+    rows[[length(rows) + 1]] <- data.frame(
+      name = nm, mu = mu, sigma = sg,
+      ow = owcrps_sample(y = wf_y, dat = wf_dat,
+                         weight_func = get_weight_func(nm, mu, sg, weight = TRUE)),
+      tw = twcrps_sample(y = wf_y, dat = wf_dat,
+                         chain_func = get_weight_func(nm, mu, sg, weight = FALSE)))
+  }
+}
+write_ref("weight_func_univ", do.call(rbind, rows))
+write_ref("weight_func_univ_dat", data.frame(dat = wf_dat, y = wf_y))
+
+## Multivariate: R allows only the normal shapes, since the logistic chaining
+## function has no product form.
+rows <- list()
+for (nm in c("norm_cdf", "norm_surv", "norm_pdf")) {
+  for (mu in c(0, 0.8)) for (sg in c(0.7, 1.5)) {
+    # Different in every dimension, so that a weight applying one dimension's
+    # parameters to all of them cannot match. The test rebuilds the same
+    # vectors from the base `mu` and `sigma` written to the table.
+    muv <- mu + c(0, 0.4, -0.3, 0.8); sgv <- sg * c(1, 0.7, 1.3, 0.9)
+    rows[[length(rows) + 1]] <- data.frame(
+      name = nm, mu = mu, sigma = sg,
+      ow = owes_sample(y = wf_yv, dat = wf_X,
+                       weight_func = get_weight_func(nm, muv, sgv, weight = TRUE)),
+      tw = twes_sample(y = wf_yv, dat = wf_X,
+                       chain_func = get_weight_func(nm, muv, sgv, weight = FALSE)))
+  }
+}
+write_ref("weight_func_mv", do.call(rbind, rows))
+write_ref("weight_func_mv_dat",
+          cbind(as.data.frame(t(wf_X)), y = NA)[, seq_len(4)])
+write_ref("weight_func_mv_obs", data.frame(y = wf_yv))

@@ -6,10 +6,11 @@ argument, so you rarely need to think about which method you are calling.
 
 ## Parametric forecasts (Distributions.jl)
 
-Pass any `UnivariateDistribution` from
+Pass a distribution from
 [Distributions.jl](https://github.com/JuliaStats/Distributions.jl) as the
-first argument. The package uses a closed-form CRPS where one exists; it falls
-back to adaptive quadrature otherwise.
+first argument. Each family R scoringRules scores has a closed form; see
+[Supported distributions](@ref supported-distributions) for which families
+each score takes.
 
 ```@example modes
 using ScoringRules, Distributions
@@ -113,11 +114,14 @@ corresponding quantile values:
 levels = [0.1, 0.25, 0.5, 0.75, 0.9]
 qs     = [-1.28, -0.67, 0.0, 0.67, 1.28]   # standard-normal quantiles
 
-scores = quantile_score(levels, qs, 0.5)
+quantile_score(levels, qs, 0.5)   # mean pinball loss across the levels
 ```
 
+This returns the mean across levels.
+For the score at each level separately, pass `reduce = identity`:
+
 ```@example modes
-mean(scores)   # mean quantile score
+quantile_score(levels, qs, 0.5; reduce = identity)
 ```
 
 For a single quantile level from an ensemble:

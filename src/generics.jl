@@ -1,18 +1,38 @@
 # Generic definitions of the three univariate scores.
 #
-# `logs` and `dss` have closed forms that depend only on the log-density and on
-# the first two moments, so a single generic method covers every
-# `Distributions.jl` type. `crps` needs a distribution-specific closed form;
-# the generic methods here provide a numerical fallback (quadrature for
-# continuous distributions, summation for discrete ones) that the
-# per-distribution methods in `crps/` override.
+# Each score covers the forecast families R scoringRules scores, and no
+# others. `logs` and `dss` need only the log-density and the first two
+# moments: one method each serves every family on R's list; `crps` has one
+# closed-form method per family, in `crps/`.
 #
 # All three follow the negative orientation used throughout the package: a
 # *lower* score indicates a better forecast. Broadcast over vectors of
 # forecasts and observations with the usual dot syntax, e.g. `crps.(ds, ys)`.
 
+# Forecast families R scoringRules has a `logs_*` function for.
+const _TDistLocScale = Distributions.LocationScale{<:Real, Continuous, <:TDist}
+const _NormalMixture = MixtureModel{Univariate, Continuous, <:Normal}
+const _BetaLocScale = Distributions.LocationScale{<:Real, Continuous, <:Beta}
+const _ExpLocScale = Distributions.LocationScale{<:Real, Continuous, <:Exponential}
+const _LogsForecast = Union{
+    Normal, Truncated{<:Normal}, TDist, _TDistLocScale, Truncated{<:TDist},
+    Truncated{<:_TDistLocScale}, Logistic, Truncated{<:Logistic}, Laplace,
+    LogLaplace, Exponential, Gamma, Beta, _BetaLocScale, Uniform, LogNormal,
+    LogLogistic, GeneralizedExtremeValue, GeneralizedPareto, TwoPieceNormal,
+    TwoPieceExponential, _NormalMixture, Poisson, NegativeBinomial, Binomial,
+    Hypergeometric,
+}
+
+# Forecast families R scoringRules has a `dss_*` function for.
+const _DssForecast = Union{
+    Normal, TDist, _TDistLocScale, Logistic, Laplace, LogLaplace, Exponential,
+    Gamma, Beta, _BetaLocScale, Uniform, LogNormal, LogLogistic,
+    GeneralizedExtremeValue,
+    GeneralizedPareto, _NormalMixture, Poisson, NegativeBinomial,
+}
+
 """
-    logs(d::UnivariateDistribution, y)
+    logs(d, y)
 
 Logarithmic score of the forecast distribution `d` at the observation `y`,
 equal to the negative log-likelihood `-logpdf(d, y)` (or `-logpmf` for discrete
@@ -20,7 +40,12 @@ equal to the negative log-likelihood `-logpdf(d, y)` (or `-logpmf` for discrete
 
 # Arguments
 
-  - `d`: forecast distribution (any `UnivariateDistribution`).
+  - `d`: forecast distribution, from a family R scoringRules has a `logs_*`
+    function for: normal, Student-t (location-scale), logistic and their
+    truncations, Laplace, [`LogLaplace`](@ref), exponential (also shifted),
+    gamma, beta (also on an interval), uniform, log-normal, log-logistic, GEV, GPD, [`TwoPieceNormal`](@ref),
+    [`TwoPieceExponential`](@ref), a mixture of normals, Poisson, negative
+    binomial, binomial and hypergeometric.
   - `y`: scalar observation.
 
 # Example
@@ -30,10 +55,19 @@ using Distributions, ScoringRules
 logs(Normal(0, 1), 0.5)
 ```
 """
-logs(d::UnivariateDistribution, y::Real) = -logpdf(d, y)
+logs(d::_LogsForecast, y::Real) = -logpdf(d, y)
+
+# R's shifted exponential (`logs_exp2`, `crps_expM`) increases from its
+# location; a negative scale would make it decrease, which R has no form for.
+function _check_exp_scale(d::_ExpLocScale)
+    d.σ > 0 || throw(ArgumentError("R scoringRules has no exponential with a negative scale"))
+    return d
+end
+
+logs(d::_ExpLocScale, y::Real) = -logpdf(_check_exp_scale(d), y)
 
 """
-    dss(d::UnivariateDistribution, y)
+    dss(d, y)
 
 Dawid–Sebastiani score of the forecast distribution `d` at the observation `y`,
 
@@ -51,7 +85,11 @@ the `dss_*` functions in R scoringRules.
 
 # Arguments
 
-  - `d`: forecast distribution (any `UnivariateDistribution`).
+  - `d`: forecast distribution, from a family R scoringRules has a `dss_*`
+    function for: normal, Student-t (location-scale), logistic, Laplace,
+    [`LogLaplace`](@ref), exponential, gamma, beta (also on an interval),
+    uniform, log-normal, log-logistic, GEV, GPD, a mixture of normals, Poisson
+    and negative binomial.
   - `y`: scalar observation.
 
 # Example
@@ -61,7 +99,7 @@ using Distributions, ScoringRules
 dss(Normal(0, 1), 0.5)
 ```
 """
-function dss(d::UnivariateDistribution, y::Real)
+function dss(d::_DssForecast, y::Real)
     v = _forecast_var(d)
     # A nonexistent variance means the DSS is undefined; return NaN, as the
     # dss_* functions in R scoringRules do.
@@ -137,7 +175,7 @@ function ess_moments(y::Real, mean::Real, var::Real, skew::Real)
 end
 
 """
-    crps(d::UnivariateDistribution, y)
+    crps(d, y)
 
 Continuous ranked probability score of the forecast distribution `d` at the
 observation `y`,
@@ -146,12 +184,13 @@ observation `y`,
 \\mathrm{CRPS}(F, y) = \\int_{-\\infty}^{\\infty} \\bigl(F(x) - \\mathbf{1}\\{x \\ge y\\}\\bigr)^2 \\, dx .
 ```
 
-Distribution-specific methods provide closed forms; this generic method is a
-numerical fallback (adaptive quadrature for continuous `d`). Lower is better.
+Each family R scoringRules scores has its own closed-form method; see
+[Supported distributions](@ref supported-distributions) for the list. Lower is
+better.
 
 # Arguments
 
-  - `d`: forecast distribution (any `UnivariateDistribution`).
+  - `d`: forecast distribution.
   - `y`: scalar observation.
 
 # Example
@@ -161,28 +200,4 @@ using Distributions, ScoringRules
 crps(Normal(0, 1), 0.5)
 ```
 """
-function crps(d::ContinuousUnivariateDistribution, y::Real)
-    lo = minimum(d)
-    hi = maximum(d)
-    left, _ = quadgk(x -> cdf(d, x)^2, lo, y)
-    right, _ = quadgk(x -> ccdf(d, x)^2, y, hi)
-    return left + right
-end
-
-# Generic discrete fallback: CRPS = Σ_k (F(k) - 1{k ≥ y})^2 over the integer
-# support, truncating an unbounded upper tail once the survival probability is
-# negligible.
-function crps(d::DiscreteUnivariateDistribution, y::Real)
-    lo = minimum(d)
-    hi = maximum(d)
-    if !isfinite(hi)
-        hi = ceil(Int, quantile(d, 1 - 1.0e-12)) + 1
-    end
-    lo = isfinite(lo) ? ceil(Int, lo) : floor(Int, quantile(d, 1.0e-12)) - 1
-    s = 0.0
-    for k in lo:hi
-        Fk = cdf(d, k)
-        s += (Fk - (k >= y ? 1.0 : 0.0))^2
-    end
-    return s
-end
+function crps end
