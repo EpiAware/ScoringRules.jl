@@ -1,4 +1,4 @@
-# ScoringRules <img src="docs/src/assets/logo-dark.svg" width="150" alt="ScoringRules logo" align="right">
+# ScoringRules <img src="docs/src/assets/logo.svg" width="150" alt="ScoringRules logo" align="right">
 
 <!-- badges:start -->
 | **Documentation** | **Build Status** | **Code Quality** | **License & DOI** | **Downloads** |
