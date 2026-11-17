@@ -33,7 +33,9 @@ function _wk_logis_pdf(z, μ, σ)
     return logistic(u) * logistic(-u) / σ
 end
 
-_ck_norm_cdf(z, μ, σ) = (z - μ) * _norm_cdf((z - μ) / σ) + σ * _norm_pdf((z - μ) / σ)
+# R writes the second term as σ² times the N(μ, σ²) density, which is NaN
+# rather than Inf at σ = Inf.
+_ck_norm_cdf(z, μ, σ) = (z - μ) * _norm_cdf((z - μ) / σ) + σ^2 * (_norm_pdf((z - μ) / σ) / σ)
 _ck_norm_surv(z, μ, σ) = z - _ck_norm_cdf(z, μ, σ)
 _ck_norm_pdf(z, μ, σ) = _norm_cdf((z - μ) / σ)
 _ck_logis_cdf(z, μ, σ) = σ * log1pexp((z - μ) / σ)
@@ -175,11 +177,8 @@ function _check_weight_params(name::Symbol, mu, sigma)
     )
     all(>(0), sigma) ||
         throw(DomainError(sigma, "sigma must be strictly positive"))
-    # R accepts any `mu`: an infinite one makes the weight constant, 0 or 1,
-    # and the kernels give R's values for it. An infinite `sigma` is refused:
-    # its weight is flat and R's normal chaining functions return NaN for it.
-    all(isfinite, sigma) ||
-        throw(ArgumentError("sigma must be finite"))
+    # As in R, `mu` and `sigma` may be infinite: an infinite `mu` makes the
+    # weight constant at 0 or 1, and an infinite `sigma` makes it flat.
     # R rejects the logistic shapes with vector parameters, for the weight and
     # the chaining function alike.
     max(lm, ls) > 1 && name in _LOGIS_NAMES && throw(
@@ -208,8 +207,8 @@ TRUE)` in R scoringRules.
 # Keyword Arguments
 
   - `mu`: location of the weight, a scalar or a length-`d` vector.
-  - `sigma`: scale of the weight, finite and strictly positive, a scalar or a
-    length-`d` vector.
+  - `sigma`: scale of the weight, strictly positive, a scalar or a length-`d`
+    vector.
 
 `name` selects the shape, with `mu` and `sigma` its location and scale:
 
@@ -259,8 +258,8 @@ FALSE)` in R scoringRules.
 # Keyword Arguments
 
   - `mu`: location of the weight, a scalar or a length-`d` vector.
-  - `sigma`: scale of the weight, finite and strictly positive, a scalar or a
-    length-`d` vector.
+  - `sigma`: scale of the weight, strictly positive, a scalar or a length-`d`
+    vector.
 
 `name`, `mu` and `sigma` are as in [`weight_function`](@ref), and the function
 returned is the antiderivative of the weight of the same name:

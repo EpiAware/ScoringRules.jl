@@ -79,8 +79,6 @@ end
     @test_throws ArgumentError chaining_function(:gumbel_cdf)
     @test_throws DomainError weight_function(:norm_cdf; sigma = 0.0)
     @test_throws DomainError weight_function(:norm_cdf; sigma = -1.0)
-    @test_throws ArgumentError weight_function(:norm_cdf; sigma = Inf)
-    @test_throws ArgumentError chaining_function(:norm_cdf; sigma = Inf)
     @test_throws DimensionMismatch weight_function(:norm_cdf; mu = [0.0, 1.0], sigma = [1.0, 2.0, 3.0])
     # As in R, the logistic shapes have no multivariate form. R applies the
     # same check whichever half of the pair it is asked for, and a chaining
@@ -160,4 +158,24 @@ end
         @test all(isnan, weight_function(name; mu = NaN).(x))
         @test all(isnan, chaining_function(name; mu = NaN).(x))
     end
+end
+
+@testitem "an infinite sigma gives R's flat weights and chaining functions" tags = [:sample] begin
+    using ScoringRules
+
+    # R: get_weight_func(name, 0, Inf) and get_weight_func(name, 0, Inf,
+    # weight = FALSE) evaluated at x = c(-1, 0, 2).
+    x = [-1.0, 0.0, 2.0]
+    ref = Dict(
+        :norm_cdf => (0.5, NaN), :norm_surv => (0.5, NaN), :norm_pdf => (0.0, 0.5),
+        :logis_cdf => (0.5, Inf), :logis_surv => (0.5, -Inf), :logis_pdf => (0.0, 0.5),
+    )
+    for (name, (wr, cr)) in ref
+        @test all(==(wr), weight_function(name; sigma = Inf).(x))
+        @test isequal(chaining_function(name; sigma = Inf).(x), fill(cr, 3))
+    end
+    # R: owcrps_sample(0.4, c(0.1, 0.5, 0.9),
+    #   weight_func = get_weight_func("norm_cdf", 0, Inf)).
+    w = weight_function(:norm_cdf; sigma = Inf)
+    @test owcrps([0.1, 0.5, 0.9], 0.4; weight_func = w) ≈ 0.06111111 rtol = 1.0e-6
 end
