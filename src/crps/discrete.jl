@@ -24,10 +24,11 @@ returns `Q` directly rather than `1 - P`, keeping the far upper tail accurate.
 """
 function _crps_pois(y::Real, lambda::Real)
     # As in R: NaN propagates, and an infinite observation is infinitely far
-    # from a forecast with a finite mean.
+    # from a forecast with a finite mean. Both are built from `y` and `λ` so
+    # that a dual number keeps NaN partials, or the slope of `|y - λ|`.
+    isnan(y) && return (y + lambda) * oftype(float(y), NaN)
+    isinf(y) && return abs(y - lambda)
     T = typeof(float(y) * float(lambda))
-    isnan(y) && return T(NaN)
-    isinf(y) && return T(Inf)
     k = floor(y + 1)
     poiscdf = k <= 0 ? oftype(float(lambda), 0) : ccdf_ad_safe(Gamma(k, 1.0), lambda)
     c1 = (y - lambda) * (2 * poiscdf - 1)
