@@ -130,8 +130,9 @@ g$crps <- crps_gtclogis(g$y, location = g$location, scale = g$scale,
 write_ref("gtclogis", g)
 
 ## ---- Student-t ------------------------------------------------------------
-g <- grid(df = c(2, 3, 10, 30), location = c(-1, 0, 2), scale = c(0.5, 1, 3),
-          y = c(-5, -1, 0, 1, 5))
+g <- grid(df = c(1.5, 2, 3, 10, 30, 200), location = c(-1, 0, 2),
+          scale = c(0.5, 1, 3),
+          y = c(-500, -5, -1, 0, 1, 5, 500))
 g$crps <- crps_t(g$y, df = g$df, location = g$location, scale = g$scale)
 g$logs <- logs_t(g$y, df = g$df, location = g$location, scale = g$scale)
 g$dss  <- dss_t(g$y, df = g$df, location = g$location, scale = g$scale)
@@ -151,9 +152,9 @@ g$logs <- logs_tt(g$y, df = g$df, location = g$location, scale = g$scale,
 write_ref("tt", g)
 
 ## ---- censored Student-t ---------------------------------------------------
-g <- grid(df = c(3, 10), location = c(-1, 0, 2), scale = c(0.5, 2),
-          lower = c(-Inf, -1, 0), upper = c(Inf, 1, 5),
-          y = c(-2, 0, 0.5, 3))
+g <- grid(df = c(2.5, 3, 10, 20), location = c(-1, 0, 2), scale = c(0.5, 2),
+          lower = c(-Inf, -1, 0, 100), upper = c(Inf, 1, 5, -50, -200),
+          y = c(-201, -51, -2, 0, 0.5, 3, 101))
 g <- g[g$lower < g$upper, ]
 g$crps <- crps_ct(g$y, df = g$df, location = g$location, scale = g$scale,
                   lower = g$lower, upper = g$upper)
@@ -240,10 +241,12 @@ write_ref("lnorm", g)
 
 ## ---- GEV ------------------------------------------------------------------
 # shape < 1 required; cover negative (Weibull), zero (Gumbel ~0), positive (Frechet)
-g <- grid(shape = c(-0.5, -0.1, 0.0, 0.1, 0.5, 0.9),
+# Shapes down to 1e-3 either side of zero, where the general closed form and
+# the Gumbel limit have to meet.
+g <- grid(shape = c(-0.5, -0.1, -0.01, -0.001, 0.0, 0.001, 0.01, 0.1, 0.5, 0.9),
           location = c(-1, 0, 2), scale = c(0.5, 1, 2),
           y = c(-3, -1, 0, 1, 3, 8))
-# shape=0 exactly triggers Gumbel limit; use very small value near 0 for robustness
+# shape = 0 takes the Gumbel branch; the neighbouring shapes take the general one
 g$crps <- crps_gev(g$y, shape = g$shape, location = g$location, scale = g$scale)
 g$logs <- logs_gev(g$y, shape = g$shape, location = g$location, scale = g$scale)
 g$dss  <- dss_gev(g$y, shape = g$shape, location = g$location, scale = g$scale)
@@ -252,7 +255,7 @@ write_ref("gev", g)
 ## ---- GPD ------------------------------------------------------------------
 # Includes observations below the support with positive shape (y < location),
 # which the closed form now handles exactly as R does.
-g <- grid(shape = c(-0.5, 0.0, 0.5, 0.9),
+g <- grid(shape = c(-0.5, -0.01, -0.001, 0.0, 0.001, 0.01, 0.5, 0.9),
           location = c(0, 1), scale = c(0.5, 1, 2),
           y = c(-2, -0.5, 0, 0.5, 1, 2, 5))
 g$crps <- crps_gpd(g$y, shape = g$shape, location = g$location, scale = g$scale)
@@ -340,8 +343,8 @@ g$dss  <- dss_nbinom(g$y, size = g$size, prob = g$prob)
 write_ref("nbinom", g)
 
 ## ---- Binomial -------------------------------------------------------------
-g <- grid(size = c(5, 10, 20), prob = c(0.2, 0.5, 0.8),
-          y = c(0, 2, 5, 10, 20))
+g <- grid(size = c(5, 10, 20, 200), prob = c(0.02, 0.2, 0.5, 0.8),
+          y = c(-3, 0, 2, 5, 10, 20, 150))
 g <- g[g$y <= g$size, ]
 g$crps <- crps_binom(g$y, size = g$size, prob = g$prob)
 g$logs <- logs_binom(g$y, size = g$size, prob = g$prob)
@@ -817,14 +820,14 @@ gn <- expand.grid(location = c(-1, 0, 1, 2), scale = c(0.5, 1, 2),
 g_norm  <- gradcrps_norm(gn$y, gn$location, gn$scale)
 g_logis <- gradcrps_logis(gn$y, gn$location, gn$scale)
 write.csv(cbind(gn, dloc = g_norm[, 1],  dscale = g_norm[, 2]),
-          "test/references/data/grad_norm.csv",  row.names = FALSE)
+          file.path(outdir, "grad_norm.csv"),  row.names = FALSE)
 write.csv(cbind(gn, dloc = g_logis[, 1], dscale = g_logis[, 2]),
-          "test/references/data/grad_logis.csv", row.names = FALSE)
+          file.path(outdir, "grad_logis.csv"), row.names = FALSE)
 gt <- expand.grid(df = c(2, 5, 20), location = c(0, 1), scale = c(1, 2),
                   y = c(-1.5, 0.3, 1.2, 3))
 g_t <- gradcrps_t(gt$y, gt$df, gt$location, gt$scale)
 write.csv(cbind(gt, dloc = g_t[, 1], dscale = g_t[, 2]),
-          "test/references/data/grad_t.csv", row.names = FALSE)
+          file.path(outdir, "grad_t.csv"), row.names = FALSE)
 
 ## ---- smooth weight and chaining functions (get_weight_func) ----
 ## R's `get_weight_func` builds the normal and logistic weight functions of
