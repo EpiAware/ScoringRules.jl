@@ -1,3 +1,7 @@
+## Unreleased
+
+- `crps(::Poisson, y)` returns `NaN` for a `NaN` observation, `Inf` for an infinite one and a finite score for an observation beyond the range of `Int`, as R's `crps_pois` does. It used to throw.
+
 ## 1.0.0
 
 First working version: a port of the R
