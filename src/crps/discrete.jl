@@ -28,7 +28,7 @@ function _besselix_asymptotic(nu::Integer, x::Real)
 end
 
 # Poisson mass by Loader's saddle-point form, without the cancellation in `logpdf`.
-function _poispdf_large(k::Integer, lambda::Real)
+function _poispdf_large(k::Real, lambda::Real)
     d = k - lambda
     if abs(d) < 0.1 * (k + lambda)
         v = d / (k + lambda)
@@ -62,8 +62,8 @@ function _crps_pois(y::Real, lambda::Real)
     poiscdf = k <= 0 ? oftype(float(lambda), 0) : ccdf_ad_safe(Gamma(k, 1.0), lambda)
     c1 = (y - lambda) * (2 * poiscdf - 1)
     x = 2 * lambda
-    n = floor(Int, y)
-    pmf = x < _BESSEL_ASYMPTOTIC_MIN || n < 1000 ? pdf(Poisson(lambda), n) :
+    n = floor(y)
+    pmf = x < _BESSEL_ASYMPTOTIC_MIN || n < 1000 ? pdf(Poisson(lambda), n < 1000 ? Int(n) : n) :
         _poispdf_large(n, lambda)
     bessel(nu) = x < _BESSEL_ASYMPTOTIC_MIN ? besselix(nu, x) : _besselix_asymptotic(nu, x)
     c2 = 2 * pmf - (bessel(0) + bessel(1))
