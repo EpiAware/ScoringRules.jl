@@ -14,7 +14,7 @@ Lerch and Allen). See the README for attribution and provenance.
   two-piece exponential and mixture-of-normals families, and for the Poisson,
   negative binomial, binomial and hypergeometric discrete families.
 - The Poisson `crps` no longer throws an `AmosException` beyond `λ ≈ 5e8`
-  and stays accurate for large means.
+  and is accurate for large means.
 - `LogLaplace`, `TwoPieceNormal` and `TwoPieceExponential` distribution types
   (the log-logistic uses `Distributions.LogLogistic`).
 - `BoundaryMass(dist; lower, upper, lmass, umass)` distribution wrapper for
