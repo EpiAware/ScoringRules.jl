@@ -13,7 +13,7 @@ Lerch and Allen). See the README for attribution and provenance.
   uniform, log-normal, log-logistic, log-Laplace, GEV, GPD, two-piece normal,
   two-piece exponential and mixture-of-normals families, and for the Poisson,
   negative binomial, binomial and hypergeometric discrete families.
-- The Poisson `crps` stays accurate for any mean. Beyond `λ ≈ 5e8` it no longer throws an `AmosException`, and above `λ ≈ 5e5` it evaluates the scaled Bessel functions by their large-argument expansion and the Poisson mass without cancellation. R's `crps_pois` returns wrong scores from `λ ≈ 1e5`; see the Differences from R page.
+- The Poisson `crps` no longer throws an `AmosException` beyond `λ ≈ 5e8` and stays accurate for large means. R's `crps_pois` fails from `λ ≈ 1e5`; see the Differences from R page.
 - `LogLaplace`, `TwoPieceNormal` and `TwoPieceExponential` distribution types
   (the log-logistic uses `Distributions.LogLogistic`).
 - `BoundaryMass(dist; lower, upper, lmass, umass)` distribution wrapper for

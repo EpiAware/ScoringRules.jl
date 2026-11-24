@@ -38,7 +38,7 @@ in all tested cases.
 
 From a mean of about ``10^5``, R's `besselI(x, nu, expon.scaled = TRUE)` returns zero, and `crps_pois` returns wrong scores. At ``\lambda = 10^8`` with ``y = \lambda`` it returns 7978.85, whereas the normal limit ``\sqrt{\lambda}(\sqrt{2} - 1)/\sqrt{\pi}`` is about 2337 and ScoringRules.jl returns 2336.95.
 
-ScoringRules.jl evaluates the scaled Bessel functions with their large-argument expansion once ``2\lambda \ge 10^6``, since `besselix` throws an `AmosException` beyond ``\lambda \approx 5 \times 10^8``. From the same point it computes the Poisson mass with a saddle-point form that avoids the loss of digits in `logpdf`. Scores therefore stay finite and accurate for any mean, and agree with R wherever R is correct.
+ScoringRules.jl uses a large-argument expansion for the scaled Bessel functions and a saddle-point form for the Poisson mass once ``2\lambda \ge 10^6``. Scores stay finite and accurate for any mean.
 
 ## Ensemble DSS: population vs sample variance
 

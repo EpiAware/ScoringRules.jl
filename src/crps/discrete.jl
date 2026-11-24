@@ -11,14 +11,10 @@
 
 # ── Poisson ────────────────────────────────────────────────────────────────
 # Formula from Jordan et al. (2019), translating crps_pois in scores_pois.R.
-# R's `besselI(x, nu, expon.scaled = TRUE)` is `besselix(nu, x)`, the scaled
-# form; the unscaled `besseli` overflows from x = 2λ ≈ 700. `besselix` itself
-# throws an `AmosException` from x ≈ 1e9, so large arguments use the expansion
-# below instead.
+# R's `besselI(x, nu, expon.scaled = TRUE)` is `besselix(nu, x)`.
 
 # Large-argument expansion exp(-x) I_ν(x) ≈ (2πx)^(-1/2) Σₖ cₖ with c₀ = 1 and
-# cₖ = cₖ₋₁ ((2k-1)² - 4ν²) / (8kx). Ten terms leave a relative error below
-# 1e-30 for x ≥ 1e6.
+# cₖ = cₖ₋₁ ((2k-1)² - 4ν²) / (8kx).
 const _BESSEL_ASYMPTOTIC_MIN = 1.0e6
 
 function _besselix_asymptotic(nu::Integer, x::Real)
@@ -31,9 +27,7 @@ function _besselix_asymptotic(nu::Integer, x::Real)
     return total / sqrt(2 * pi * x)
 end
 
-# `logpdf(Poisson(λ), k)` subtracts terms of size λ and loses about log10(λ) - 16
-# digits of the mass at large λ. Loader's saddle-point form evaluates the
-# deviance term `λ - k + k log(k/λ)` without that cancellation.
+# Poisson mass by Loader's saddle-point form, without the cancellation in `logpdf`.
 function _poispdf_large(k::Integer, lambda::Real)
     d = k - lambda
     if abs(d) < 0.1 * (k + lambda)
@@ -50,13 +44,9 @@ function _poispdf_large(k::Integer, lambda::Real)
     else
         s = k * log(k / lambda) + lambda - k
     end
-    # Stirling error of k!; accurate to 1e-18 for k ≥ 1000.
     stirlerr = 1 / (12k) - 1 / (360 * float(k)^3)
     return exp(-stirlerr - s) / sqrt(2 * pi * k)
 end
-
-_besselix01(nu::Integer, x::Real) =
-    x < _BESSEL_ASYMPTOTIC_MIN ? besselix(nu, x) : _besselix_asymptotic(nu, x)
 
 """
 CRPS of a `Poisson(λ)` forecast, in closed form.
@@ -75,7 +65,8 @@ function _crps_pois(y::Real, lambda::Real)
     n = floor(Int, y)
     pmf = x < _BESSEL_ASYMPTOTIC_MIN || n < 1000 ? pdf(Poisson(lambda), n) :
         _poispdf_large(n, lambda)
-    c2 = 2 * pmf - (_besselix01(0, x) + _besselix01(1, x))
+    bessel(nu) = x < _BESSEL_ASYMPTOTIC_MIN ? besselix(nu, x) : _besselix_asymptotic(nu, x)
+    c2 = 2 * pmf - (bessel(0) + bessel(1))
     return c1 + lambda * c2
 end
 
