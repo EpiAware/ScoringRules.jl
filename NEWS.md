@@ -1,3 +1,7 @@
+## Unreleased
+
+- `crps(dat, y; bw)` warns that `bw` is ignored when the method is `:edf`, as R's `crps_sample` does.
+
 ## 1.0.0
 
 First working version: a port of the R
