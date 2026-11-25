@@ -216,8 +216,8 @@ Logarithmic score of an ensemble forecast `dat` (a vector of `m` simulation
 draws) at observation `y` using Gaussian kernel density estimation.
 
 If `bw` is `nothing`, Silverman's rule-of-thumb bandwidth is used (matching
-R's `bw.nrd`), computed from `dat` alone, ignoring `w`.  With member weights
-the density is `sum(w .* pdf.(Normal.(dat, bw), y)) / sum(w)`.  Lower is better.
+R's `bw.nrd`) computed from `dat` alone.  With `w`, the density is
+`sum(w .* pdf.(Normal.(dat, bw), y)) / sum(w)`.  Lower is better.
 
 # Arguments
 
@@ -232,8 +232,8 @@ the density is `sum(w .* pdf.(Normal.(dat, bw), y)) / sum(w)`.  Lower is better.
 # Provenance
 
 Ported from `logs_sample` / `lsmixnC` in R scoringRules (scores_sample_univ.R;
-mixn.cpp; Jordan, Krüger, Lerch, Allen). R's `logs_sample` takes no member
-weights; `w` is an extension.
+mixn.cpp; Jordan, Krüger, Lerch, Allen). `w` is an extension: R's
+`logs_sample` takes no weights.
 
 # Example
 
@@ -254,7 +254,6 @@ function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing, w = nothing)
             any(i -> dat[i] == y && w[i] > 0, eachindex(dat))
         return hit ? -Inf : Inf
     end
-    # KDE density at y: the weighted mean of φ_{bw}(y − datᵢ); log score = −log density
     den = 0.0
     sw = 0.0
     @inbounds for i in eachindex(dat)

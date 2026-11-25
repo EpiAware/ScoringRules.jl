@@ -87,8 +87,6 @@
         # Invalid weights throw.
         @test_throws DimensionMismatch dss(dat, y; w = w[1:3])
         @test_throws ArgumentError dss(dat, y; w = -w)
-        # The weighted log score is the weighted kernel density, with the
-        # default bandwidth taken from the ensemble alone.
         bwd = _bw_nrd(dat)
         for yy in (-2.0, y, 1.5), bwv in (nothing, 0.2, 1.0)
             b = bwv === nothing ? bwd : bwv
@@ -97,7 +95,6 @@
             @test logs(dat, yy; w = 7 .* w, bw = bwv) ≈ logs(dat, yy; w = w, bw = bwv)
         end
         @test logs(dat, y; w = uniform) ≈ logs(dat, y)
-        # A zero-weight member does not count at zero bandwidth.
         d0 = [0.0, 1.0, 3.0]
         @test logs(d0, 1.0; bw = 0, w = [1, 1, 1]) == -Inf
         @test logs(d0, 1.0; bw = 0, w = [1, 0, 1]) == Inf
