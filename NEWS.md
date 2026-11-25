@@ -1,6 +1,6 @@
 ## Unreleased
 
-- `logs(dat, y; w)` takes optional member weights, giving the weighted kernel density `sum(w .* pdf.(Normal.(dat, bw), y)) / sum(w)`. The default bandwidth is computed from `dat` alone. R's `logs_sample` has no weights, so this extends its interface.
+- `logs(dat, y; w)` takes optional member weights. The density is then `sum(w .* pdf.(Normal.(dat, bw), y)) / sum(w)`, and the default bandwidth is computed from `dat` alone. R's `logs_sample` takes no weights, so this extends its interface.
 - `crps(dat, y; bw)` warns that `bw` is ignored when the method is `:edf`, as R's `crps_sample` does.
 
 ## 1.0.0
