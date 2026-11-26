@@ -58,6 +58,8 @@ implementations agree for practical purposes. The full test suite checks
 `logs`/`dss`, the ensemble scores and the weighted/multivariate scores the same
 way, at `atol = 1e-9, rtol = 1e-7`.
 
+The reference grids reach the parameters where the closed forms are hardest to get right: a Student's ``t`` with 1.5 or 200 degrees of freedom observed 500 scale units out, a censored ``t`` with a bound in the far tail, GEV and GPD shapes within `1e-3` of zero, and a binomial with 200 trials. The table above includes the widened Student's ``t`` and binomial rows; the GEV, GPD and censored ``t`` grids are compared in the test suite.
+
 ## Gradients via automatic differentiation
 
 R ships analytic CRPS gradients (`gradcrps_*`) only for the Normal, Logistic and

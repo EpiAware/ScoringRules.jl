@@ -151,7 +151,8 @@ Two approximation methods are available via `method`:
 
   - `:edf` (default) — empirical distribution function approximation using the
     quantile decomposition of Laio & Tamea (2007).  Optional finite, non-negative weights
-    `w` (length `m`) are normalised to sum to one internally.
+    `w` (length `m`) are normalised to sum to one internally. The `bw`
+    argument is ignored for this method, with a warning, as in R.
 
   - `:kde` — Gaussian kernel density estimate with bandwidth `bw`.  If `bw` is
     `nothing`, Silverman's rule-of-thumb is applied (matching R's `bw.nrd`).
@@ -168,7 +169,8 @@ Lower is better.
 
   - `method`: `:edf` (default) or `:kde`.
   - `w`: optional finite, non-negative weight vector (length `m`) with a positive sum; only used for `:edf`.
-  - `bw`: optional bandwidth; only used for `:kde`.
+  - `bw`: optional bandwidth; only used for `:kde`. Passing it with `:edf`
+    warns that it is ignored.
 
 # Provenance
 
@@ -190,6 +192,8 @@ function crps(
     _check_nonempty(dat)
     _check_finite_sample(dat, y)
     if method === :edf
+        bw === nothing ||
+            @warn "the `bw` argument is ignored for method = :edf" maxlog = 1
         if w === nothing
             return _crps_edf_unweighted(y, dat)
         else
