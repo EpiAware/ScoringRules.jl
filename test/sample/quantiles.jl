@@ -153,3 +153,29 @@ end
         @test quantile_score([alpha], [q[i]], y) ≈ per_level[i]
     end
 end
+
+@testitem "ensemble quantile and interval scores do not depend on the ensemble's axes" tags = [:sample] begin
+    using ScoringRules
+    using OffsetArrays
+
+    # An ensemble with offset axes scores as the plain vector of the same
+    # values; the reference values are from R scoringRules 1.1.3 on that
+    # plain vector.
+    v = [3.0, 1.0, 2.0, 5.0, -0.5]
+    y = 1.5
+    @test quantile_score(v, y; alpha = 0.3) ≈ 0.0899999999999999 rtol = 1.0e-12
+    @test quantile_score(v, y; alpha = 0.3, type = 1) ≈ 0.15 rtol = 1.0e-12
+    @test interval_score(v, y; level = 0.6) ≈ 2.7 rtol = 1.0e-12
+    for ax in (0:4, -3:1, 2:6)
+        o = OffsetArray(v, ax)
+        for type in 1:9, alpha in (0.05, 0.3, 0.5, 0.9)
+            @test quantile_score(o, y; alpha, type) ≈ quantile_score(v, y; alpha, type) rtol = 1.0e-12
+        end
+        for type in 1:9, level in (0.2, 0.6, 0.9)
+            @test interval_score(o, y; level, type) ≈ interval_score(v, y; level, type) rtol = 1.0e-12
+        end
+    end
+
+    # R: qs_sample(1.5, c(3, 1, 2, 5), alpha = 0.3).
+    @test quantile_score(OffsetArray([3.0, 1.0, 2.0, 5.0], 0:3), 1.5; alpha = 0.3) ≈ 0.28 rtol = 1.0e-12
+end

@@ -44,6 +44,12 @@ function _check_member_weights(dat::AbstractVector, w::AbstractVector)
     return nothing
 end
 
+# The ensemble's values in a one-based `Vector`. An ensemble is a set of values,
+# so one with offset axes scores as the plain vector of the same values; the
+# helpers that take a member's rank or a mixture component from its index, or
+# that call `Statistics.quantile` (which rejects offset axes), work on this copy.
+_plain_vector(x::AbstractVector) = copyto!(Vector{eltype(x)}(undef, length(x)), x)
+
 # Silverman's rule-of-thumb bandwidth, matching R's `bw.nrd`.
 # bw.nrd(x) = 1.06 * min(sd(x), IQR(x)/1.34) * n^(-1/5)
 # R's var() uses the (n − 1) denominator and quantile() uses type 7 (linear
@@ -53,7 +59,8 @@ function _bw_nrd(x::AbstractVector)
     n = length(x)
     n < 2 && error("need at least 2 data points for bandwidth estimation")
     s = std(x)                                   # n-1 denominator
-    q25, q75 = quantile(x, 0.25), quantile(x, 0.75)
+    xs = _plain_vector(x)
+    q25, q75 = quantile(xs, 0.25), quantile(xs, 0.75)
     h = (q75 - q25) / 1.34
     return 1.06 * min(s, h) * n^(-0.2)
 end
@@ -67,7 +74,7 @@ end
 function _crps_edf_unweighted(y::Real, dat::AbstractVector)
     n = length(dat)
     c1n = 1.0 / n
-    x = sort(dat)
+    x = sort!(_plain_vector(dat))
     s = 0.0
     @inbounds for i in eachindex(x)
         a = (i - 0.5) * c1n       # (i − 0.5) / n, i.e. seq(0.5/n, 1−0.5/n)
@@ -105,7 +112,7 @@ function _crps_kde(y::Real, dat::AbstractVector, bw::Union{Real, Nothing})
     n = length(dat)
     ww = fill(1.0 / n, n)
     sw = fill(bw_val, n)
-    return _crps_mixnorm(y, dat, sw, ww)
+    return _crps_mixnorm(y, _plain_vector(dat), sw, ww)
 end
 
 # ---------------------------------------------------------------------------

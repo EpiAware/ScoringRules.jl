@@ -169,7 +169,8 @@ function owcrps(
     # combination reach the NaN return below rather than becoming a NaN vector
     # (normalising an all-zero member-weight vector divides by zero).
     if w === nothing
-        w_mem = ones(length(dat))
+        # A scalar, so the combined weights below keep the ensemble's axes.
+        w_mem = 1.0
     else
         length(w) == length(dat) || throw(
             DimensionMismatch(
