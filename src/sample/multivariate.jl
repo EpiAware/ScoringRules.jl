@@ -16,14 +16,28 @@ export es, vs, mmds
 """
     _check_multiv(X, y)
 
-Verify that `X` is a `d × m` matrix and `y` is a length-`d` vector.
+Verify that `X` is a `d × m` matrix and `y` is a length-`d` vector, both with
+one-based axes.
 """
 function _check_multiv(X::AbstractMatrix, y::AbstractVector)
     d = length(y)
-    return size(X, 1) == d || throw(
+    size(X, 1) == d || throw(
         DimensionMismatch("rows of X ($(size(X, 1))) must equal length of y ($d)")
     )
+    # The score loops index `X`, `y`, the member weights and `w_vs` over
+    # one-based ranges under `@inbounds`, so an offset axis on any of them
+    # reads past the end of the array instead of throwing. `w` and `w_vs` do
+    # not reach here and are checked where they are validated.
+    (_one_based(X) && _one_based(y)) || throw(
+        ArgumentError(
+            "X and y must have one-based axes, got $(axes(X)) and $(axes(y))"
+        )
+    )
+    return nothing
 end
+
+# `Base.require_one_based_indexing` does this but is not public API.
+_one_based(A) = all(ax -> ax == 1:length(ax), axes(A))
 
 """
     _member_weights(m, w)
@@ -53,7 +67,15 @@ end
 Normalised member weights for the columns of the `d × m` ensemble matrix `X`
 (see [`_member_weights`](@ref)).
 """
-_w_helper(X::AbstractMatrix, w) = _member_weights(size(X, 2), w)
+function _w_helper(X::AbstractMatrix, w)
+    # `w ./ sum(w)` keeps the axes of `w`, and the multivariate score loops
+    # index it over `1:m`. The univariate `twcrps` shares `_member_weights` and
+    # loops with `eachindex`, so offset weights stay valid there.
+    w === nothing || _one_based(w) || throw(
+        ArgumentError("member weights w must have one-based axes, got $(axes(w))")
+    )
+    return _member_weights(size(X, 2), w)
+end
 
 """
     _check_w_vs(w_vs, d)
@@ -69,6 +91,9 @@ function _check_w_vs(w_vs::AbstractMatrix, d::Integer)
         )
     )
     any(<(0), w_vs) && throw(ArgumentError("weight matrix w_vs must be non-negative"))
+    _one_based(w_vs) || throw(
+        ArgumentError("w_vs must have one-based axes, got $(axes(w_vs))")
+    )
     return isapprox(w_vs, w_vs'; atol = 1.0e-12) || throw(
         ArgumentError(
             "weight matrix w_vs must be symmetric"
