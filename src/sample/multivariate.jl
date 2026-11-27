@@ -76,27 +76,64 @@ function _check_w_vs(w_vs::AbstractMatrix, d::Integer)
     )
 end
 
+# Squared Euclidean distance between two columns of the ensemble, and between
+# a column and the observation, accumulated in place. `es` and `mmds` take
+# m(m−1)/2 of these, and forming `view(X, :, i) .- view(X, :, j)` for each
+# allocated a temporary per pair: at d = 50, m = 3000 that was 2 GiB per `es`
+# call. `T` is the accumulator type, at least Float64 so that a Float32 square
+# does not overflow where the `norm` this replaced rescaled.
+@inline function _col_sqdist(::Type{T}, X::AbstractMatrix, i::Integer, j::Integer) where {T}
+    s = zero(T)
+    @inbounds @simd for k in axes(X, 1)
+        s += abs2(T(X[k, i] - X[k, j]))
+    end
+    return s
+end
+
+@inline function _col_sqdist(::Type{T}, X::AbstractMatrix, i::Integer, y::AbstractVector) where {T}
+    s = zero(T)
+    @inbounds @simd for k in axes(X, 1)
+        s += abs2(T(X[k, i] - y[k]))
+    end
+    return s
+end
+
+_dist_type(X::AbstractMatrix, y::AbstractVector) =
+    promote_type(_float_type(X), _float_type(y), Float64)
+_dist_type(X::AbstractMatrix) = promote_type(_float_type(X), Float64)
+
+# The Euclidean distance from its square. Two coincident points put the square
+# at exactly zero, where the derivative of `sqrt` is `0 * Inf`, so automatic
+# differentiation would return NaN for any score with a tied pair. The
+# distance has a kink there and zero is its subgradient. Only an exact zero is
+# special: a NaN square, from a missing member or observation, stays NaN.
+@inline _sqrt_dist(s::Real) = iszero(s) ? zero(s) : sqrt(s)
+
 # ---------------------------------------------------------------------------
 # Energy score
 # ---------------------------------------------------------------------------
 
 # "XY" part: Σ_i w_i ‖X_i − y‖
 function _esC_xy(y::AbstractVector, X::AbstractMatrix, w::AbstractVector)
+    T = _dist_type(X, y)
     out = 0.0
-    @inbounds for (wi, xi) in zip(w, eachcol(X))
-        out += wi * norm(xi .- y)
+    @inbounds for i in axes(X, 2)
+        out += w[i] * _sqrt_dist(_col_sqdist(T, X, i, y))
     end
     return out
 end
 
 # "XX" part: Σ_{i≤j} 2 w_i w_j ‖X_i − X_j‖
 function _esC_xx(X::AbstractMatrix, w::AbstractVector)
+    T = _dist_type(X)
     out = 0.0
     m = size(X, 2)
     @inbounds for i in 1:m
-        @inbounds for j in (i + 1):m
-            out += 2.0 * w[i] * w[j] * norm(view(X, :, i) .- view(X, :, j))
+        acc = 0.0
+        for j in (i + 1):m
+            acc += w[j] * _sqrt_dist(_col_sqdist(T, X, i, j))
         end
+        out += 2.0 * w[i] * acc
     end
     return out
 end
@@ -261,24 +298,26 @@ end
 
 # "XY" part: Σ_i w_i exp(−½ ‖X_i − y‖²)
 function _mmdsC_xy(y::AbstractVector, X::AbstractMatrix, w::AbstractVector)
+    T = _dist_type(X, y)
     out = 0.0
-    @inbounds for (wi, xi) in zip(w, eachcol(X))
-        d2 = sum(abs2, xi .- y)
-        out += wi * exp(-0.5 * d2)
+    @inbounds for i in axes(X, 2)
+        out += w[i] * exp(-0.5 * _col_sqdist(T, X, i, y))
     end
     return out
 end
 
 # "XX" part: Σ_i w_i² + Σ_{i<j} 2 w_i w_j exp(−½ ‖X_i − X_j‖²)
 function _mmdsC_xx(X::AbstractMatrix, w::AbstractVector)
+    T = _dist_type(X)
     out = 0.0
     m = size(X, 2)
     @inbounds for i in 1:m
         out += w[i]^2
-        @inbounds for j in (i + 1):m
-            d2 = sum(abs2, view(X, :, i) .- view(X, :, j))
-            out += 2.0 * w[i] * w[j] * exp(-0.5 * d2)
+        acc = 0.0
+        for j in (i + 1):m
+            acc += w[j] * exp(-0.5 * _col_sqdist(T, X, i, j))
         end
+        out += 2.0 * w[i] * acc
     end
     return out
 end

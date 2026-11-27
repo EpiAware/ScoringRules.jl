@@ -141,3 +141,45 @@ end
         @test_throws ArgumentError mmds(X, y; w = fill(-1.0, m))
     end
 end
+
+@testitem "energy score gradients stay finite where members coincide" tags = [:sample] begin
+    using ScoringRules
+    using ForwardDiff: derivative, gradient
+
+    # Ties are ordinary: an integer ensemble has them, and the default clamp
+    # in `twes` sends every member past the bound to the same point. The
+    # distance between two tied members has a kink there, and the subgradient
+    # is zero; the score must not turn it into NaN.
+    cd(f, x; h = 1.0e-6) = (f(x + h) - f(x - h)) / (2h)
+    y = [0.5, 1.0]
+    tied = [1.0 1.0 3.0; 2.0 2.0 0.0]
+    at_obs = [0.5 1.0 3.0; 1.0 2.0 0.0]
+    clamped = [0.2 5.0 6.0 -0.3; 0.1 7.0 8.0 0.4]
+    wf = weight_function(:norm_cdf; mu = [0.0, 0.0], sigma = [2.0, 2.0])
+    # A central difference averages the slopes either side of a kink, which
+    # is the zero subgradient, so it is an independent reference both where
+    # tied members move together and where a member crosses the observation.
+    cases = [
+        s -> es(tied .+ s, y),
+        s -> es(tied .* (1 + s), y),
+        s -> es(at_obs .+ s, y),
+        s -> es(tied .+ s, y; w = [0.2, 0.5, 0.3]),
+        s -> twes(clamped .+ s, y; b = 1.0),
+        s -> owes(tied .+ s, y; weight_func = wf),
+    ]
+    for f in cases
+        g = derivative(f, 0.0)
+        @test isfinite(g)
+        @test g ≈ cd(f, 0.0) atol = 1.0e-6
+    end
+
+    # Two members at x = (1, 2) and y = 0: the tied pair contributes its zero
+    # subgradient, leaving the derivative of mean_i ‖x_i‖, x_i / (2‖x_i‖).
+    g = gradient(x -> es(reshape(x, 2, 2), [0.0, 0.0]), [1.0, 2.0, 1.0, 2.0])
+    @test g ≈ [1.0, 2.0, 1.0, 2.0] ./ (2 * sqrt(5.0))
+
+    # The MMD kernel is smooth at a tie and needs no special case.
+    gm = gradient(x -> mmds(reshape(x, 2, 2), [0.0, 0.0]), [1.0, 2.0, 1.0, 2.0])
+    @test all(isfinite, gm)
+    @test gm ≈ [1.0, 2.0, 1.0, 2.0] .* exp(-2.5) ./ 2
+end

@@ -43,7 +43,6 @@ using EpiAwareADTools: cdf_ad_safe, ccdf_ad_safe
 using LogExpFunctions: log1pexp, logistic
 using HypergeometricFunctions: _₂F₁
 using Statistics: mean, var, std, quantile
-using LinearAlgebra: norm
 using Random: AbstractRNG
 using DocStringExtensions: TYPEDSIGNATURES, TYPEDEF, TYPEDFIELDS, DOCSTRING, @template
 
