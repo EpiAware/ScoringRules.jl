@@ -195,3 +195,17 @@ end
     @test isnan(vs(X, y; w_vs = [0.0 0.0 0.0; 0.0 1.0 1.0; 0.0 1.0 1.0]))
     @test isnan(owvs(X, y; weight_func = z -> 1.0, w = [1.0, 0.0, 1.0]))
 end
+
+@testitem "variogram score propagates a missing value" tags = [:sample] begin
+    using ScoringRules
+
+    # R's vs_sample returns NA for an NA member or observation.
+    X = Union{Missing, Float64}[1.0 0.5 2.0; 2.0 3.0 -1.0; 0.0 1.0 1.0]
+    y = [0.0, 1.0, 0.5]
+    Xm = copy(X)
+    Xm[1, 1] = missing
+    @test ismissing(vs(Xm, y))
+    @test ismissing(vs(Xm, y; w = [1.0, 2.0, 1.0]))
+    @test ismissing(vs(X, Union{Missing, Float64}[0.0, missing, 0.5]))
+    @test vs(X, y) ≈ vs(Float64.(X), y)
+end

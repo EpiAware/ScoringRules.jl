@@ -169,15 +169,15 @@ function _vs_core(y::AbstractVector, X::AbstractMatrix, w_vs, w, p::Real)
             vdat = 0.0
             if w === nothing
                 for i in 1:m
-                    vdat += abs(T(X[k, i]) - T(X[l, i]))^p
+                    vdat += abs(convert(T, X[k, i]) - convert(T, X[l, i]))^p
                 end
                 vdat /= m
             else
                 for i in 1:m
-                    vdat += w[i] * abs(T(X[k, i]) - T(X[l, i]))^p
+                    vdat += w[i] * abs(convert(T, X[k, i]) - convert(T, X[l, i]))^p
                 end
             end
-            vy = abs(T(y[k]) - T(y[l]))^p
+            vy = abs(convert(T, y[k]) - convert(T, y[l]))^p
             wkl = w_vs === nothing ? 1.0 : w_vs[k, l]
             out += 2.0 * wkl * (vy - vdat)^2
         end
