@@ -210,13 +210,14 @@ function crps(
 end
 
 """
-    logs(dat::AbstractVector{<:Real}, y::Real; bw=nothing)
+    logs(dat::AbstractVector{<:Real}, y::Real; bw=nothing, w=nothing)
 
 Logarithmic score of an ensemble forecast `dat` (a vector of `m` simulation
 draws) at observation `y` using Gaussian kernel density estimation.
 
 If `bw` is `nothing`, Silverman's rule-of-thumb bandwidth is used (matching
-R's `bw.nrd`).  Lower is better.
+R's `bw.nrd`) computed from `dat` alone.  With `w`, the density is
+`sum(w .* pdf.(Normal.(dat, bw), y)) / sum(w)`.  Lower is better.
 
 # Arguments
 
@@ -226,11 +227,13 @@ R's `bw.nrd`).  Lower is better.
 # Keyword Arguments
 
   - `bw`: optional bandwidth; defaults to Silverman's rule-of-thumb.
+  - `w`: optional finite, non-negative member weight vector (length `m`) with a positive sum.
 
 # Provenance
 
 Ported from `logs_sample` / `lsmixnC` in R scoringRules (scores_sample_univ.R;
-mixn.cpp; Jordan, Krüger, Lerch, Allen).
+mixn.cpp; Jordan, Krüger, Lerch, Allen). `w` is an extension: R's
+`logs_sample` takes no weights.
 
 # Example
 
@@ -240,18 +243,25 @@ dat = randn(100)
 logs(dat, 0.5)
 ```
 """
-function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing)
+function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing, w = nothing)
     _check_nonempty(dat)
     _check_finite_sample(dat, y)
     _check_bw(bw)
+    w === nothing || _check_member_weights(dat, w)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
-    bw_val == 0 && return any(==(y), dat) ? -Inf : Inf
-    # KDE density at y: the mean of φ_{bw}(y − datᵢ); log score = −log density
-    den = 0.0
-    @inbounds for x in dat
-        den += _norm_pdf((y - x) / bw_val) / bw_val
+    if bw_val == 0
+        hit = w === nothing ? any(==(y), dat) :
+            any(i -> dat[i] == y && w[i] > 0, eachindex(dat))
+        return hit ? -Inf : Inf
     end
-    return -log(den / length(dat))
+    den = 0.0
+    sw = 0.0
+    @inbounds for i in eachindex(dat)
+        wi = w === nothing ? 1.0 : w[i]
+        den += wi * _norm_pdf((y - dat[i]) / bw_val) / bw_val
+        sw += wi
+    end
+    return -log(den / sw)
 end
 
 """

@@ -1,5 +1,6 @@
 ## Unreleased
 
+- `logs(dat, y; w)` takes optional member weights. The density is then `sum(w .* pdf.(Normal.(dat, bw), y)) / sum(w)`, and the default bandwidth is computed from `dat` alone. R's `logs_sample` takes no weights, so this extends its interface.
 - `crps(::Poisson, y)` returns `NaN` for a `NaN` observation, `Inf` for an infinite one and a finite score for an observation beyond the range of `Int`, as R's `crps_pois` does. It used to throw.
 - `crps(dat, y; bw)` warns that `bw` is ignored when the method is `:edf`, as R's `crps_sample` does.
 

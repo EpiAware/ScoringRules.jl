@@ -1,6 +1,7 @@
 @testitem "sample univariate scores match R scoringRules" setup = [References] begin
     using ScoringRules
     using ScoringRules: _bw_nrd
+    using Distributions: Normal, pdf
 
     atol = 1.0e-9
     rtol = 1.0e-7
@@ -86,8 +87,19 @@
         # Invalid weights throw.
         @test_throws DimensionMismatch dss(dat, y; w = w[1:3])
         @test_throws ArgumentError dss(dat, y; w = -w)
-        # As in R's logs_sample, the sample log score takes no member weights.
-        @test_throws MethodError logs(dat, y; w = w)
+        bwd = _bw_nrd(dat)
+        for yy in (-2.0, y, 1.5), bwv in (nothing, 0.2, 1.0)
+            b = bwv === nothing ? bwd : bwv
+            dens = sum(w .* pdf.(Normal.(dat, b), yy)) / sum(w)
+            @test logs(dat, yy; w = w, bw = bwv) ≈ -log(dens)
+            @test logs(dat, yy; w = 7 .* w, bw = bwv) ≈ logs(dat, yy; w = w, bw = bwv)
+        end
+        @test logs(dat, y; w = uniform) ≈ logs(dat, y)
+        d0 = [0.0, 1.0, 3.0]
+        @test logs(d0, 1.0; bw = 0, w = [1, 1, 1]) == -Inf
+        @test logs(d0, 1.0; bw = 0, w = [1, 0, 1]) == Inf
+        @test_throws DimensionMismatch logs(dat, y; w = w[1:3])
+        @test_throws ArgumentError logs(dat, y; w = -w)
         # Non-finite weights and an all-zero weight vector throw too, so a
         # degenerate w cannot leak NaN into an aggregated score.
         for bad in ([NaN; w[2:end]], [Inf; w[2:end]], zero(w))
