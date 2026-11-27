@@ -57,4 +57,13 @@
         @test crps(censored(Logistic(0.0, 1.0), 1.0, 1.0), 0.5) ≈ 0.5
         @test crps(truncated(Logistic(0.0, 1.0), 1.0, 1.0), 0.5) ≈ 0.5
     end
+
+    @testset "zero scale is a point forecast" begin
+        # R scoringRules: crps_logis(y, location, 0) is |y - location|, e.g.
+        # crps_logis(c(-3, 0, 5), -2, 0) returns 1 2 7.
+        for μ in (-2.0, 0.0, 1.0), y in (-3.0, -1.0, 0.0, 0.5, 1.0, 2.0, 5.0)
+            d = Logistic(μ, 0.0; check_args = false)
+            @test crps(d, y) == abs(y - μ)
+        end
+    end
 end
