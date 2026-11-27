@@ -141,3 +141,71 @@ end
         @test_throws ArgumentError mmds(X, y; w = fill(-1.0, m))
     end
 end
+
+@testitem "vs on an integer ensemble does not wrap" begin
+    using ScoringRules
+
+    # The score written out over all ordered pairs in BigFloat, where no
+    # difference can wrap or overflow.
+    function vs_ref(X, y, p, w, w_vs)
+        Xb, yb = big.(X), big.(y)
+        d, m = size(Xb)
+        wn = big.(w) ./ sum(big.(w))
+        return sum(
+            w_vs[k, l] * (
+                abs(yb[k] - yb[l])^p -
+                    sum(wn[i] * abs(Xb[k, i] - Xb[l, i])^p for i in 1:m)
+            )^2
+                for k in 1:d, l in 1:d
+        )
+    end
+
+    @test vs(Int32[2000000000 0; -2000000000 0], Int32[0, 0]) ≈ 2.0e9 rtol = 1.0e-12
+
+    for T in (Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64)
+        lo, hi = typemin(T), typemax(T)
+        # Members and observation at both ends of the type's range, so every
+        # difference between dimensions leaves the type.
+        X = T[hi lo hi; lo hi zero(T); hi zero(T) lo]
+        y = T[lo, hi, zero(T)]
+        w = [1.0, 2.0, 0.5]
+        w_vs = [1.0 0.5 2.0; 0.5 1.0 0.0; 2.0 0.0 1.0]
+        for p in (0.5, 1.0, 2.0)
+            unif = ones(3)
+            ref = vs_ref(X, y, p, unif, ones(3, 3))
+            ref_w = vs_ref(X, y, p, w, ones(3, 3))
+            ref_wvs = vs_ref(X, y, p, unif, w_vs)
+            ref_both = vs_ref(X, y, p, w, w_vs)
+            @test vs(X, y; p) ≈ ref rtol = 1.0e-10
+            @test vs(X, y; p, w) ≈ ref_w rtol = 1.0e-10
+            @test vs(X, y; p, w_vs) ≈ ref_wvs rtol = 1.0e-10
+            @test vs(X, y; p, w, w_vs) ≈ ref_both rtol = 1.0e-10
+            # Identity chaining and a constant outcome weight leave the
+            # ensemble as it is, so the weighted forms reduce to `vs`.
+            @test twvs(X, y; p, chain_func = identity, w, w_vs) ≈ ref_both rtol = 1.0e-10
+            @test owvs(X, y; p, weight_func = z -> 1.0, w, w_vs) ≈ ref_both rtol = 1.0e-10
+        end
+    end
+
+    # A missing value in a member or a dimension still reaches the score
+    # when its member or pair weight is zero, as in R.
+    X = [1.0 NaN 3.0; 2.0 0.0 1.0; 0.5 1.0 2.0]
+    y = [0.0, 1.0, 2.0]
+    @test isnan(vs(X, y; w = [1.0, 0.0, 1.0]))
+    @test isnan(vs(X, y; w_vs = [0.0 0.0 0.0; 0.0 1.0 1.0; 0.0 1.0 1.0]))
+    @test isnan(owvs(X, y; weight_func = z -> 1.0, w = [1.0, 0.0, 1.0]))
+end
+
+@testitem "variogram score propagates a missing value" tags = [:sample] begin
+    using ScoringRules
+
+    # R's vs_sample returns NA for an NA member or observation.
+    X = Union{Missing, Float64}[1.0 0.5 2.0; 2.0 3.0 -1.0; 0.0 1.0 1.0]
+    y = [0.0, 1.0, 0.5]
+    Xm = copy(X)
+    Xm[1, 1] = missing
+    @test ismissing(vs(Xm, y))
+    @test ismissing(vs(Xm, y; w = [1.0, 2.0, 1.0]))
+    @test ismissing(vs(X, Union{Missing, Float64}[0.0, missing, 0.5]))
+    @test vs(X, y) ≈ vs(Float64.(X), y)
+end

@@ -146,65 +146,43 @@ function _check_vs_order(p::Real)
     return nothing
 end
 
-# No-weight path: Σ_{k≤l} 2 (|y_k − y_l|^p − mean_i |X_{k,i} − X_{l,i}|^p)^2
-function _vsC(y::AbstractVector, X::AbstractMatrix, p::Real)
+# Variogram score in one pass over the ensemble:
+#
+#   VS_p = Σ_{k≤l} 2 w_kl (|y_k − y_l|^p − Σ_i w_i |X_{k,i} − X_{l,i}|^p)²
+#
+# `w_vs` and `w` may each be `nothing`, meaning all-ones pairs and uniform
+# members. With member weights R writes this as the kernel score
+# Σ_i w_i κ(X_i, y) − ½ Σ_{i,j} w_i w_j κ(X_i, X_j), which is the same number
+# (the double sum is twice the weighted variance of |X_k − X_l|^p in each pair,
+# and cancels that variance out of the first sum) at m² kernel evaluations
+# instead of m.
+function _vs_core(y::AbstractVector, X::AbstractMatrix, w_vs, w, p::Real)
+    # The differences are taken in floating point: an integer difference wraps
+    # (and `abs(typemin)` stays negative), and a Float32 one raised to `p`
+    # overflows far sooner than in Float64.
+    T = promote_type(_float_type(X), _float_type(y), Float64)
     out = 0.0
     d = length(y)
-    @inbounds for k in 1:d
-        @inbounds for l in k:d
-            vdat = mean(abs(X[k, i] - X[l, i])^p for i in 1:size(X, 2))
-            vy = abs(y[k] - y[l])^p
-            out += 2.0 * (vy - vdat)^2
-        end
-    end
-    return out
-end
-
-# w_vs-weighted path: Σ_{k≤l} 2 w_vs[k,l] (|y_k − y_l|^p − mean_i |X_{k,i} − X_{l,i}|^p)^2
-function _vsC_w_vs(y::AbstractVector, X::AbstractMatrix, w_vs::AbstractMatrix, p::Real)
-    out = 0.0
-    d = length(y)
-    @inbounds for k in 1:d
-        @inbounds for l in k:d
-            vdat = mean(abs(X[k, i] - X[l, i])^p for i in 1:size(X, 2))
-            vy = abs(y[k] - y[l])^p
-            out += 2.0 * w_vs[k, l] * (vy - vdat)^2
-        end
-    end
-    return out
-end
-
-# Variogram kernel: Σ_{k≤l} 2 w_vs[k,l] (|x1_k − x1_l|^p − |x2_k − x2_l|^p)^2
-function _vskernel(x1::AbstractVector, x2::AbstractVector, w_vs::AbstractMatrix, p::Real)
-    out = 0.0
-    d = length(x1)
-    @inbounds for k in 1:d
-        @inbounds for l in k:d
-            vx1 = abs(x1[k] - x1[l])^p
-            vx2 = abs(x2[k] - x2[l])^p
-            out += 2.0 * w_vs[k, l] * (vx1 - vx2)^2
-        end
-    end
-    return out
-end
-
-# Member-weight path (w per column, default w_vs = ones)
-function _vsC_w(
-        y::AbstractVector, X::AbstractMatrix, w_vs::AbstractMatrix,
-        w::AbstractVector, p::Real
-    )
     m = size(X, 2)
-    s1 = 0.0
-    @inbounds for i in 1:m
-        s1 += w[i] * _vskernel(view(X, :, i), y, w_vs, p)
-    end
-    s2 = 0.0
-    @inbounds for i in 1:m
-        @inbounds for j in 1:m
-            s2 += w[i] * w[j] * _vskernel(view(X, :, i), view(X, :, j), w_vs, p)
+    @inbounds for k in 1:d
+        for l in k:d
+            vdat = 0.0
+            if w === nothing
+                for i in 1:m
+                    vdat += abs(convert(T, X[k, i]) - convert(T, X[l, i]))^p
+                end
+                vdat /= m
+            else
+                for i in 1:m
+                    vdat += w[i] * abs(convert(T, X[k, i]) - convert(T, X[l, i]))^p
+                end
+            end
+            vy = abs(convert(T, y[k]) - convert(T, y[l]))^p
+            wkl = w_vs === nothing ? 1.0 : w_vs[k, l]
+            out += 2.0 * wkl * (vy - vdat)^2
         end
     end
-    return s1 - s2 / 2.0
+    return out
 end
 
 """
@@ -247,12 +225,8 @@ function vs(
     _check_vs_order(p)
     d = length(y)
     w_vs === nothing || _check_w_vs(w_vs, d)
-    if w === nothing
-        return w_vs === nothing ? _vsC(y, X, p) : _vsC_w_vs(y, X, w_vs, p)
-    end
-    wv = _w_helper(X, w)
-    wvs = w_vs === nothing ? ones(d, d) : w_vs
-    return _vsC_w(y, X, wvs, wv, p)
+    wv = w === nothing ? nothing : _w_helper(X, w)
+    return _vs_core(y, X, w_vs, wv, p)
 end
 
 # ---------------------------------------------------------------------------
