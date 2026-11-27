@@ -1,9 +1,10 @@
 # Small numerical helpers shared across scoring-rule implementations.
 
-# Standard normal pdf and cdf, written out to avoid constructing a `Normal`
+# Standard normal pdf, cdf and quantile, written out to avoid constructing a `Normal`
 # object in hot inner loops.
 @inline _norm_pdf(x::Real) = exp(-x^2 / 2) / sqrt(2 * oftype(float(x), pi))
 @inline _norm_cdf(x::Real) = erfc(-x / sqrt(oftype(float(x), 2))) / 2
+@inline _norm_invcdf(p::Real) = -sqrt(oftype(float(p), 2)) * erfcinv(2 * p)
 @inline _norm_logpdf(x::Real) = -(x^2 + log(2 * oftype(float(x), pi))) / 2
 
 # The floating-point type to compute in. `float` needs a numeric type, and an

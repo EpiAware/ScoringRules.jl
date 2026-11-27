@@ -37,7 +37,7 @@ using Distributions: Distributions, Beta, Binomial, Censored, Continuous,
     Truncated, Uniform, Univariate, UnivariateDistribution,
     cdf, components, dof, location, logpdf, params, pdf, probs,
     scale, shape, truncated
-using SpecialFunctions: erfc, gamma, digamma, logbeta,
+using SpecialFunctions: erfc, erfcinv, gamma, digamma, logbeta,
     besselix, expinti
 using EpiAwareADTools: cdf_ad_safe, ccdf_ad_safe
 using LogExpFunctions: log1pexp, logistic
