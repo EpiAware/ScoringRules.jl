@@ -57,10 +57,6 @@ function _member_weights(m::Integer, w)
         )
     )
     any(<(0), w) && throw(ArgumentError("member weights w must be non-negative"))
-    # `w ./ sw` keeps the axes of `w`, and the score loops index it over `1:m`.
-    _one_based(w) || throw(
-        ArgumentError("member weights w must have one-based axes, got $(axes(w))")
-    )
     sw = sum(w)
     return w ./ sw
 end
@@ -71,7 +67,15 @@ end
 Normalised member weights for the columns of the `d × m` ensemble matrix `X`
 (see [`_member_weights`](@ref)).
 """
-_w_helper(X::AbstractMatrix, w) = _member_weights(size(X, 2), w)
+function _w_helper(X::AbstractMatrix, w)
+    # `w ./ sum(w)` keeps the axes of `w`, and the multivariate score loops
+    # index it over `1:m`. The univariate `twcrps` shares `_member_weights` and
+    # loops with `eachindex`, so offset weights stay valid there.
+    w === nothing || _one_based(w) || throw(
+        ArgumentError("member weights w must have one-based axes, got $(axes(w))")
+    )
+    return _member_weights(size(X, 2), w)
+end
 
 """
     _check_w_vs(w_vs, d)

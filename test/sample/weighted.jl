@@ -375,3 +375,15 @@ end
         )
     end
 end
+
+@testitem "twcrps scores offset member weights as plain ones" tags = [:sample] begin
+    using ScoringRules
+    using OffsetArrays: OffsetArray
+
+    # The multivariate scores reject offset member weights; the univariate
+    # twcrps shares their weight normalisation and must still accept them.
+    dat = [0.3, -1.2, 0.8, 0.1]
+    w = [1.0, 2.0, 0.5, 1.5]
+    od, ow = OffsetArray(dat, 0:3), OffsetArray(w, 0:3)
+    @test twcrps(od, 0.2; a = -1, b = 1, w = ow) ≈ twcrps(dat, 0.2; a = -1, b = 1, w = w)
+end
