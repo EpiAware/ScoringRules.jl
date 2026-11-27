@@ -375,3 +375,30 @@ end
         )
     end
 end
+
+@testitem "tw/ow CRPS do not depend on the ensemble's axes" tags = [:sample] begin
+    using ScoringRules
+    using OffsetArrays
+
+    # An ensemble with offset axes scores as the plain vector of the same
+    # values; the reference values are from R scoringRules 1.1.3 on that
+    # plain vector.
+    v = [3.0, 1.0, 2.0, 5.0, -0.5]
+    wv = [0.5, 1.0, 2.0, 0.3, 1.2]
+    y = 1.5
+    @test twcrps(v, y; a = 0, b = 2.5) ≈ 0.38 rtol = 1.0e-12
+    @test owcrps(v, y; a = 0, b = 4) ≈ 0.3888888888888888 rtol = 1.0e-12
+    for ax in (0:4, -3:1, 2:6)
+        o = OffsetArray(v, ax)
+        ow = OffsetArray(wv, ax)
+        @test twcrps(o, y; a = 0, b = 2.5) ≈ twcrps(v, y; a = 0, b = 2.5) rtol = 1.0e-12
+        @test owcrps(o, y; a = 0, b = 4) ≈ owcrps(v, y; a = 0, b = 4) rtol = 1.0e-12
+        @test twcrps(o, y; a = 0, b = 2.5, w = ow) ≈
+            twcrps(v, y; a = 0, b = 2.5, w = wv) rtol = 1.0e-12
+        @test owcrps(o, y; a = 0, b = 4, w = ow) ≈
+            owcrps(v, y; a = 0, b = 4, w = wv) rtol = 1.0e-12
+        @test_throws DimensionMismatch twcrps(v, y; w = ow)
+        @test_throws DimensionMismatch owcrps(v, y; w = ow)
+        @test_throws DimensionMismatch owcrps(o, y; w = wv)
+    end
+end

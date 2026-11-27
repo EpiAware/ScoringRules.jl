@@ -29,7 +29,7 @@ function _quantile_hf(x::AbstractVector, p::Real, qtype::Int)
     1 <= qtype <= 9 ||
         throw(ArgumentError("quantile type must be an integer 1–9, got $qtype"))
     n = length(x)
-    xs = sort(x)
+    xs = sort!(_plain_vector(x))
     # R's stats::quantile guards against `n * p` landing just below an integer
     # through floating-point error: the index uses a multiplicative fuzz
     # `floor(nppm * (1 + fuzz))`, with fuzz = 4 eps except for type 7, which

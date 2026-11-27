@@ -156,3 +156,43 @@ end
     @test_logs crps(dat, 0.3)
     @test_logs crps(dat, 0.3; method = :kde, bw = 0.2)
 end
+
+@testitem "univariate ensemble scores do not depend on the ensemble's axes" tags = [:sample] begin
+    using ScoringRules
+    using OffsetArrays
+
+    # An ensemble is a set of values, so one with offset axes scores as the
+    # plain vector of the same values. The reference values are from R
+    # scoringRules 1.1.3 on that plain vector.
+    v = [3.0, 1.0, 2.0, 5.0, -0.5]
+    wv = [0.5, 1.0, 2.0, 0.3, 1.2]
+    y = 1.5
+    ref = [
+        (d -> crps(d, y), 0.5599999999999999),
+        (d -> crps(d, y; method = :kde), 0.58429898366794),
+        (d -> crps(d, y; method = :kde, bw = 0.7), 0.5442546989606725),
+        (d -> logs(d, y), 1.7603703121893499),
+        (d -> clogs(d, y; a = 0, b = 2.5), 1.7603703121893499),
+        (d -> clogs(d, y; a = 0, b = 2.5, cens = false), 0.8488535276288279),
+        (d -> dss(d, y), 1.3401226341760044),
+    ]
+    for ax in (0:4, -3:1, 2:6)
+        o = OffsetArray(v, ax)
+        for (f, r) in ref
+            @test f(v) ≈ r rtol = 1.0e-12
+            @test f(o) ≈ f(v) rtol = 1.0e-12
+        end
+        # Member weights follow their members when both share the axes.
+        ow = OffsetArray(wv, ax)
+        @test crps(o, y; w = ow) ≈ crps(v, y; w = wv) rtol = 1.0e-12
+        @test dss(o, y; w = ow) ≈ dss(v, y; w = wv) rtol = 1.0e-12
+        # Weights on other axes than the ensemble's cannot be matched to
+        # members.
+        @test_throws DimensionMismatch crps(v, y; w = ow)
+        @test_throws DimensionMismatch crps(o, y; w = wv)
+        @test_throws DimensionMismatch dss(v, y; w = ow)
+    end
+
+    # R: crps_sample(1.5, c(3, 1, 2)).
+    @test crps(OffsetArray([3.0, 1.0, 2.0], 0:2), 1.5) ≈ 0.3888888888888888 rtol = 1.0e-12
+end
