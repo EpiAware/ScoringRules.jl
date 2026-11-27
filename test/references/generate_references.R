@@ -335,8 +335,15 @@ g$dss  <- dss_pois(g$y, lambda = g$lambda)
 write_ref("pois", g)
 
 ## ---- Negative binomial ----------------------------------------------------
-g <- grid(size = c(1, 3, 10), prob = c(0.3, 0.5, 0.8),
-          y = c(0, 1, 3, 10, 20))
+# Sizes from 15, where the Gauss series for the hypergeometric factor starts to
+# lose digits, and a prob of 0.95, where its argument is small but its size
+# times the argument is not. Half-integer sizes are left out: R returns -Inf
+# for some of them, so test/crps/discrete.jl checks those by brute-force
+# summation instead. Past a size of about 1e6 R's factor drifts, so the grid
+# stops at 1e4.
+g <- grid(size = c(1, 3, 10, 15, 40, 100, 200, 1000, 10000),
+          prob = c(0.05, 0.3, 0.5, 0.8, 0.95),
+          y = c(0, 1, 3, 10, 20, 100, 1000))
 g$crps <- crps_nbinom(g$y, size = g$size, prob = g$prob)
 g$logs <- logs_nbinom(g$y, size = g$size, prob = g$prob)
 g$dss  <- dss_nbinom(g$y, size = g$size, prob = g$prob)

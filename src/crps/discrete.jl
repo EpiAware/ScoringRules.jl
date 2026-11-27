@@ -8,6 +8,7 @@
 # Module-level imports required (in addition to those already in ScoringRules.jl):
 #   using SpecialFunctions: besselix     (for Poisson)
 #   using HypergeometricFunctions: _₂F₁ (for NegativeBinomial; already imported)
+#   using LinearAlgebra: eigen, SymTridiagonal (its quadrature rule)
 
 # ── Poisson ────────────────────────────────────────────────────────────────
 # Formula from Jordan et al. (2019), translating crps_pois in scores_pois.R.
@@ -52,7 +53,82 @@ crps(d::Poisson, y::Real) = _crps_pois(y, d.λ)
 #   Distributions.NegativeBinomial(r, p): r = size (number of successes),
 #   p = prob (success probability); mean = r*(1-p)/p.
 #
-# The hypergeometric function call is `_₂F₁(size+1, 0.5, 2, -4*c2)`.
+# The hypergeometric factor is `₂F₁(size+1, ½; 2; −4·c2)`, from `_f21_nbinom`.
+
+# `₂F₁(a, ½; 2; −Z)` for `Z ≥ 0`.
+#
+# `HypergeometricFunctions` is within about 1e-13 of a 128-bit reference while
+# `a < 16` or `a·Z < 6`, which covers sizes below 15 and a `prob` near one.
+# Past that it loses digits fast: 1e-10 at `a·Z ≈ 20`, 3e2 at `a = 61,
+# Z = 0.56`, NaN from `a ≈ 100` at the `Z ≈ 31` of a `prob = 0.3` forecast.
+# There the factor is taken by one of two sums whose terms are all positive.
+# The closed form needs it to full relative accuracy: it subtracts terms of
+# the size of the variance to leave a score of the size of the standard
+# deviation.
+function _f21_nbinom(a::Real, Z::Real)
+    (a >= 16 && a * Z >= 6) || return _₂F₁(a, 0.5, 2.0, -Z)
+    return a * log1p(Z) >= 36 ? _f21_nbinom_laguerre(a, Z) : _f21_nbinom_pfaff(a, Z)
+end
+
+# Gauss–Laguerre rule for the weight `v^{-1/2} e^{-v}` on `(0, ∞)`, by
+# Golub–Welsch. Twenty nodes put the factor within 2e-15 of a 128-bit
+# reference wherever `_f21_nbinom` uses it.
+function _gauss_laguerre_half(n::Integer)
+    alpha = -0.5
+    jacobi = SymTridiagonal(
+        [2k + alpha + 1 for k in 0:(n - 1)], [sqrt(k * (k + alpha)) for k in 1:(n - 1)]
+    )
+    nodes, vectors = eigen(jacobi)
+    return nodes, sqrt(π) .* vectors[1, :] .^ 2
+end
+const _LAGUERRE_HALF = _gauss_laguerre_half(20)
+
+# From the Euler integral
+#
+#   ₂F₁(a, ½; 2; −Z) = (2/π) ∫₀¹ t^{−1/2} (1−t)^{1/2} (1 + Zt)^{−a} dt,
+#
+# substituting `v = a·log1p(Zt)` turns `(1 + Zt)^{−a}` into `e^{−v}` and the
+# `t^{−1/2}` endpoint into `v^{−1/2}`:
+#
+#   ₂F₁ = 2 / (π √(aZ)) ∫₀^V v^{−1/2} e^{−v} h(v/a) dv,
+#   h(u) = √(u / expm1(u)) · e^u · √(1 − expm1(u)/Z),   V = a·log1p(Z).
+#
+# `h` is smooth on the scale of `a`, and the integrand is zero past `V`, where
+# its square-root edge is weighted by `e^{−V}`. From `V = 36` that edge is
+# below `eps` and the rule above integrates the rest exactly to rounding,
+# whatever the size: the cost is twenty evaluations of `h`.
+function _f21_nbinom_laguerre(a::Real, Z::Real)
+    nodes, weights = _LAGUERRE_HALF
+    s = zero(float(a) * float(Z))
+    for i in eachindex(nodes)
+        u = nodes[i] / a
+        e = expm1(u)
+        e < Z || continue
+        s += weights[i] * sqrt(u / e) * exp(u) * sqrt(1 - e / Z)
+    end
+    # `√a·√Z` rather than `√(aZ)`, which overflows for a `prob` below 1e-154.
+    return 2 * s / (π * sqrt(a) * sqrt(Z))
+end
+
+# Pfaff's transformation, `₂F₁(a, ½; 2; −Z) = (1+Z)^{−a} ₂F₁(a, 3/2; 2; w)`
+# with `w = Z/(1+Z)`, whose series has positive terms. It needs about
+# `a·Z + 37(1+Z)` of them, a few hundred where `_f21_nbinom` uses it
+# (`a ≥ 16` and `a·log1p(Z) < 36`, so `Z < 8.5`).
+function _f21_nbinom_pfaff(a::Real, Z::Real)
+    w = Z / (1 + Z)
+    t = one(float(a) * float(Z))
+    s = t
+    k = 0
+    while true
+        t *= (a + k) * (k + 1.5) / ((k + 2) * (k + 1)) * w
+        s1 = s + t
+        s1 == s && break
+        s = s1
+        k += 1
+    end
+    return s * exp(-a * log1p(Z))
+end
+
 """
 CRPS of a `NegativeBinomial(size, prob)` forecast, in closed form.
 """
@@ -63,7 +139,7 @@ function _crps_nbinom(y::Real, size::Real, prob::Real)
     c3 = (
         prob * (2 * cdf(NegativeBinomial(size + 1, prob), y - 1) - 1)
             +
-            _₂F₁(size + 1, 0.5, 2.0, -4 * c2)
+            _f21_nbinom(size + 1, 4 * c2)
     )
     return c1 - size * c2 * c3
 end
