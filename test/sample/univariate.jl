@@ -156,3 +156,33 @@ end
     @test_logs crps(dat, 0.3)
     @test_logs crps(dat, 0.3; method = :kde, bw = 0.2)
 end
+
+@testitem "univariate sample scores do not wrap integer ensembles" tags = [:sample] begin
+    using ScoringRules
+
+    # R stores counts as doubles; here an unsigned or narrow integer
+    # difference or square would wrap in its own type. R gives 3.5 for
+    # crps_sample(5, c(0, 2)).
+    @test crps(UInt32[0, 2], UInt32(5)) ≈ 3.5 rtol = 1.0e-12
+
+    # Members and observation near the limits of each type, scored against
+    # the same values as Float64 (whose scores are checked against R above).
+    for T in (UInt8, UInt32, UInt64, Int8, Int32)
+        dat = T[typemin(T) + 2, typemax(T) - 10, typemax(T) - 3, typemax(T) ÷ 2, 1, 0, 7]
+        y = typemax(T) - T(5)
+        datf, yf = Float64.(dat), Float64(y)
+        w = 1:length(dat)
+        @testset "$T" begin
+            @test crps(dat, y) ≈ crps(datf, yf) rtol = 1.0e-12
+            @test crps(dat, y; w = w) ≈ crps(datf, yf; w = w) rtol = 1.0e-12
+            @test crps(dat, y; method = :kde) ≈ crps(datf, yf; method = :kde) rtol = 1.0e-12
+            @test logs(dat, y) ≈ logs(datf, yf) rtol = 1.0e-12
+            for cens in (true, false)
+                @test clogs(dat, y; a = 1, b = 2.0e9, cens = cens) ≈
+                    clogs(datf, yf; a = 1, b = 2.0e9, cens = cens) rtol = 1.0e-12
+            end
+            @test dss(dat, y) ≈ dss(datf, yf) rtol = 1.0e-12
+            @test dss(dat, y; w = w) ≈ dss(datf, yf; w = w) rtol = 1.0e-12
+        end
+    end
+end

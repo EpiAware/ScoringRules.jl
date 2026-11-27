@@ -375,3 +375,25 @@ end
         )
     end
 end
+
+@testitem "weighted CRPS does not wrap integer ensembles" tags = [:sample] begin
+    using ScoringRules
+
+    # Members and observation near the limits of each type, scored against
+    # the same values as Float64 (whose scores are checked against R above).
+    # A custom chaining function keeps the integer type, so the default
+    # clamping alone would not show the wrap.
+    for T in (UInt8, UInt32, UInt64, Int8, Int32)
+        dat = T[typemin(T) + 2, typemax(T) - 10, typemax(T) - 3, typemax(T) ÷ 2, 1, 0, 7]
+        y = typemax(T) - T(5)
+        datf, yf = Float64.(dat), Float64(y)
+        @testset "$T" begin
+            @test twcrps(dat, y; a = 2, b = 1.0e30) ≈ twcrps(datf, yf; a = 2, b = 1.0e30) rtol = 1.0e-12
+            @test twcrps(dat, y; chain_func = identity) ≈
+                twcrps(datf, yf; chain_func = identity) rtol = 1.0e-12
+            @test owcrps(dat, y; a = -1, b = 1.0e30) ≈ owcrps(datf, yf; a = -1, b = 1.0e30) rtol = 1.0e-12
+            @test owcrps(dat, y; weight_func = z -> 1.0, w = 1:length(dat)) ≈
+                owcrps(datf, yf; weight_func = z -> 1.0, w = 1:length(dat)) rtol = 1.0e-12
+        end
+    end
+end

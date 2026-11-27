@@ -119,6 +119,13 @@ function _check_nonempty(dat::AbstractVector)
     return nothing
 end
 
+# Scores are computed in floating point whatever the ensemble's element type.
+# A difference or square of unsigned or wide integers wraps in its own type:
+# `crps(UInt32[0, 2], UInt32(5))` would come back as -4.29e9 rather than 3.5.
+# The conversion allocates only for the element types that would be wrong.
+_as_float(dat::AbstractVector{<:AbstractFloat}) = dat
+_as_float(dat::AbstractVector) = float.(dat)
+
 # R's univariate sample scores stop on a missing or infinite value in the
 # observation or the ensemble ("Input with missing values", "Input with
 # infinite values"). Its multivariate scores have no such check.
@@ -191,6 +198,8 @@ function crps(
     )
     _check_nonempty(dat)
     _check_finite_sample(dat, y)
+    dat = _as_float(dat)
+    y = float(y)
     if method === :edf
         bw === nothing ||
             @warn "the `bw` argument is ignored for method = :edf" maxlog = 1
@@ -243,6 +252,8 @@ logs(dat, 0.5)
 function logs(dat::AbstractVector{<:Real}, y::Real; bw = nothing)
     _check_nonempty(dat)
     _check_finite_sample(dat, y)
+    dat = _as_float(dat)
+    y = float(y)
     _check_bw(bw)
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
     bw_val == 0 && return any(==(y), dat) ? -Inf : Inf
@@ -307,6 +318,8 @@ function clogs(
     )
     _check_nonempty(dat)
     _check_finite_sample(dat, y)
+    dat = _as_float(dat)
+    y = float(y)
     _check_bw(bw)
     a < b || throw(ArgumentError("a must be strictly less than b, got a=$a, b=$b"))
     bw_val = bw === nothing ? _bw_nrd(dat) : Float64(bw)
@@ -382,6 +395,8 @@ dss(dat, 0.5)
 function dss(dat::AbstractVector{<:Real}, y::Real; w = nothing)
     _check_nonempty(dat)
     _check_finite_sample(dat, y)
+    dat = _as_float(dat)
+    y = float(y)
     if w === nothing
         m = mean(dat)
         # Population variance: mean(dat.^2) - mean(dat).^2  (matches R dss_edf)

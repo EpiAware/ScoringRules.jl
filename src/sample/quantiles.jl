@@ -80,7 +80,10 @@ This is the negatively-oriented (lower = better) formulation of the check
 function / pinball loss.
 """
 @inline function _qs_quantile(y::Real, x::Real, alpha::Real)
-    return (Float64(y < x) - alpha) * (x - y)
+    # Floating point before the subtraction: an unsigned or wide-integer
+    # difference wraps in its own type.
+    yf, xf = float(y), float(x)
+    return (Float64(yf < xf) - alpha) * (xf - yf)
 end
 
 """
