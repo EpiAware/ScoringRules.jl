@@ -34,6 +34,12 @@ integrate fallback because `expinti` is implemented in arbitrary precision.
 Results agree with R's numerical integration to within the integration tolerance
 in all tested cases.
 
+## Poisson CRPS at large means
+
+From a mean of about ``10^5``, R's `besselI(x, nu, expon.scaled = TRUE)` returns zero, so `crps_pois` returns wrong scores. At ``\lambda = 10^8`` with ``y = \lambda`` it returns 7978.85, whereas the normal limit ``\sqrt{\lambda}(\sqrt{2} - 1)/\sqrt{\pi}`` is about 2337 and ScoringRules.jl returns 2336.95.
+
+ScoringRules.jl uses a large-argument expansion for the scaled Bessel functions and a saddle-point form for the Poisson mass once ``2\lambda \ge 10^6``. Scores stay finite and accurate for any mean.
+
 ## Ensemble DSS: population vs sample variance
 
 `dss(dat, y)` for an ensemble `dat` uses the **population** variance
