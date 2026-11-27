@@ -153,3 +153,34 @@ end
         @test quantile_score([alpha], [q[i]], y) ≈ per_level[i]
     end
 end
+
+@testitem "quantile and interval scores do not wrap integer inputs" tags = [:sample] begin
+    using ScoringRules
+
+    # An unsigned or narrow integer difference would wrap in its own type.
+    # R gives 22 for ints_quantiles(5, 1, 3, 0.8).
+    @test interval_score(UInt32(1), UInt32(3), UInt32(5), 0.8) ≈ 22 rtol = 1.0e-12
+
+    # Inputs near the limits of each type, scored against the same values as
+    # Float64 (whose scores are checked against R above).
+    for T in (UInt8, UInt32, UInt64, Int8, Int32)
+        dat = T[typemin(T) + 2, typemax(T) - 10, typemax(T) - 3, typemax(T) ÷ 2, 1, 0, 7]
+        y = typemax(T) - T(5)
+        datf, yf = Float64.(dat), Float64(y)
+        levels = [0.2, 0.5, 0.9]
+        @testset "$T" begin
+            @test quantile_score(dat, y; alpha = 0.3) ≈ quantile_score(datf, yf; alpha = 0.3) rtol = 1.0e-12
+            @test interval_score(dat, y; level = 0.8) ≈ interval_score(datf, yf; level = 0.8) rtol = 1.0e-12
+            @test quantile_score(levels, dat[[5, 4, 3]], y; reduce = identity) ≈
+                quantile_score(levels, datf[[5, 4, 3]], yf; reduce = identity) rtol = 1.0e-12
+            # The observation above, inside and below the interval in turn.
+            for obs in (dat[2], dat[4] - T(1), dat[6])
+                @test interval_score(dat[5], dat[4], obs, 0.8) ≈
+                    interval_score(datf[5], datf[4], Float64(obs), 0.8) rtol = 1.0e-12
+            end
+            lo = min(dat[1], dat[6])
+            @test interval_score(lo, dat[5], dat[3], 0.8) ≈
+                interval_score(Float64(lo), datf[5], datf[3], 0.8) rtol = 1.0e-12
+        end
+    end
+end
