@@ -141,3 +141,58 @@ end
         @test_throws ArgumentError mmds(X, y; w = fill(-1.0, m))
     end
 end
+
+@testitem "multivariate scores reject offset axes" tags = [:sample] begin
+    using ScoringRules
+    using OffsetArrays: OffsetArray
+
+    # The score loops index `X`, `y`, `w` and `w_vs` over one-based ranges
+    # under `@inbounds`, so offset axes read past the end of the array:
+    # `es(OffsetArray([1.0 2; 3 4], 0:1, 0:1), OffsetArray([0.0, 1], 0:1))`
+    # returned 1.8028 against the true 2.5673.
+    P = [0.3 -1.2 0.8 0.1; -0.4 0.9 -0.2 1.3; 1.1 0.2 -1.5 0.6]
+    y = [0.2, -0.3, 0.7]
+    w = [1.0, 2.0, 0.5, 1.5]
+    wvs = [1 / (1 + abs(k - l)) for k in 1:3, l in 1:3]
+    bounds = (a = -1.25, b = 1.25)
+    scores = (es, vs, mmds, twes, owes, twvs, owvs, twmmds, owmmds)
+    kw(f) = f in (es, vs, mmds) ? (;) : bounds
+
+    offset_X = (
+        OffsetArray(P, 0:2, 1:4), OffsetArray(P, 1:3, 0:3),
+        OffsetArray(P, 101:103, 101:104),
+    )
+    offset_y = (OffsetArray(y, 0:2), OffsetArray(y, 4:6))
+    offset_w = (OffsetArray(w, 0:3), OffsetArray(w, 5:8))
+    offset_wvs = (OffsetArray(wvs, 0:2, 0:2), OffsetArray(wvs, 1:3, 2:4))
+
+    for f in scores
+        for X in offset_X
+            @test_throws ArgumentError f(X, y; kw(f)...)
+        end
+        for yo in offset_y
+            @test_throws ArgumentError f(P, yo; kw(f)...)
+        end
+        for wo in offset_w
+            @test_throws ArgumentError f(P, y; w = wo, kw(f)...)
+        end
+    end
+    for f in (vs, twvs, owvs), wvo in offset_wvs
+        @test_throws ArgumentError f(P, y; w_vs = wvo, kw(f)...)
+        @test_throws ArgumentError f(P, y; w = w, w_vs = wvo, kw(f)...)
+    end
+
+    # An OffsetArray whose axes start at one is an ordinary array and scores
+    # as one.
+    X1 = OffsetArray(P, 1:3, 1:4)
+    y1 = OffsetArray(y, 1:3)
+    w1 = OffsetArray(w, 1:4)
+    wvs1 = OffsetArray(wvs, 1:3, 1:3)
+    for f in scores
+        @test f(X1, y1; w = w1, kw(f)...) == f(P, y; w = w, kw(f)...)
+    end
+    for f in (vs, twvs, owvs)
+        @test f(X1, y1; w = w1, w_vs = wvs1, kw(f)...) ==
+            f(P, y; w = w, w_vs = wvs, kw(f)...)
+    end
+end
