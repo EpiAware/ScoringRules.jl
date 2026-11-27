@@ -138,11 +138,12 @@ end
         @test _f21_nbinom(a, Z) === _₂F₁(a, 0.5, 2.0, -Z)
     end
     # Elsewhere, against `₂F₁(a, ½; 2; −Z)` from its Euler integral in 200-bit
-    # arithmetic. The first seven take the Pfaff series, the rest the Laguerre
+    # arithmetic. The first eight take the Pfaff series, the rest the Laguerre
     # rule; the comment gives the Gauss series' relative error where it is
     # above 1e-14.
     for (a, Z, ref) in (
             (16.0, 1.0, 0.2837910598522961),
+            (19.0, 0.56, 0.3434993119452377),    # 1.1e-12
             (16.0, 8.4, 0.09948463718372556),
             (201.0, 0.1, 0.2489317796263936),    # 6.0e-10
             (51.0, 0.5, 0.22280127792966553),    # 9.4e-6
@@ -177,6 +178,21 @@ end
             for y in unique(max.(0.0, round.((0.0, m - 2sd, m, m + 3sd))))
                 @test crps(d, y) ≈ lattice_crps(d, y) rtol = 1.0e-10
             end
+        end
+    end
+    # Sizes 15 to 50 with a `prob` near 0.9, where the series has already lost
+    # digits but not yet failed: 4e-11 at size 15 and `a·Z = 11`, 4e-7 at size
+    # 28.5 and `a·Z = 18`. The Laguerre rule loses digits below `a·log1p(Z) =
+    # 36` in the same way, 6e-11 at size 50 and 20.5. Here the score is within
+    # 3e-14 of the lattice sum.
+    for (r, p) in (
+            (15.0, 0.87), (20.0, 0.9), (25.0, 0.78), (25.0, 0.88),
+            (28.5, 0.88), (29.5, 0.88), (50.0, 0.88), (50.0, 0.9),
+        )
+        d = NegativeBinomial(r, p)
+        m, sd = mean(d), std(d)
+        for y in unique(max.(0.0, round.((0.0, m - 2sd, m, m + 3sd))))
+            @test crps(d, y) ≈ lattice_crps(d, y) rtol = 1.0e-12
         end
     end
 end
