@@ -45,9 +45,14 @@ end
 CRPS of a `Logistic(μ, σ)` forecast, in closed form.
 
 Unit formula (σ = 1, μ = 0):  CRPS = y - 2·log F(y) - 1
+
+A zero scale is the point forecast at `μ`, whose CRPS is the absolute error.
+The unit formula cannot reach it: `z` is infinite there and `σ * Inf` is
+`NaN`.
 """
 function _crps_logis(y::Real, location::Real, scale::Real)
     scale < 0 && return oftype(float(y), NaN)
+    scale == 0 && return abs(float(y - location))
     return scale * _crps_logis_unit((y - location) / scale)
 end
 
