@@ -85,7 +85,7 @@ end
 @inline function _col_sqdist(::Type{T}, X::AbstractMatrix, i::Integer, j::Integer) where {T}
     s = zero(T)
     @inbounds @simd for k in axes(X, 1)
-        s += abs2(T(X[k, i] - X[k, j]))
+        s += abs2(_to_dist(T, X[k, i] - X[k, j]))
     end
     return s
 end
@@ -93,14 +93,18 @@ end
 @inline function _col_sqdist(::Type{T}, X::AbstractMatrix, i::Integer, y::AbstractVector) where {T}
     s = zero(T)
     @inbounds @simd for k in axes(X, 1)
-        s += abs2(T(X[k, i] - y[k]))
+        s += abs2(_to_dist(T, X[k, i] - y[k]))
     end
     return s
 end
 
 _dist_type(X::AbstractMatrix, y::AbstractVector) =
-    promote_type(_float_type(X), _float_type(y), Float64)
-_dist_type(X::AbstractMatrix) = promote_type(_float_type(X), Float64)
+    nonmissingtype(promote_type(_float_type(X), _float_type(y), Float64))
+_dist_type(X::AbstractMatrix) = nonmissingtype(promote_type(_float_type(X), Float64))
+
+# A `missing` member or observation propagates to the score, as R's `NA` does.
+@inline _to_dist(::Type{T}, x::Missing) where {T} = missing
+@inline _to_dist(::Type{T}, x) where {T} = T(x)
 
 # The Euclidean distance from its square. Two coincident points put the square
 # at exactly zero, where the derivative of `sqrt` is `0 * Inf`, so automatic
@@ -108,6 +112,7 @@ _dist_type(X::AbstractMatrix) = promote_type(_float_type(X), Float64)
 # distance has a kink there and zero is its subgradient. Only an exact zero is
 # special: a NaN square, from a missing member or observation, stays NaN.
 @inline _sqrt_dist(s::Real) = iszero(s) ? zero(s) : sqrt(s)
+@inline _sqrt_dist(::Missing) = missing
 
 # ---------------------------------------------------------------------------
 # Energy score

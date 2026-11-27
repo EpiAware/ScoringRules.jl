@@ -183,3 +183,19 @@ end
     @test all(isfinite, gm)
     @test gm ≈ [1.0, 2.0, 1.0, 2.0] .* exp(-2.5) ./ 2
 end
+
+@testitem "energy and MMD scores propagate a missing value" tags = [:sample] begin
+    using ScoringRules
+
+    # R's es_sample and mmds_sample return NA for an NA member or observation.
+    Xm = Union{Missing, Float64}[1.0 missing; 2.0 3.0]
+    X = [1.0 0.5; 2.0 3.0]
+    ym = Union{Missing, Float64}[0.0, missing]
+    for f in (es, mmds)
+        @test ismissing(f(Xm, [0.0, 0.0]))
+        @test ismissing(f(X, ym))
+    end
+    @test ismissing(twes(Xm, [0.0, 0.0]; a = -Inf, b = Inf))
+    # A Union element type with no missing value scores as the plain matrix.
+    @test es(Union{Missing, Float64}[1.0 0.5; 2.0 3.0], [0.0, 0.0]) ≈ es(X, [0.0, 0.0])
+end
