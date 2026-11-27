@@ -142,3 +142,17 @@ end
     @test_throws ArgumentError clogs(dat, 0.0; a = 1.0, b = 1.0)
     @test_throws ArgumentError clogs(dat, 0.0; a = 2.0, b = 1.0)
 end
+
+@testitem "crps warns when bw is passed to the EDF method" tags = [:sample] begin
+    using ScoringRules
+
+    # R's crps_sample says "Parameter 'bw' is ignored for edf method." and
+    # scores as if it had not been given: crps_sample(0.3, c(0.1, 0.5, 0.9),
+    # method = "edf", bw = 0.2) is 0.1555556.
+    dat = [0.1, 0.5, 0.9]
+    s = @test_logs (:warn, r"`bw` argument is ignored for method = :edf") crps(dat, 0.3; bw = 0.2)
+    @test s == crps(dat, 0.3)
+    @test s ≈ 0.15555555555555556 rtol = 1.0e-12
+    @test_logs crps(dat, 0.3)
+    @test_logs crps(dat, 0.3; method = :kde, bw = 0.2)
+end

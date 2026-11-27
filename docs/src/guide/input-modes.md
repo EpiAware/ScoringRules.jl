@@ -44,9 +44,7 @@ crps(d_cens, 0.7)
 
 ## Ensemble / sample forecasts
 
-When a parametric form is not available, pass a vector of draws. The CRPS is
-computed via the empirical distribution function (EDF) approximation by
-default; a kernel density estimate is available via `method = :kde`.
+When a parametric form is not available, pass a vector of draws. The CRPS is computed via the empirical distribution function (EDF) approximation by default; a kernel density estimate is available via `method = :kde`. Its bandwidth `bw` defaults to Silverman's rule of thumb; passing `bw` to the EDF method warns that it is ignored, as R does.
 
 ```@example modes
 draws = randn(1000)

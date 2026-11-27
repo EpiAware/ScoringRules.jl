@@ -58,13 +58,24 @@ and `0` for `y < 0` (empty support — matching R's `crps_pois`). Routed through
 returns `Q` directly rather than `1 - P`, keeping the far upper tail accurate.
 """
 function _crps_pois(y::Real, lambda::Real)
+    # As in R: NaN propagates, and an infinite observation is infinitely far
+    # from a forecast with a finite mean. Both are built from `y` and `λ` so
+    # that a dual number keeps NaN partials, or the slope of `|y - λ|`.
+    isnan(y) && return (y + lambda) * oftype(float(y), NaN)
+    isinf(y) && return abs(y - lambda)
+    T = typeof(float(y) * float(lambda))
     k = floor(y + 1)
     poiscdf = k <= 0 ? oftype(float(lambda), 0) : ccdf_ad_safe(Gamma(k, 1.0), lambda)
     c1 = (y - lambda) * (2 * poiscdf - 1)
     x = 2 * lambda
     n = floor(y)
-    pmf = x < _BESSEL_ASYMPTOTIC_MIN || n < 1000 ? pdf(Poisson(lambda), n < 1000 ? Int(n) : n) :
+    pmf = if n < 0 || (x < _BESSEL_ASYMPTOTIC_MIN && n >= 9.0e18)
+        zero(T)
+    elseif x < _BESSEL_ASYMPTOTIC_MIN || n < 1000
+        pdf(Poisson(lambda), Int(n))
+    else
         _poispdf_large(n, lambda)
+    end
     bessel(nu) = x < _BESSEL_ASYMPTOTIC_MIN ? besselix(nu, x) : _besselix_asymptotic(nu, x)
     c2 = 2 * pmf - (bessel(0) + bessel(1))
     return c1 + lambda * c2

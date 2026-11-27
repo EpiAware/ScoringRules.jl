@@ -92,3 +92,28 @@ end
         @test g ≈ fd rtol = 1.0e-3
     end
 end
+
+@testitem "the Poisson CRPS takes a NaN, infinite or huge observation as R does" tags = [:crps] begin
+    using ScoringRules
+    using Distributions
+    using ForwardDiff
+
+    # R: crps_pois(y, lambda). Past the range of `Int` the score is
+    # `|y - λ|` less half the forecast's mean absolute difference, which R
+    # returns to full precision.
+    for λ in (0.5, 3.0, 50.0)
+        @test isnan(crps(Poisson(λ), NaN))
+        @test crps(Poisson(λ), Inf) == Inf
+        @test crps(Poisson(λ), -Inf) == Inf
+        for y in (1.0e30, -1.0e30, 1.0e19, -1.0e19, 9.1e18, 1.0e18)
+            @test crps(Poisson(λ), y) == abs(y)
+        end
+    end
+    # The early returns keep the dual numbers attached to `y` and `λ`.
+    @test isnan(ForwardDiff.derivative(λ -> crps(Poisson(λ), NaN), 3.0))
+    @test isnan(ForwardDiff.derivative(y -> crps(Poisson(3.0), y), NaN))
+    @test ForwardDiff.derivative(λ -> crps(Poisson(λ), Inf), 3.0) == -1
+    @test ForwardDiff.derivative(y -> crps(Poisson(3.0), y), -Inf) == -1
+    @test crps(Poisson(3.0), 2.5) ≈ 0.46493408896051547 rtol = 1.0e-14
+    @test crps(Poisson(50.0), -1.0) ≈ 47.015573383788656 rtol = 1.0e-14
+end
